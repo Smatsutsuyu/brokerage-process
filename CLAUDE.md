@@ -6,7 +6,9 @@ This file is the authoritative project context for Claude Code working on the La
 
 ## Quick Start for Claude Code
 
-**If this is your first session on this project, read this entire file before doing anything.** Then read `marketing-process-checklist.html` (Chris's prototype, the authoritative UI reference) and `Marketing_Process_Checklist.xlsx` (Chris's wireframe spreadsheet, the source for hierarchical checklist structure).
+**If this is your first session on this project, read this entire file before doing anything.** Then read `references/marketing-process-checklist.html` (Chris's prototype, the authoritative UI reference) and `references/Marketing Process Checklist.xlsx` (Chris's wireframe spreadsheet, the source for hierarchical checklist structure).
+
+**To run the platform locally**, see [docs/local-development.md](docs/local-development.md). TL;DR: `npm install`, `npm run db:up`, `npm run db:migrate`, `npm run dev`. Local Postgres runs in Docker; Clerk/Resend keys can stay as placeholders until those accounts are live.
 
 **Current phase:** Phase 1 (Foundation), week 1. Goal: scaffold and ship to a Vercel preview URL before doing anything else.
 
@@ -515,41 +517,68 @@ For the first three weeks, work in this order:
 - Set up Prettier with Tailwind plugin → **Done** (`.prettierrc.json`, `format` and `format:check` scripts)
 - Connect repo to Vercel (Lakebridge org), confirm preview deploy works on a push → **Pending** (Lakebridge Vercel account in progress)
 
-**Day 2: Tooling layer (no configuration yet).**
+**Day 2: Tooling layer (no configuration yet).** _(Completed 2026-04-30.)_
 
-- Install Drizzle ORM and drizzle-kit
-- Install Clerk's Next.js SDK (`@clerk/nextjs`)
-- Install Sentry for Next.js with the wizard
-- Install `@t3-oss/env-nextjs` for environment variable schema
-- Install Resend SDK
-- Set up basic folder structure: `app/`, `components/`, `lib/`, `db/schema/`, `db/migrations/`
-- Verify everything builds and lints clean
+- Install Drizzle ORM and drizzle-kit → **Done** (`drizzle-orm` runtime, `drizzle-kit` dev). Postgres driver: **`@neondatabase/serverless`** (Drizzle has first-class Neon support; works in both Node and Edge runtimes).
+- Install Clerk's Next.js SDK (`@clerk/nextjs`) → **Done** (package only; Clerk init/middleware deferred until Lakebridge Clerk account is provisioned).
+- Install Sentry for Next.js with the wizard → **Package installed** (`@sentry/nextjs`); **wizard deferred** until Lakebridge Sentry account is provisioned. Wizard requires an active org/project.
+- Install `@t3-oss/env-nextjs` for environment variable schema → **Done** (also installed `zod` as the required peer).
+- Install Resend SDK → **Done** (`resend`).
+- Set up basic folder structure: `app/`, `components/`, `lib/`, `db/schema/`, `db/migrations/` → **Done**. `src/app/`, `src/components/ui/`, `src/lib/` already existed from scaffold; added `src/db/schema/` and `src/db/migrations/` (with `.gitkeep` placeholders until populated).
+- Verify everything builds and lints clean → **Done**.
 
-**Day 3: Connect Neon.**
+**Day 3: Connect Neon.** _(Prep done 2026-04-30; Neon connection pending Lakebridge Neon account.)_
 
-- Create Neon project from your collaborator access (US East region, near Vercel)
-- Pull connection string into `.env.local` and Vercel environment
-- Configure Drizzle to point at Neon
-- Run a hello-world migration to prove the connection
-- Set up the Drizzle migration workflow (drizzle-kit generate + drizzle-kit migrate scripts)
+- Create Neon project from your collaborator access (US East region, near Vercel) → **Pending** (waiting on Lakebridge Neon account)
+- Pull connection string into `.env.local` and Vercel environment → **Pending**. `.env.local` exists with placeholder `DATABASE_URL`; swap to real value once Neon project is up.
+- Configure Drizzle to point at Neon → **Done** (drizzle.config.ts at repo root, points at `process.env.DATABASE_URL` via dotenv-loaded `.env.local`)
+- Run a hello-world migration to prove the connection → **Pending** (will be the first real migration after schema lands in Day 4-5)
+- Set up the Drizzle migration workflow → **Done** (`db:generate`, `db:migrate`, `db:push`, `db:studio` npm scripts)
 
-**Day 4-5: Core schema.**
+Also done as part of Day 3 prep:
+- `src/lib/env.ts` — `@t3-oss/env-nextjs` schema with DATABASE_URL, CLERK_SECRET_KEY, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, RESEND_API_KEY (more vars added when those features are wired)
+- `.env.example` — committed, documents all required env vars with placeholder values
+- `.env.local` — gitignored, holds Sean's local placeholder values for development build to pass
+- `src/db/index.ts` — Drizzle client wired to Neon HTTP driver
+- Build and lint pass clean against placeholder env values
 
-- Organizations table (Clerk org sync)
-- Users table (Clerk user sync, role enum: owner, broker, analyst, viewer)
-- Deals table (org_id, name, units, city, type, status, priority, timestamps)
-- Builders table (org_id, company name, classification: private/public)
-- Contacts table (builder_id, name, title, email, phone, lead user_id)
-- Deal_buyers join table (deal_id, builder_id, tier enum: green/yellow/red/not_selected, called_at, om_sent_at, comments)
-- Checklist_categories table (deal_id, phase, order, name) — for hierarchical structure
-- Checklist_items table (category_id, order, name, completed, completed_by, completed_at, depends_on relation)
-- QA_items table (deal_id, question, answer, approved, approved_by, approved_at)
-- Issues table (deal_id, title, description, status enum, priority enum, assigned_user_id, identified_at)
-- Consultants table (deal_id, role, side: buyer/seller, firm_name, contact_name, email, phone, notes)
-- Documents table (deal_id, name, type, r2_key, version, status: draft/final, uploaded_by, uploaded_at)
-- Audit_log table (org_id, user_id, action, entity_type, entity_id, before/after json, timestamp)
+**Day 4-5: Core schema.** _(Schema written and migration generated 2026-04-30; migration applied to real DB pending Neon access.)_
 
-Run migrations. Seed a single Lakebridge org and Chris's user for development.
+All tables in `src/db/schema/` (one file per logical entity, plus `enums.ts` for shared enums). 14 tables total — slightly more than the original list because:
+- `contacts` lives in `builders.ts` (related entity, kept colocated)
+- `checklist_item_dependencies` is its own table (many-to-many: an item can depend on multiple prerequisites)
+
+Tables shipped:
+
+- `organizations` (Clerk org sync — `clerk_org_id`, name, slug)
+- `users` (Clerk user sync — `clerk_user_id`, email, name, role enum: owner/broker/analyst/viewer)
+- `deals` (org_id, name, units, city, state, type, status enum: phase_1..phase_4/closed/cancelled, priority enum, notes)
+- `builders` (org_id, name, classification enum: private/public, notes)
+- `contacts` (builder_id, first_name, last_name, title, email, phone, notes)
+- `deal_buyers` (deal_id + builder_id unique join, tier enum: green/yellow/red/**not_selected**, lead_user_id, called_at, om_sent_at, comments)
+- `checklist_categories` (deal_id, phase enum, name, sort_order) — hierarchical container
+- `checklist_items` (category_id, name, description, optional, sort_order, completed, completed_at, completed_by, **external_link_url** + label for Dropbox links per CLAUDE.md note 10)
+- `checklist_item_dependencies` (item_id, depends_on_item_id, composite PK) — many-to-many for prerequisite enforcement
+- `qa_items` (deal_id, question, answer, approved, approved_at, approved_by)
+- `issues` (deal_id, title, description, status enum: open/in_progress/resolved, priority enum: low/medium/high/urgent, assigned_user_id, identified_at, resolved_at)
+- `consultants` (deal_id, role enum 11 values, side enum: buyer/seller, firm_name, contact info, notes — flat per CLAUDE.md note 16 "informative metadata, not a primary feature")
+- `documents` (deal_id, name, type, version int, status enum: draft/final, r2_key, external_url, mime_type, size_bytes, uploaded_by, uploaded_at — `r2_key` and `external_url` both nullable to support platform-stored vs. linked)
+- `audit_log` (org_id, user_id, action, entity_type, entity_id, before/after/metadata jsonb, created_at)
+
+Conventions used across all tables:
+- UUID primary keys with `gen_random_uuid()` defaults (Postgres 13+ built-in)
+- `org_id` foreign key on every multi-tenant table with `onDelete: cascade`
+- User foreign keys (completed_by, approved_by, assigned_user_id, etc.) use `onDelete: set null` so user deletion doesn't cascade-destroy historical records
+- `deal_buyers.builder_id` uses `onDelete: restrict` — can't delete a builder that's actively in a deal
+- All timestamps `with timezone`, `defaultNow()` on creation, `$onUpdate(() => new Date())` on `updated_at`
+- snake_case column naming via Drizzle's `casing: "snake_case"` config — TypeScript code reads camelCase, DB reads snake_case
+- Type exports per file: `export type X = typeof xTable.$inferSelect; export type NewX = typeof xTable.$inferInsert;`
+
+Migration `src/db/migrations/0000_modern_dorian_gray.sql` generated locally. Will be applied to Neon as the first migration once Lakebridge Neon project is live.
+
+**Indexes deliberately omitted at this stage.** At 20-50 deals scale, Postgres scans are fine without them. When real query patterns surface (or if perf ever lags), add indexes in a follow-up migration — start with `org_id` on hot tables.
+
+Run migrations. Seed a single Lakebridge org and Chris's user for development. _(Pending Neon access.)_
 
 **Day 6-7: Configure Clerk and build app shell.**
 
