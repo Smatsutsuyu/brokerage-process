@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marketing Process Checklist — Lakebridge Capital</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
+
+  .priority-ribbon{background:linear-gradient(135deg,#1e293b,#0f172a);padding:10px 20px;display:flex;align-items:center;gap:12px;overflow-x:auto;white-space:nowrap;border-bottom:2px solid #f59e0b}
+  .priority-ribbon-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#f59e0b;flex-shrink:0;display:flex;align-items:center;gap:6px}
+  .priority-ribbon-label::before{content:'★';font-size:14px}
+  .priority-chip{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.1);color:#fbbf24;transition:all .15s;flex-shrink:0}
+  .priority-chip:hover{background:rgba(245,158,11,0.2)}
+  .priority-chip.active{background:#f59e0b;color:#1e293b;border-color:#f59e0b}
+  .chip-progress{display:inline-block;margin-left:6px;font-weight:400;opacity:.8;font-size:11px}
+  .no-priority-msg{font-size:12px;color:rgba(255,255,255,0.4);font-style:italic}
+
+  .app-layout{display:flex;min-height:calc(100vh - 50px)}
+  .sidebar{width:260px;background:#fff;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;flex-shrink:0}
+  .sidebar-header{padding:20px;border-bottom:1px solid #e5e7eb}
+  .sidebar-header h2{font-size:14px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+  .add-deal-btn{width:100%;padding:9px 14px;border-radius:8px;border:1px dashed #d1d5db;background:#f9fafb;color:#6b7280;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px;justify-content:center}
+  .add-deal-btn:hover{border-color:#3b82f6;color:#3b82f6;background:#eff6ff}
+  .deal-list{flex:1;overflow-y:auto;padding:8px}
+  .deal-card{padding:12px 14px;border-radius:8px;cursor:pointer;margin-bottom:4px;transition:all .15s;border:1px solid transparent;position:relative}
+  .deal-card:hover{background:#f3f4f6}
+  .deal-card.active{background:#eff6ff;border-color:#3b82f6}
+  .deal-card-name{font-size:13px;font-weight:600;color:#1f2937;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+  .deal-card-meta{font-size:11px;color:#9ca3af;display:flex;align-items:center;gap:8px}
+  .deal-card-progress{width:60px;height:4px;background:#e5e7eb;border-radius:99px;overflow:hidden}
+  .deal-card-progress-fill{height:100%;background:#3b82f6;border-radius:99px;transition:width .3s}
+  .priority-star{color:#f59e0b;font-size:12px;cursor:pointer;flex-shrink:0}
+  .priority-star.inactive{color:#d1d5db}.priority-star.inactive:hover{color:#fbbf24}
+  .deal-delete{position:absolute;top:8px;right:8px;font-size:14px;color:#d1d5db;cursor:pointer;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:4px;opacity:0;transition:all .15s}
+  .deal-card:hover .deal-delete{opacity:1}
+  .deal-delete:hover{color:#ef4444;background:#fee2e2}
+
+  .main-content{flex:1;padding:32px 40px;overflow-y:auto;max-height:calc(100vh - 50px)}
+  .main-header{margin-bottom:20px}
+  .main-header h1{font-size:26px;font-weight:700;color:#1a1a2e;margin-bottom:4px}
+  .main-header .subtitle{font-size:13px;color:#9ca3af}
+
+  .tab-bar{display:flex;gap:0;margin-bottom:24px;border-bottom:2px solid #e5e7eb;flex-wrap:wrap}
+  .tab-btn{padding:10px 20px;font-size:13px;font-weight:600;color:#6b7280;cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;display:flex;align-items:center;gap:6px;white-space:nowrap}
+  .tab-btn:hover{color:#374151}
+  .tab-btn.active{color:#3b82f6;border-bottom-color:#3b82f6}
+  .tab-btn .tab-count{font-size:11px;background:#e5e7eb;color:#6b7280;padding:1px 7px;border-radius:99px;font-weight:500}
+  .tab-btn.active .tab-count{background:#dbeafe;color:#3b82f6}
+
+  .progress-bar-container{background:#fff;border-radius:12px;padding:16px 24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;align-items:center;gap:16px}
+  .progress-bar-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+  .progress-bar-track{flex:1;height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden}
+  .progress-bar-fill{height:100%;background:linear-gradient(90deg,#3b82f6,#6366f1);border-radius:99px;transition:width .4s;width:0%}
+  .progress-bar-pct{font-size:14px;font-weight:700;color:#1a1a2e;min-width:40px;text-align:right}
+
+  .section{margin-bottom:24px}
+  .section-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:14px 20px;border-radius:10px 10px 0 0;user-select:none;transition:filter .2s}
+  .section-header:hover{filter:brightness(.97)}
+  .section-header.phase-1{background:#1e3a5f}
+  .section-header.phase-2{background:#1a4731}
+  .section-header.phase-3{background:#5b2c6f}
+  .section-header.phase-4{background:#7c2d12}
+  .section-header h2{font-size:14px;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px}
+  .phase-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;background:rgba(255,255,255,.18);padding:2px 8px;border-radius:99px;color:rgba(255,255,255,.9)}
+  .section-right{display:flex;align-items:center;gap:12px}
+  .section-count{font-size:12px;color:rgba(255,255,255,.7);font-weight:500}
+  .chevron{color:rgba(255,255,255,.6);transition:transform .25s;font-size:16px}
+  .section-header.collapsed .chevron{transform:rotate(-90deg)}
+  .section-body{background:#fff;border-radius:0 0 10px 10px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden;transition:max-height .35s}
+  .section-body.collapsed{max-height:0!important;border:none}
+
+  .checklist-item{display:flex;align-items:center;padding:12px 20px;border-bottom:1px solid #f3f4f6;transition:background .15s;gap:12px}
+  .checklist-item:last-child{border-bottom:none}
+  .checklist-item:hover{background:#f9fafb}
+  .checklist-item.checked{background:#f0fdf4}
+  .checklist-item.checked .item-text{color:#9ca3af;text-decoration:line-through}
+  .step-number{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;color:#fff}
+  .step-number.p1{background:#2563eb}.step-number.p2{background:#16a34a}.step-number.p3{background:#7c3aed}.step-number.p4{background:#ea580c}
+  .checklist-item.checked .step-number{opacity:.4}
+  .custom-checkbox{width:18px;height:18px;border:2px solid #d1d5db;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+  .custom-checkbox:hover{border-color:#9ca3af}
+  .custom-checkbox.checked{background:#22c55e;border-color:#22c55e}
+  .custom-checkbox.checked::after{content:'✓';color:#fff;font-size:12px;font-weight:700}
+  .item-text{font-size:13px;font-weight:450;color:#374151;flex:1;line-height:1.4}
+  .optional-tag{font-size:10px;font-weight:500;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:99px;white-space:nowrap}
+  .responsibility-slot{font-size:10px;font-weight:500;background:#eff6ff;color:#3b82f6;padding:2px 8px;border-radius:99px;white-space:nowrap;border:1px dashed #93c5fd}
+  .tab-link{font-size:10px;font-weight:500;background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:99px;white-space:nowrap;cursor:pointer;border:1px solid #e5e7eb;transition:all .15s}
+  .tab-link:hover{background:#dbeafe;color:#3b82f6;border-color:#93c5fd}
+
+  .action-btn{padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:4px;flex-shrink:0}
+  .action-btn.claude-action{background:linear-gradient(135deg,#d97706,#b45309);color:#fff}
+  .action-btn.claude-action:hover{background:linear-gradient(135deg,#b45309,#92400e);transform:translateY(-1px);box-shadow:0 2px 6px rgba(180,83,9,.3)}
+  .action-btn.email-action{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff}
+  .action-btn.email-action:hover{background:linear-gradient(135deg,#1d4ed8,#1e40af);transform:translateY(-1px);box-shadow:0 2px 6px rgba(37,99,235,.3)}
+  .action-btn.generate-action{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff}
+  .action-btn.generate-action:hover{background:linear-gradient(135deg,#6d28d9,#5b21b6);transform:translateY(-1px);box-shadow:0 2px 6px rgba(124,58,237,.3)}
+  .btn-icon{font-size:12px}
+
+  /* Contacts */
+  .contacts-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+  .filter-btn{padding:6px 14px;border-radius:99px;font-size:12px;font-weight:600;border:1px solid #e5e7eb;background:#fff;color:#6b7280;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px}
+  .filter-btn:hover{border-color:#9ca3af}
+  .filter-btn.active{border-color:currentColor}
+  .filter-btn.f-all.active{background:#1e293b;color:#fff;border-color:#1e293b}
+  .filter-btn.f-green.active{background:#dcfce7;color:#15803d;border-color:#86efac}
+  .filter-btn.f-yellow.active{background:#fef9c3;color:#a16207;border-color:#fde047}
+  .filter-btn.f-red.active{background:#fee2e2;color:#dc2626;border-color:#fca5a5}
+  .filter-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .dot-green{background:#22c55e}.dot-yellow{background:#eab308}.dot-red{background:#ef4444}
+  .contacts-actions{margin-left:auto;display:flex;gap:8px}
+  .add-contact-btn,.add-issue-btn,.add-consultant-btn{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:600;border:none;background:#3b82f6;color:#fff;cursor:pointer;transition:all .15s}
+  .add-contact-btn:hover,.add-issue-btn:hover,.add-consultant-btn:hover{background:#2563eb}
+  .email-tier-btn{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .15s}
+  .email-tier-btn.green{background:#dcfce7;color:#15803d}.email-tier-btn.green:hover{background:#bbf7d0}
+  .email-tier-btn.yellow{background:#fef9c3;color:#a16207}.email-tier-btn.yellow:hover{background:#fef08a}
+
+  .contacts-table-wrap{background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow-x:auto}
+  .contacts-table{width:100%;border-collapse:collapse;font-size:13px}
+  .contacts-table th{background:#f9fafb;padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid #e5e7eb;white-space:nowrap}
+  .contacts-table td{padding:10px 14px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+  .contacts-table tr:hover{background:#f9fafb}
+  .contacts-table tr.row-green{border-left:3px solid #22c55e}
+  .contacts-table tr.row-yellow{border-left:3px solid #eab308}
+  .contacts-table tr.row-red{border-left:3px solid #ef4444}
+  .interest-badge{padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none}
+  .interest-green{background:#dcfce7;color:#15803d}
+  .interest-yellow{background:#fef9c3;color:#a16207}
+  .interest-red{background:#fee2e2;color:#dc2626}
+  .row-actions{display:flex;gap:4px}
+  .row-action-btn{width:26px;height:26px;border-radius:4px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;background:transparent;color:#d1d5db;transition:all .15s}
+  .row-action-btn:hover{background:#fee2e2;color:#ef4444}
+  .row-action-btn.edit:hover{background:#dbeafe;color:#3b82f6}
+  .check-col{text-align:center}
+  .contact-checkbox{width:16px;height:16px;cursor:pointer;accent-color:#3b82f6}
+  .contacts-empty{text-align:center;padding:48px 20px;color:#9ca3af;font-size:14px}
+
+  /* Q&A */
+  .qa-container{max-width:800px}
+  .qa-entry{background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:20px 24px;margin-bottom:16px;position:relative;border-left:3px solid #3b82f6}
+  .qa-entry.approved{border-left-color:#22c55e;background:#f0fdf4}
+  .qa-entry-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .qa-number{font-size:12px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px}
+  .qa-entry.approved .qa-number{color:#16a34a}
+  .qa-entry-actions{display:flex;gap:6px}
+  .qa-small-btn{padding:4px 10px;border-radius:5px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all .15s}
+  .qa-small-btn.delete{background:#fee2e2;color:#dc2626}.qa-small-btn.delete:hover{background:#fecaca}
+  .qa-small-btn.approve{background:#dcfce7;color:#16a34a}.qa-small-btn.approve:hover{background:#bbf7d0}
+  .qa-small-btn.unapprove{background:#fef3c7;color:#92400e}.qa-small-btn.unapprove:hover{background:#fde68a}
+  .qa-label{font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px}
+  .qa-input{width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;transition:border-color .15s;line-height:1.5}
+  .qa-input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+  .qa-input.q{min-height:48px;font-weight:600}
+  .qa-input.a{min-height:80px;margin-top:10px}
+  .qa-approved-text{font-size:14px;line-height:1.6;color:#374151}
+  .qa-approved-text strong{display:block;margin-bottom:4px}
+  .qa-approved-badge{font-size:10px;font-weight:600;background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:99px;margin-left:8px}
+  .qa-add-row{text-align:center;margin:20px 0}
+  .qa-add-btn{padding:10px 24px;border-radius:8px;font-size:13px;font-weight:600;border:1px dashed #d1d5db;background:#fff;color:#6b7280;cursor:pointer;transition:all .15s}
+  .qa-add-btn:hover{border-color:#3b82f6;color:#3b82f6;background:#eff6ff}
+  .qa-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;background:#fff;padding:16px 20px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .qa-toolbar-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0}
+  .qa-toolbar-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  .qa-big-btn{padding:9px 18px;border-radius:8px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px}
+  .qa-big-btn:disabled{opacity:.4;cursor:not-allowed}
+  .qa-big-btn.approve-all{background:#dcfce7;color:#16a34a}.qa-big-btn.approve-all:hover:not(:disabled){background:#bbf7d0}
+  .qa-big-btn.generate-pdf{background:linear-gradient(135deg,#d97706,#b45309);color:#fff}.qa-big-btn.generate-pdf:hover:not(:disabled){background:linear-gradient(135deg,#b45309,#92400e)}
+  .qa-big-btn.send-email{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff}.qa-big-btn.send-email:hover:not(:disabled){background:linear-gradient(135deg,#1d4ed8,#1e40af)}
+
+  /* Issues Tracker */
+  .issue-card{background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:16px 20px;margin-bottom:12px;border-left:3px solid #e5e7eb;position:relative}
+  .issue-card.status-open{border-left-color:#ef4444}
+  .issue-card.status-in-progress{border-left-color:#f59e0b}
+  .issue-card.status-resolved{border-left-color:#22c55e;background:#f0fdf4}
+  .issue-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .issue-id{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px}
+  .issue-status-badge{padding:3px 10px;border-radius:99px;font-size:10px;font-weight:600;cursor:pointer;user-select:none}
+  .issue-status-badge.open{background:#fee2e2;color:#dc2626}
+  .issue-status-badge.in-progress{background:#fef3c7;color:#92400e}
+  .issue-status-badge.resolved{background:#dcfce7;color:#16a34a}
+  .issue-title{font-size:14px;font-weight:600;color:#1f2937;margin-bottom:6px}
+  .issue-desc{font-size:13px;color:#6b7280;line-height:1.5;margin-bottom:8px}
+  .issue-meta{display:flex;gap:12px;font-size:11px;color:#9ca3af;flex-wrap:wrap}
+  .issue-meta span{display:flex;align-items:center;gap:3px}
+  .issue-actions{position:absolute;top:12px;right:12px;display:flex;gap:4px}
+
+  /* Consultant Roster */
+  .consultant-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+  .consultant-card{background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:16px 20px;border-left:3px solid #e5e7eb;position:relative;transition:all .15s}
+  .consultant-card.filled{border-left-color:#3b82f6}
+  .consultant-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.1)}
+  .consultant-role{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  .consultant-name{font-size:15px;font-weight:600;color:#1f2937;margin-bottom:4px}
+  .consultant-company{font-size:13px;color:#6b7280;margin-bottom:6px}
+  .consultant-contact{font-size:12px;color:#9ca3af;line-height:1.6}
+  .consultant-contact a{color:#3b82f6;text-decoration:none}
+  .consultant-empty{font-size:13px;color:#d1d5db;font-style:italic}
+  .consultant-edit-btn{position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:6px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;background:transparent;color:#d1d5db;transition:all .15s}
+  .consultant-edit-btn:hover{background:#dbeafe;color:#3b82f6}
+
+  .footer{text-align:center;margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb}
+  .footer button{padding:8px 20px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s;margin:0 4px}
+  .btn-reset{background:#fee2e2;color:#dc2626}.btn-reset:hover{background:#fecaca}
+  .btn-checkall{background:#dcfce7;color:#16a34a}.btn-checkall:hover{background:#bbf7d0}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity .2s}
+  .modal-overlay.show{opacity:1;pointer-events:auto}
+  .modal{background:#fff;border-radius:14px;padding:28px;width:420px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.2);transform:scale(.95);transition:transform .2s}
+  .modal-overlay.show .modal{transform:scale(1)}
+  .modal h3{font-size:17px;font-weight:700;margin-bottom:16px;color:#1a1a2e}
+  .modal label{display:block;font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px}
+  .modal input,.modal select,.modal textarea{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;margin-bottom:14px;transition:border-color .15s}
+  .modal input:focus,.modal select:focus,.modal textarea:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+  .modal-actions button{padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+  .modal-cancel{background:#f3f4f6;color:#374151}.modal-cancel:hover{background:#e5e7eb}
+  .modal-save{background:#3b82f6;color:#fff}.modal-save:hover{background:#2563eb}
+  .modal-run{background:linear-gradient(135deg,#d97706,#b45309);color:#fff}.modal-run:hover{background:linear-gradient(135deg,#b45309,#92400e)}
+  .action-description{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;margin:12px 0;font-size:13px}
+  .action-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-right:4px}
+  .action-tag.claude{background:#fef3c7;color:#92400e}.action-tag.email{background:#dbeafe;color:#1e40af}
+  .empty-state{text-align:center;padding:80px 40px}
+  .empty-state-icon{font-size:48px;margin-bottom:16px;opacity:.3}
+  .empty-state h2{font-size:20px;font-weight:600;color:#374151;margin-bottom:8px}
+  .empty-state p{font-size:14px;color:#9ca3af;margin-bottom:24px}
+  .empty-state button{padding:10px 24px;border-radius:8px;font-size:14px;font-weight:600;border:none;background:#3b82f6;color:#fff;cursor:pointer}
+  .form-row{display:flex;gap:12px}.form-row>div{flex:1}
+  .tier-check-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px}
+  .tier-check-row input{width:16px;height:16px;accent-color:#3b82f6}
+  .recipient-preview{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:10px 0;font-size:12px;max-height:140px;overflow-y:auto;line-height:1.6}
+</style>
+</head>
+<body>
+
+<div class="priority-ribbon" id="priorityRibbon">
+  <div class="priority-ribbon-label">High Priority</div>
+  <span class="no-priority-msg" id="noPriorityMsg">Star a deal to pin it here</span>
+</div>
+
+<div class="app-layout">
+  <div class="sidebar">
+    <div class="sidebar-header"><h2>Deals</h2><button class="add-deal-btn" onclick="openNewDealModal()">+ New Deal</button></div>
+    <div class="deal-list" id="dealList"></div>
+  </div>
+  <div class="main-content" id="mainContent"></div>
+</div>
+
+<!-- DEAL MODAL -->
+<div class="modal-overlay" id="dealModal"><div class="modal">
+  <h3 id="dealModalTitle">New Deal</h3>
+  <label>Deal Name</label><input type="text" id="dealNameInput" placeholder="e.g. Riverside Estates Phase 2">
+  <label>Location / Community</label><input type="text" id="dealLocationInput" placeholder="e.g. Riverside, CA">
+  <label>Priority</label><select id="dealPriorityInput"><option value="normal">Normal</option><option value="high">High Priority</option></select>
+  <div class="modal-actions"><button class="modal-cancel" onclick="closeDealModal()">Cancel</button><button class="modal-save" onclick="saveDeal()">Save Deal</button></div>
+</div></div>
+
+<!-- ACTION MODAL -->
+<div class="modal-overlay" id="actionModal"><div class="modal" style="width:520px">
+  <h3 id="actionModalTitle">Run Action</h3>
+  <div id="actionModalBody" style="font-size:14px;color:#374151;line-height:1.6;margin-bottom:16px"></div>
+  <div class="modal-actions"><button class="modal-cancel" onclick="closeActionModal()">Cancel</button><button class="modal-run" id="actionModalRun" onclick="executeAction()">Ask Claude to Run</button></div>
+</div></div>
+
+<!-- CONTACT MODAL -->
+<div class="modal-overlay" id="contactModal"><div class="modal" style="width:520px">
+  <h3 id="contactModalTitle">Add Contact</h3>
+  <label>Builder / Company</label><input type="text" id="cBuilderInput" placeholder="e.g. Toll Brothers">
+  <div class="form-row"><div><label>Contact Name</label><input type="text" id="cNameInput" placeholder="e.g. John Smith"></div><div><label>Title</label><input type="text" id="cTitleInput" placeholder="e.g. VP of Land"></div></div>
+  <div class="form-row"><div><label>Email</label><input type="email" id="cEmailInput" placeholder="john@company.com"></div><div><label>Phone</label><input type="tel" id="cPhoneInput" placeholder="(555) 123-4567"></div></div>
+  <label>Private / Public</label><select id="cTypeInput"><option value="Private">Private</option><option value="Public">Public</option></select>
+  <label>Interest Level</label><select id="cInterestInput"><option value="green">Green — Interested</option><option value="yellow">Yellow — Evaluating</option><option value="red">Red — Immediate Pass</option></select>
+  <label>Lead</label><input type="text" id="cLeadInput" placeholder="e.g. Chris">
+  <label>Comments</label><textarea id="cCommentsInput" rows="2" placeholder="Notes..."></textarea>
+  <div class="modal-actions"><button class="modal-cancel" onclick="closeContactModal()">Cancel</button><button class="modal-save" onclick="saveContact()">Save Contact</button></div>
+</div></div>
+
+<!-- EMAIL TIER MODAL -->
+<div class="modal-overlay" id="emailModal"><div class="modal" style="width:560px">
+  <h3 id="emailModalTitle">Draft Emails</h3>
+  <div id="emailModalBody" style="font-size:14px;color:#374151;line-height:1.6;margin-bottom:16px"></div>
+  <div class="modal-actions"><button class="modal-cancel" onclick="closeEmailModal()">Cancel</button><button class="modal-run" onclick="executeEmailAction()">Ask Claude to Draft</button></div>
+</div></div>
+
+<!-- SEND Q&A EMAIL MODAL -->
+<div class="modal-overlay" id="sendQAModal"><div class="modal" style="width:520px">
+  <h3>Send Q&A File</h3>
+  <label>Sender Email</label><input type="email" id="qaFromEmail" placeholder="your.email@landadvisors.com">
+  <label>Subject Line</label><input type="text" id="qaSubject" readonly style="background:#f9fafb;color:#374151">
+  <label>Send To (Interest Level)</label>
+  <div style="margin-bottom:14px">
+    <div class="tier-check-row"><input type="checkbox" id="qaSendGreen" checked><span class="filter-dot dot-green"></span> Green (<span id="qaSendGreenCount">0</span>)</div>
+    <div class="tier-check-row"><input type="checkbox" id="qaSendYellow" checked><span class="filter-dot dot-yellow"></span> Yellow (<span id="qaSendYellowCount">0</span>)</div>
+    <div class="tier-check-row"><input type="checkbox" id="qaSendRed"><span class="filter-dot dot-red"></span> Red (<span id="qaSendRedCount">0</span>)</div>
+  </div>
+  <label>Recipients Preview</label><div class="recipient-preview" id="qaRecipientPreview"></div>
+  <div class="modal-actions"><button class="modal-cancel" onclick="closeSendQAModal()">Cancel</button><button class="modal-run" onclick="executeSendQA()" style="background:linear-gradient(135deg,#2563eb,#1d4ed8)">✉ Copy Email Draft Prompt</button></div>
+</div></div>
+
+<!-- ISSUE MODAL -->
+<div class="modal-overlay" id="issueModal"><div class="modal" style="width:520px">
+  <h3 id="issueModalTitle">Add Issue</h3>
+  <label>Issue Title</label><input type="text" id="issueTitleInput" placeholder="e.g. Grading plan revision needed">
+  <label>Description</label><textarea id="issueDescInput" rows="3" placeholder="Describe the issue..."></textarea>
+  <div class="form-row">
+    <div><label>Status</label><select id="issueStatusInput"><option value="open">Open</option><option value="in-progress">In Progress</option><option value="resolved">Resolved</option></select></div>
+    <div><label>Priority</label><select id="issuePriorityInput"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div>
+  </div>
+  <label>Assigned To</label><input type="text" id="issueAssignedInput" placeholder="e.g. Chris">
+  <label>Date Identified</label><input type="date" id="issueDateInput">
+  <div class="modal-actions"><button class="modal-cancel" onclick="closeIssueModal()">Cancel</button><button class="modal-save" onclick="saveIssue()">Save Issue</button></div>
+</div></div>
+
+<!-- CONSULTANT MODAL -->
+<div class="modal-overlay" id="consultantModal"><div class="modal" style="width:520px">
+  <h3 id="consultantModalTitle">Edit Consultant</h3>
+  <label>Role</label><input type="text" id="consultantRoleInput" readonly style="background:#f9fafb">
+  <label>Company / Firm</label><input type="text" id="consultantCompanyInput" placeholder="e.g. Hunsaker & Associates">
+  <label>Contact Name</label><input type="text" id="consultantNameInput" placeholder="e.g. Jane Doe">
+  <div class="form-row"><div><label>Email</label><input type="email" id="consultantEmailInput" placeholder="jane@firm.com"></div><div><label>Phone</label><input type="tel" id="consultantPhoneInput" placeholder="(555) 123-4567"></div></div>
+  <label>Notes</label><textarea id="consultantNotesInput" rows="2" placeholder="Additional notes..."></textarea>
+  <div class="modal-actions"><button class="modal-cancel" onclick="closeConsultantModal()">Cancel</button><button class="modal-save" onclick="saveConsultant()">Save</button></div>
+</div></div>
+
+<script>
+const CHECKLIST={
+  1:[{text:"Listing Agreement"},{text:"Initial List of Potential Buyers"},{text:"HOA Budget"},{text:"Cost to Complete"},
+    {text:"CFD Analysis",action:{type:"claude",label:"Generate",desc:"Have Claude run a CFD analysis based on deal parameters."}},
+    {text:"Market Study",optional:true,action:{type:"claude",label:"Generate",desc:"Have Claude compile a market study using comparable sales and submarket data."}},
+    {text:"Premium Analysis",action:{type:"claude",label:"Generate",desc:"Have Claude build a premium analysis comparing lot premiums across comparables."}},
+    {text:"Valuation",action:{type:"claude",label:"Generate",desc:"Have Claude produce a valuation model based on underwriting inputs."}},
+    {text:"Entitlement Schedule"},{text:"Development Schedule",optional:true},
+    {text:"Entitlement Summary",action:{type:"claude",label:"Summarize",desc:"Have Claude generate a clean entitlement summary."}},
+    {text:"Custom Underwriting File for Deal",action:{type:"claude",label:"Generate",desc:"Have Claude create a custom underwriting file pre-populated with deal data."}},
+    {text:"Offering Memorandum",action:{type:"claude",label:"Draft OM",desc:"Have Claude draft an Offering Memorandum from your deal data."}},
+    {text:"Marketing Report (green, yellow, red buyers)",action:{type:"claude",label:"Generate",desc:"Have Claude categorize your buyer list into green/yellow/red tiers."}},
+    {text:"Determine PSA Attorney (we or they draft preference)"}],
+  2:[{text:"Send out OM / Blast",action:{type:"email",label:"Draft Emails",desc:"Have Claude draft personalized OM blast emails by tier.",useContacts:true}},
+    {text:"Request In-Person Meeting with Top Buyers",action:{type:"email",label:"Draft Emails",desc:"Have Claude draft meeting request emails for green buyers.",useContacts:true,tier:"green"}},
+    {text:"Coordinate a Q&A File",action:{type:"claude",label:"Generate",desc:"Have Claude compile common buyer questions into a Q&A document."},tabLink:"qa"},
+    {text:"Send out Q&A File",action:{type:"email",label:"Draft Emails",desc:"Have Claude draft a distribution email with Q&A attached.",useContacts:true},tabLink:"qa"},
+    {text:"Share Market Study",optional:true,action:{type:"email",label:"Draft Emails",desc:"Have Claude draft an email sharing the market study.",useContacts:true,tier:"green"}},
+    {text:"Email Notification of Offers Due (X days before)",action:{type:"email",label:"Draft Emails",desc:"Have Claude draft offer deadline reminder emails.",useContacts:true}},
+    {text:"Day-of Reminder",action:{type:"email",label:"Draft Emails",desc:"Have Claude draft same-day reminder emails.",useContacts:true}},
+    {text:"Follow-up to Missing Offers (Green & Yellow)",action:{type:"email",label:"Draft Emails",desc:"Have Claude draft follow-up emails requesting a status update.",useContacts:true,tier:"green,yellow"}}],
+  3:[{text:"Schedule Meeting with Ownership"},
+    {text:"Create Initial Summary and Send Out as Received",action:{type:"claude",label:"Generate",desc:"Have Claude create an initial offer summary."}},
+    {text:"Review Underwriting Sheets for Clarification",action:{type:"claude",label:"Review",desc:"Have Claude review UW sheets and flag items needing clarification."}},
+    {text:"Run LOI through Claude — Create SOO Matrix",action:{type:"claude",label:"Create SOO",desc:"Have Claude parse LOIs and generate a side-by-side SOO comparison matrix."}},
+    {text:"Run UW Sheets — Revenue Charts & UW Summary",action:{type:"claude",label:"Analyze",desc:"Have Claude produce revenue charts and a consolidated UW summary."}},
+    {text:"PDF Everything Together",action:{type:"claude",label:"Compile",desc:"Have Claude merge all documents into a single PDF package."}},
+    {text:"Create Recommendation — Pro/Con of Each Offer",action:{type:"claude",label:"Recommend",desc:"Have Claude generate a recommendation memo with pros, cons, and ranking."}}],
+  4:[{text:"Share All Due Diligence",action:{type:"email",label:"Draft Emails",desc:"Have Claude draft a DD distribution email with document list for the winning buyer.",useContacts:true,tier:"green"}},
+    {text:"Kick Off PSA"},
+    {text:"Kickoff Call"},
+    {text:"Bi-Weekly Meeting Schedule for DD"},
+    {text:"Determine CTC Date"},
+    {text:"Issues Tracking Sheet",tabLink:"issues"},
+    {text:"Create Consultant Roster",tabLink:"consultants"}]
+};
+const PHASE_META={1:{name:"Initial Checklist",color:"p1",headerClass:"phase-1"},2:{name:"Marketing Process",color:"p2",headerClass:"phase-2"},3:{name:"Ownership Summary of Offers",color:"p3",headerClass:"phase-3"},4:{name:"Deal Management",color:"p4",headerClass:"phase-4"}};
+const CONSULTANT_ROLES=["Landscape Architect","Civil Engineer","Soils Engineer","Cost to Complete Consultant","HOA Consultant","Dry Utility Consultant","Phase 1 Consultant","Land Use Consultant","Biologist"];
+
+let deals=[],activeDealId=null,activeTab='checklist',editingDealId=null,editingContactIdx=null,editingIssueIdx=null,editingConsultantIdx=null,pendingAction=null,contactFilter='all',pendingEmailTier=null,issueFilter='all';
+function genId(){return 'deal_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)}
+
+function loadDeals(){
+  try{const s=localStorage.getItem('lbc_deals_v4');if(s)deals=JSON.parse(s)}catch(e){}
+  if(!deals.length){
+    const d={id:genId(),name:'The Laurel',location:'',priority:'high',checks:{},
+      contacts:[
+        {builder:'Intracorp',type:'Private',contact:'',title:'',email:'',phone:'',lead:'Chris',interest:'green',called:false,omSent:false,comments:''},
+        {builder:'Shea',type:'Private',contact:'',title:'',email:'',phone:'',lead:'Chris',interest:'green',called:false,omSent:false,comments:''},
+        {builder:'New Home Co.',type:'Private',contact:'',title:'',email:'',phone:'',lead:'Chris',interest:'yellow',called:false,omSent:false,comments:''},
+        {builder:'Pulte',type:'Public',contact:'',title:'',email:'',phone:'',lead:'Chris',interest:'green',called:false,omSent:false,comments:''},
+        {builder:'D.R. Horton',type:'Public',contact:'',title:'',email:'',phone:'',lead:'Chris',interest:'yellow',called:false,omSent:false,comments:''},
+        {builder:'Toll Brothers',type:'Public',contact:'',title:'',email:'',phone:'',lead:'Chris',interest:'green',called:false,omSent:false,comments:''},
+        {builder:'Century Communities',type:'Public',contact:'',title:'',email:'',phone:'',lead:'Chris',interest:'yellow',called:false,omSent:false,comments:''},
+        {builder:'KB Home',type:'Public',contact:'',title:'',email:'',phone:'',lead:'Chris',interest:'red',called:false,omSent:false,comments:''},
+        {builder:'Meritage',type:'Public',contact:'',title:'',email:'',phone:'',lead:'Chris',interest:'green',called:false,omSent:false,comments:''},
+        {builder:'Lennar',type:'Public',contact:'',title:'',email:'',phone:'',lead:'Chris',interest:'green',called:false,omSent:false,comments:''},
+        {builder:'Taylor Morrison',type:'Public',contact:'',title:'',email:'',phone:'',lead:'Chris',interest:'yellow',called:false,omSent:false,comments:''},
+        {builder:'Beazer',type:'Public',contact:'',title:'',email:'',phone:'',lead:'Chris',interest:'red',called:false,omSent:false,comments:''}],
+      qaItems:[],issues:[],consultants:CONSULTANT_ROLES.map(r=>({role:r,company:'',name:'',email:'',phone:'',notes:''}))};
+    deals.push(d)
+  }
+  deals.forEach(d=>{if(!d.contacts)d.contacts=[];if(!d.qaItems)d.qaItems=[];if(!d.issues)d.issues=[];if(!d.consultants)d.consultants=CONSULTANT_ROLES.map(r=>({role:r,company:'',name:'',email:'',phone:'',notes:''}))});
+  if(!activeDealId&&deals.length)activeDealId=deals[0].id
+}
+function saveDeals(){try{localStorage.setItem('lbc_deals_v4',JSON.stringify(deals))}catch(e){}}
+function getDeal(id){return deals.find(d=>d.id===id)}
+function activeDeal(){return getDeal(activeDealId)}
+
+// Deal modal
+function openNewDealModal(){editingDealId=null;document.getElementById('dealModalTitle').textContent='New Deal';document.getElementById('dealNameInput').value='';document.getElementById('dealLocationInput').value='';document.getElementById('dealPriorityInput').value='normal';document.getElementById('dealModal').classList.add('show');setTimeout(()=>document.getElementById('dealNameInput').focus(),100)}
+function openEditDealModal(id){const d=getDeal(id);if(!d)return;editingDealId=id;document.getElementById('dealModalTitle').textContent='Edit Deal';document.getElementById('dealNameInput').value=d.name;document.getElementById('dealLocationInput').value=d.location||'';document.getElementById('dealPriorityInput').value=d.priority||'normal';document.getElementById('dealModal').classList.add('show')}
+function closeDealModal(){document.getElementById('dealModal').classList.remove('show')}
+function saveDeal(){const name=document.getElementById('dealNameInput').value.trim();if(!name)return;const loc=document.getElementById('dealLocationInput').value.trim();const pri=document.getElementById('dealPriorityInput').value;if(editingDealId){const d=getDeal(editingDealId);d.name=name;d.location=loc;d.priority=pri}else{deals.push({id:genId(),name,location:loc,priority:pri,checks:{},contacts:[],qaItems:[],issues:[],consultants:CONSULTANT_ROLES.map(r=>({role:r,company:'',name:'',email:'',phone:'',notes:''}))});activeDealId=deals[deals.length-1].id}saveDeals();closeDealModal();renderAll()}
+function deleteDeal(id,e){e.stopPropagation();if(!confirm('Delete this deal?'))return;deals=deals.filter(d=>d.id!==id);if(activeDealId===id)activeDealId=deals.length?deals[0].id:null;saveDeals();renderAll()}
+function togglePriority(id,e){e.stopPropagation();getDeal(id).priority=getDeal(id).priority==='high'?'normal':'high';saveDeals();renderAll()}
+function selectDeal(id){activeDealId=id;renderAll()}
+
+// Contact modal
+function openAddContactModal(){editingContactIdx=null;document.getElementById('contactModalTitle').textContent='Add Contact';['cBuilderInput','cNameInput','cTitleInput','cEmailInput','cPhoneInput','cLeadInput','cCommentsInput'].forEach(id=>document.getElementById(id).value='');document.getElementById('cTypeInput').value='Private';document.getElementById('cInterestInput').value='green';document.getElementById('contactModal').classList.add('show')}
+function openEditContactModal(idx){const c=activeDeal().contacts[idx];if(!c)return;editingContactIdx=idx;document.getElementById('contactModalTitle').textContent='Edit Contact';document.getElementById('cBuilderInput').value=c.builder||'';document.getElementById('cNameInput').value=c.contact||'';document.getElementById('cTitleInput').value=c.title||'';document.getElementById('cEmailInput').value=c.email||'';document.getElementById('cPhoneInput').value=c.phone||'';document.getElementById('cTypeInput').value=c.type||'Private';document.getElementById('cInterestInput').value=c.interest||'green';document.getElementById('cLeadInput').value=c.lead||'';document.getElementById('cCommentsInput').value=c.comments||'';document.getElementById('contactModal').classList.add('show')}
+function closeContactModal(){document.getElementById('contactModal').classList.remove('show');editingContactIdx=null}
+function saveContact(){const d=activeDeal();if(!d)return;const c={builder:document.getElementById('cBuilderInput').value.trim(),contact:document.getElementById('cNameInput').value.trim(),title:document.getElementById('cTitleInput').value.trim(),email:document.getElementById('cEmailInput').value.trim(),phone:document.getElementById('cPhoneInput').value.trim(),type:document.getElementById('cTypeInput').value,interest:document.getElementById('cInterestInput').value,lead:document.getElementById('cLeadInput').value.trim(),comments:document.getElementById('cCommentsInput').value.trim(),called:false,omSent:false};if(!c.builder)return;if(editingContactIdx!==null){const old=d.contacts[editingContactIdx];c.called=old.called;c.omSent=old.omSent;d.contacts[editingContactIdx]=c}else d.contacts.push(c);saveDeals();closeContactModal();renderAll()}
+function deleteContact(idx){activeDeal().contacts.splice(idx,1);saveDeals();renderAll()}
+function cycleInterest(idx){const o=['green','yellow','red'],c=activeDeal().contacts[idx];c.interest=o[(o.indexOf(c.interest)+1)%3];saveDeals();renderAll()}
+function toggleCalled(idx){activeDeal().contacts[idx].called=!activeDeal().contacts[idx].called;saveDeals();renderAll()}
+function toggleOMSent(idx){activeDeal().contacts[idx].omSent=!activeDeal().contacts[idx].omSent;saveDeals();renderAll()}
+
+// Issue modal
+function openAddIssueModal(){editingIssueIdx=null;document.getElementById('issueModalTitle').textContent='Add Issue';['issueTitleInput','issueDescInput','issueAssignedInput'].forEach(id=>document.getElementById(id).value='');document.getElementById('issueStatusInput').value='open';document.getElementById('issuePriorityInput').value='high';document.getElementById('issueDateInput').value=new Date().toISOString().split('T')[0];document.getElementById('issueModal').classList.add('show');setTimeout(()=>document.getElementById('issueTitleInput').focus(),100)}
+function openEditIssueModal(idx){const iss=activeDeal().issues[idx];if(!iss)return;editingIssueIdx=idx;document.getElementById('issueModalTitle').textContent='Edit Issue';document.getElementById('issueTitleInput').value=iss.title||'';document.getElementById('issueDescInput').value=iss.description||'';document.getElementById('issueStatusInput').value=iss.status||'open';document.getElementById('issuePriorityInput').value=iss.priority||'medium';document.getElementById('issueAssignedInput').value=iss.assigned||'';document.getElementById('issueDateInput').value=iss.date||'';document.getElementById('issueModal').classList.add('show')}
+function closeIssueModal(){document.getElementById('issueModal').classList.remove('show');editingIssueIdx=null}
+function saveIssue(){const d=activeDeal();if(!d)return;const iss={title:document.getElementById('issueTitleInput').value.trim(),description:document.getElementById('issueDescInput').value.trim(),status:document.getElementById('issueStatusInput').value,priority:document.getElementById('issuePriorityInput').value,assigned:document.getElementById('issueAssignedInput').value.trim(),date:document.getElementById('issueDateInput').value};if(!iss.title)return;if(editingIssueIdx!==null)d.issues[editingIssueIdx]=iss;else d.issues.push(iss);saveDeals();closeIssueModal();renderAll()}
+function deleteIssue(idx){activeDeal().issues.splice(idx,1);saveDeals();renderAll()}
+function cycleIssueStatus(idx){const o=['open','in-progress','resolved'],iss=activeDeal().issues[idx];iss.status=o[(o.indexOf(iss.status)+1)%3];saveDeals();renderAll()}
+
+// Consultant modal
+function openConsultantModal(idx){editingConsultantIdx=idx;const c=activeDeal().consultants[idx];document.getElementById('consultantModalTitle').textContent=c.role;document.getElementById('consultantRoleInput').value=c.role;document.getElementById('consultantCompanyInput').value=c.company||'';document.getElementById('consultantNameInput').value=c.name||'';document.getElementById('consultantEmailInput').value=c.email||'';document.getElementById('consultantPhoneInput').value=c.phone||'';document.getElementById('consultantNotesInput').value=c.notes||'';document.getElementById('consultantModal').classList.add('show')}
+function closeConsultantModal(){document.getElementById('consultantModal').classList.remove('show');editingConsultantIdx=null}
+function saveConsultant(){const d=activeDeal();if(!d||editingConsultantIdx===null)return;const c=d.consultants[editingConsultantIdx];c.company=document.getElementById('consultantCompanyInput').value.trim();c.name=document.getElementById('consultantNameInput').value.trim();c.email=document.getElementById('consultantEmailInput').value.trim();c.phone=document.getElementById('consultantPhoneInput').value.trim();c.notes=document.getElementById('consultantNotesInput').value.trim();saveDeals();closeConsultantModal();renderAll()}
+
+// Action modal
+function openActionModal(section,idx){const item=CHECKLIST[section][idx];if(!item.action)return;pendingAction={section,idx,action:item.action};const deal=activeDeal();let ci='';if(item.action.useContacts){const tier=item.action.tier;let cs=deal.contacts;if(tier){const ts=tier.split(',');cs=cs.filter(c=>ts.includes(c.interest))}ci=`<div style="margin-top:10px;font-size:12px;color:#6b7280">Targets <strong>${cs.length}</strong> contact${cs.length!==1?'s':''}: ${cs.map(c=>'<strong>'+c.builder+'</strong>').join(', ')||'none'}</div>`}document.getElementById('actionModalTitle').textContent=item.text;document.getElementById('actionModalBody').innerHTML=`<span class="action-tag ${item.action.type==='claude'?'claude':'email'}">${item.action.type==='claude'?'◆ Claude':'✉ Email'}</span> for <strong>${deal.name}</strong><div class="action-description">${item.action.desc}</div>${ci}`;document.getElementById('actionModal').classList.add('show')}
+function closeActionModal(){document.getElementById('actionModal').classList.remove('show');pendingAction=null}
+function executeAction(){if(!pendingAction)return;const deal=activeDeal(),act=pendingAction.action;let cl='';if(act.useContacts){const tier=act.tier;let cs=deal.contacts;if(tier){const ts=tier.split(',');cs=cs.filter(c=>ts.includes(c.interest))}cl='\n\nContacts:\n'+cs.map(c=>`- ${c.builder} (${c.interest.toUpperCase()}) | ${c.contact||'No name'} | ${c.email||'No email'}`).join('\n')}copyFlash('actionModalRun',`Deal: ${deal.name}${deal.location?' — '+deal.location:''}\n\nAction: ${act.desc}${cl}\n\nPlease proceed.`,'Ask Claude to Run')}
+
+function openEmailTierModal(tier){const deal=activeDeal();if(!deal)return;pendingEmailTier=tier;const cs=deal.contacts.filter(c=>c.interest===tier);document.getElementById('emailModalTitle').textContent=`Draft Emails — ${tier} Contacts`;document.getElementById('emailModalBody').innerHTML=`<p>Draft emails for <strong>${cs.length}</strong> ${tier}-tier contacts on <strong>${deal.name}</strong>.</p><div class="action-description">${cs.map(c=>`• ${c.builder}${c.contact?' — '+c.contact:''}${c.email?' ('+c.email+')':''}`).join('<br>')||'<em>None.</em>'}</div>`;document.getElementById('emailModal').classList.add('show')}
+function closeEmailModal(){document.getElementById('emailModal').classList.remove('show');pendingEmailTier=null}
+function executeEmailAction(){const deal=activeDeal();if(!deal||!pendingEmailTier)return;const cs=deal.contacts.filter(c=>c.interest===pendingEmailTier);const p=`Deal: ${deal.name}\n\nDraft personalized emails for ${pendingEmailTier}-tier contacts:\n${cs.map(c=>`- ${c.builder} | ${c.contact||''} | ${c.email||''}`).join('\n')}`;copyFlash(document.querySelector('#emailModal .modal-run'),p,'Ask Claude to Draft',true)}
+
+function copyFlash(el,text,label,isEl){const btn=isEl?el:document.getElementById(el);navigator.clipboard.writeText(text).then(()=>{btn.textContent='✓ Copied!';btn.style.background='#16a34a';setTimeout(()=>{btn.textContent=label;btn.style.background='';closeActionModal();closeEmailModal()},1400)}).catch(()=>{})}
+
+// Q&A functions
+function addQA(){activeDeal().qaItems.push({q:'',a:'',approved:false});saveDeals();renderAll();setTimeout(()=>{const els=document.querySelectorAll('.qa-q-input');if(els.length)els[els.length-1].focus()},50)}
+function deleteQA(idx){activeDeal().qaItems.splice(idx,1);saveDeals();renderAll()}
+function approveQA(idx){activeDeal().qaItems[idx].approved=true;saveDeals();renderAll()}
+function unapproveQA(idx){activeDeal().qaItems[idx].approved=false;saveDeals();renderAll()}
+function approveAllQA(){activeDeal().qaItems.forEach(q=>{if(q.q.trim()&&q.a.trim())q.approved=true});saveDeals();renderAll()}
+function saveQAField(idx,field,value){activeDeal().qaItems[idx][field]=value;saveDeals()}
+function generateQAPDF(){const deal=activeDeal();const approved=deal.qaItems.filter(q=>q.approved);if(!approved.length)return alert('No approved Q&A items.');const w=window.open('','_blank','width=850,height=1100');w.document.write(`<!DOCTYPE html><html><head><title>FAQs – ${deal.name}</title><style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');@media print{@page{margin:.75in 1in;size:letter}body{print-color-adjust:exact}}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',Arial,sans-serif;color:#1a1a2e;padding:60px 70px;max-width:850px;margin:0 auto;font-size:13px;line-height:1.6}.header{display:flex;align-items:center;gap:16px;margin-bottom:32px;padding-bottom:14px;border-bottom:2px solid #1a1a2e}.logo-icon{width:36px;height:36px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;border-radius:4px}.logo-icon svg{width:22px;height:22px}.logo-text{font-size:18px;font-weight:700;letter-spacing:1.5px}.logo-sub{font-size:8.5px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:#6b7280}.title{font-size:16px;font-weight:700;margin-bottom:28px}.qa-item{margin-bottom:20px}.qa-item .q{font-weight:700;margin-bottom:5px}.qa-item .a{color:#374151}.footer{margin-top:50px;padding-top:10px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center}.print-btn{position:fixed;top:20px;right:20px;padding:10px 24px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}@media print{.print-btn{display:none}}</style></head><body><button class="print-btn" onclick="window.print()">Print / Save PDF</button><div class="header"><div class="logo-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="#fff"/><path d="M2 17l10 5 10-5" stroke="#fff" stroke-width="2"/><path d="M2 12l10 5 10-5" stroke="#fff" stroke-width="2"/></svg></div><div><div class="logo-text">Land Advisors</div><div class="logo-sub">Organization</div></div></div><div class="title">FAQs – ${deal.name}</div>${approved.map(q=>`<div class="qa-item"><div class="q">Q: ${q.q.replace(/</g,'&lt;')}</div><div class="a">A: &nbsp;${q.a.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div></div>`).join('')}<div class="footer">100 Spectrum Center Drive Suite 1400, Irvine CA 92618</div></body></html>`);w.document.close()}
+
+function openSendQAModal(){const deal=activeDeal();if(!deal)return;const cc=contactCounts(deal);document.getElementById('qaSubject').value=`Q&A - ${deal.name}`;document.getElementById('qaFromEmail').value='';document.getElementById('qaSendGreenCount').textContent=cc.green;document.getElementById('qaSendYellowCount').textContent=cc.yellow;document.getElementById('qaSendRedCount').textContent=cc.red;document.getElementById('qaSendGreen').checked=true;document.getElementById('qaSendYellow').checked=true;document.getElementById('qaSendRed').checked=false;updateQARecipientPreview();document.getElementById('sendQAModal').classList.add('show');['qaSendGreen','qaSendYellow','qaSendRed'].forEach(id=>document.getElementById(id).onchange=updateQARecipientPreview)}
+function closeSendQAModal(){document.getElementById('sendQAModal').classList.remove('show')}
+function updateQARecipientPreview(){const deal=activeDeal();if(!deal)return;const tiers=[];if(document.getElementById('qaSendGreen').checked)tiers.push('green');if(document.getElementById('qaSendYellow').checked)tiers.push('yellow');if(document.getElementById('qaSendRed').checked)tiers.push('red');const rs=deal.contacts.filter(c=>tiers.includes(c.interest));document.getElementById('qaRecipientPreview').innerHTML=rs.length?rs.map(c=>`<strong>${c.builder}</strong>${c.contact?' — '+c.contact:''}${c.email?' &lt;'+c.email+'&gt;':' <span style="color:#ef4444">(no email)</span>'}`).join('<br>'):'<em style="color:#9ca3af">No recipients selected.</em>'}
+function executeSendQA(){const deal=activeDeal();if(!deal)return;const from=document.getElementById('qaFromEmail').value.trim();const subj=document.getElementById('qaSubject').value;const tiers=[];if(document.getElementById('qaSendGreen').checked)tiers.push('green');if(document.getElementById('qaSendYellow').checked)tiers.push('yellow');if(document.getElementById('qaSendRed').checked)tiers.push('red');const rs=deal.contacts.filter(c=>tiers.includes(c.interest));const approved=deal.qaItems.filter(q=>q.approved);const btn=document.querySelector('#sendQAModal .modal-run');navigator.clipboard.writeText(`Draft email for Q&A distribution.\n\nFrom: ${from||'(not specified)'}\nSubject: ${subj}\n\nRecipients:\n${rs.map(c=>`- ${c.builder} | ${c.contact||''} | ${c.email||''}`).join('\n')}\n\n${approved.length} approved Q&A items attached.\n\nPlease draft a professional email body introducing the Q&A file.`).then(()=>{btn.textContent='✓ Copied!';btn.style.background='#16a34a';setTimeout(()=>{btn.textContent='✉ Copy Email Draft Prompt';btn.style.background='';closeSendQAModal()},1400)}).catch(()=>{})}
+
+// Helpers
+function toggleCheck(s,i){const d=activeDeal();d.checks[`${s}-${i}`]=!d.checks[`${s}-${i}`];saveDeals();renderAll()}
+function dealProgress(deal){let t=0,d=0;for(const s of[1,2,3,4])CHECKLIST[s].forEach((_,i)=>{t++;if(deal.checks[`${s}-${i}`])d++});return{total:t,done:d,pct:t?Math.round(d/t*100):0}}
+function sectionProgress(deal,s){let t=CHECKLIST[s].length,d=0;CHECKLIST[s].forEach((_,i)=>{if(deal.checks[`${s}-${i}`])d++});return{total:t,done:d}}
+function contactCounts(deal){const r={green:0,yellow:0,red:0};(deal.contacts||[]).forEach(c=>{if(r[c.interest]!==undefined)r[c.interest]++});return r}
+function switchTab(t){activeTab=t;renderAll()}
+
+// ─── RENDER ───
+function renderAll(){renderRibbon();renderSidebar();renderMain()}
+
+function renderRibbon(){const ribbon=document.getElementById('priorityRibbon'),msg=document.getElementById('noPriorityMsg');ribbon.querySelectorAll('.priority-chip').forEach(el=>el.remove());const high=deals.filter(d=>d.priority==='high');msg.style.display=high.length?'none':'inline';high.forEach(d=>{const p=dealProgress(d),chip=document.createElement('div');chip.className='priority-chip'+(d.id===activeDealId?' active':'');chip.innerHTML=`${d.name} <span class="chip-progress">${p.pct}%</span>`;chip.onclick=()=>{activeDealId=d.id;renderAll()};ribbon.appendChild(chip)})}
+
+function renderSidebar(){const list=document.getElementById('dealList');list.innerHTML='';deals.forEach(d=>{const p=dealProgress(d),card=document.createElement('div');card.className='deal-card'+(d.id===activeDealId?' active':'');card.onclick=()=>selectDeal(d.id);card.innerHTML=`<div class="deal-delete" onclick="deleteDeal('${d.id}',event)">×</div><div class="deal-card-name"><span class="priority-star ${d.priority==='high'?'':'inactive'}" onclick="togglePriority('${d.id}',event)">★</span><span ondblclick="openEditDealModal('${d.id}')">${d.name}</span></div><div class="deal-card-meta">${d.location?'<span>'+d.location+'</span>':''}<div class="deal-card-progress"><div class="deal-card-progress-fill" style="width:${p.pct}%"></div></div><span>${p.pct}%</span></div>`;list.appendChild(card)})}
+
+function renderMain(){
+  const main=document.getElementById('mainContent'),deal=activeDeal();
+  if(!deal){main.innerHTML='<div class="empty-state"><div class="empty-state-icon">📋</div><h2>No deals yet</h2><p>Create your first deal.</p><button onclick="openNewDealModal()">+ Create a Deal</button></div>';return}
+  const p=dealProgress(deal),cc=contactCounts(deal),tc=deal.contacts.length,qaCount=deal.qaItems.length,qaApproved=deal.qaItems.filter(q=>q.approved).length,issOpen=deal.issues.filter(i=>i.status!=='resolved').length,consFilled=deal.consultants.filter(c=>c.name||c.company).length;
+  let h=`<div class="main-header"><h1>${deal.name}</h1><div class="subtitle">${deal.location||'No location'} · ${p.done}/${p.total} checklist · ${tc} contacts · ${qaCount} Q&A · ${deal.issues.length} issues</div></div>
+  <div class="tab-bar">
+    <button class="tab-btn ${activeTab==='checklist'?'active':''}" onclick="switchTab('checklist')">Checklist <span class="tab-count">${p.done}/${p.total}</span></button>
+    <button class="tab-btn ${activeTab==='contacts'?'active':''}" onclick="switchTab('contacts')">Contacts <span class="tab-count">${tc}</span></button>
+    <button class="tab-btn ${activeTab==='qa'?'active':''}" onclick="switchTab('qa')">Q&A <span class="tab-count">${qaApproved}/${qaCount}</span></button>
+    <button class="tab-btn ${activeTab==='issues'?'active':''}" onclick="switchTab('issues')">Issues <span class="tab-count">${issOpen} open</span></button>
+    <button class="tab-btn ${activeTab==='consultants'?'active':''}" onclick="switchTab('consultants')">Consultants <span class="tab-count">${consFilled}/${CONSULTANT_ROLES.length}</span></button>
+  </div>`;
+  if(activeTab==='checklist')h+=renderChecklistTab(deal,p);
+  else if(activeTab==='contacts')h+=renderContactsTab(deal,cc);
+  else if(activeTab==='qa')h+=renderQATab(deal);
+  else if(activeTab==='issues')h+=renderIssuesTab(deal);
+  else h+=renderConsultantsTab(deal);
+  main.innerHTML=h
+}
+
+function renderChecklistTab(deal,p){
+  let h=`<div class="progress-bar-container"><div class="progress-bar-label">Deal Progress</div><div class="progress-bar-track"><div class="progress-bar-fill" style="width:${p.pct}%"></div></div><div class="progress-bar-pct">${p.pct}%</div></div>`;
+  for(const s of[1,2,3,4]){const sp=sectionProgress(deal,s),meta=PHASE_META[s];
+    h+=`<div class="section" id="section-${s}"><div class="section-header ${meta.headerClass}" onclick="toggleSection(${s})"><h2><span class="phase-badge">Phase ${s}</span> ${meta.name}</h2><div class="section-right"><span class="section-count">${sp.done}/${sp.total}</span><span class="chevron">▾</span></div></div><div class="section-body" id="body-${s}">`;
+    CHECKLIST[s].forEach((item,i)=>{const ck=deal.checks[`${s}-${i}`]?' checked':'';let ab='';
+      if(item.action){const cls=item.action.type==='email'?'email-action':(['Recommend','Analyze','Create SOO'].includes(item.action.label)?'generate-action':'claude-action');ab=`<button class="action-btn ${cls}" onclick="event.stopPropagation();openActionModal(${s},${i})"><span class="btn-icon">${item.action.type==='email'?'✉':'◆'}</span> ${item.action.label}</button>`}
+      let tl='';if(item.tabLink)tl=`<span class="tab-link" onclick="event.stopPropagation();switchTab('${item.tabLink}')">Open →</span>`;
+      h+=`<div class="checklist-item${ck}"><div class="step-number ${meta.color}">${i+1}</div><div class="custom-checkbox${ck}" onclick="toggleCheck(${s},${i})"></div><span class="item-text">${item.text}</span>${item.optional?'<span class="optional-tag">Optional</span>':''}${ab}${tl}<span class="responsibility-slot">TBD</span></div>`});
+    h+=`</div></div>`}
+  h+=`<div class="footer"><button class="btn-checkall" onclick="checkAllDeal()">✓ Check All</button><button class="btn-reset" onclick="resetDeal()">↺ Reset</button></div>`;return h
+}
+
+function renderContactsTab(deal,cc){
+  const cs=deal.contacts,filtered=contactFilter==='all'?cs:cs.filter(c=>c.interest===contactFilter);
+  let h=`<div class="contacts-toolbar"><button class="filter-btn f-all ${contactFilter==='all'?'active':''}" onclick="contactFilter='all';renderAll()">All (${cs.length})</button><button class="filter-btn f-green ${contactFilter==='green'?'active':''}" onclick="contactFilter='green';renderAll()"><span class="filter-dot dot-green"></span> Green (${cc.green})</button><button class="filter-btn f-yellow ${contactFilter==='yellow'?'active':''}" onclick="contactFilter='yellow';renderAll()"><span class="filter-dot dot-yellow"></span> Yellow (${cc.yellow})</button><button class="filter-btn f-red ${contactFilter==='red'?'active':''}" onclick="contactFilter='red';renderAll()"><span class="filter-dot dot-red"></span> Red (${cc.red})</button><div class="contacts-actions">${cc.green?'<button class="email-tier-btn green" onclick="openEmailTierModal(\'green\')">✉ Email Green</button>':''}${cc.yellow?'<button class="email-tier-btn yellow" onclick="openEmailTierModal(\'yellow\')">✉ Email Yellow</button>':''}<button class="add-contact-btn" onclick="openAddContactModal()">+ Add Contact</button></div></div>`;
+  if(!filtered.length)return h+`<div class="contacts-table-wrap"><div class="contacts-empty">No contacts${contactFilter!=='all'?' at this level':''}.</div></div>`;
+  h+=`<div class="contacts-table-wrap"><table class="contacts-table"><thead><tr><th>#</th><th>Interest</th><th>Builder</th><th>Contact</th><th>Title</th><th>Email</th><th>Phone</th><th>Type</th><th>Lead</th><th class="check-col">Called</th><th class="check-col">OM</th><th>Comments</th><th></th></tr></thead><tbody>`;
+  filtered.forEach((c,fi)=>{const ri=cs.indexOf(c);h+=`<tr class="row-${c.interest}"><td style="color:#9ca3af;font-size:12px">${fi+1}</td><td><span class="interest-badge interest-${c.interest}" onclick="cycleInterest(${ri})">${c.interest==='green'?'● Interested':c.interest==='yellow'?'● Evaluating':'● Pass'}</span></td><td style="font-weight:600">${c.builder}</td><td>${c.contact||'—'}</td><td style="font-size:12px;color:#6b7280">${c.title||'—'}</td><td>${c.email?'<a href="mailto:'+c.email+'" style="color:#3b82f6;text-decoration:none">'+c.email+'</a>':'—'}</td><td style="font-size:12px">${c.phone||'—'}</td><td style="font-size:12px;color:#6b7280">${c.type||''}</td><td style="font-size:12px">${c.lead||''}</td><td class="check-col"><input type="checkbox" class="contact-checkbox" ${c.called?'checked':''} onchange="toggleCalled(${ri})"></td><td class="check-col"><input type="checkbox" class="contact-checkbox" ${c.omSent?'checked':''} onchange="toggleOMSent(${ri})"></td><td style="font-size:12px;color:#6b7280;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(c.comments||'').replace(/"/g,'&quot;')}">${c.comments||''}</td><td><div class="row-actions"><button class="row-action-btn edit" onclick="openEditContactModal(${ri})">✎</button><button class="row-action-btn" onclick="deleteContact(${ri})">×</button></div></td></tr>`});
+  return h+`</tbody></table></div>`
+}
+
+function renderQATab(deal){
+  const qa=deal.qaItems,ac=qa.filter(q=>q.approved).length,hasUn=qa.some(q=>!q.approved&&q.q.trim()&&q.a.trim());
+  let h=`<div class="qa-container"><div class="qa-toolbar"><div class="qa-toolbar-label">${qa.length} Question${qa.length!==1?'s':''} · ${ac} Approved</div><div class="qa-toolbar-actions"><button class="qa-big-btn approve-all" onclick="approveAllQA()" ${hasUn?'':'disabled'}>✓ Approve All</button><button class="qa-big-btn generate-pdf" onclick="generateQAPDF()" ${ac?'':'disabled'}>◆ Generate PDF</button><button class="qa-big-btn send-email" onclick="openSendQAModal()" ${ac?'':'disabled'}>✉ Send Email</button></div></div>`;
+  qa.forEach((item,i)=>{
+    if(item.approved)h+=`<div class="qa-entry approved"><div class="qa-entry-header"><div class="qa-number">Q${i+1} <span class="qa-approved-badge">✓ Approved</span></div><div class="qa-entry-actions"><button class="qa-small-btn unapprove" onclick="unapproveQA(${i})">Edit</button><button class="qa-small-btn delete" onclick="deleteQA(${i})">Delete</button></div></div><div class="qa-approved-text"><strong>Q: ${item.q.replace(/</g,'&lt;')}</strong>A: ${item.a.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div></div>`;
+    else h+=`<div class="qa-entry"><div class="qa-entry-header"><div class="qa-number">Q${i+1}</div><div class="qa-entry-actions">${item.q.trim()&&item.a.trim()?`<button class="qa-small-btn approve" onclick="approveQA(${i})">✓ Approve</button>`:''}<button class="qa-small-btn delete" onclick="deleteQA(${i})">Delete</button></div></div><div class="qa-label">Question</div><textarea class="qa-input q qa-q-input" placeholder="Enter the buyer's question..." oninput="saveQAField(${i},'q',this.value)">${item.q.replace(/</g,'&lt;')}</textarea><div class="qa-label" style="margin-top:10px">Answer</div><textarea class="qa-input a" placeholder="Enter your answer..." oninput="saveQAField(${i},'a',this.value)">${item.a.replace(/</g,'&lt;')}</textarea></div>`
+  });
+  return h+`<div class="qa-add-row"><button class="qa-add-btn" onclick="addQA()">+ Add Question</button></div></div>`
+}
+
+function renderIssuesTab(deal){
+  const issues=deal.issues,openC=issues.filter(i=>i.status==='open').length,ipC=issues.filter(i=>i.status==='in-progress').length,resC=issues.filter(i=>i.status==='resolved').length;
+  const filtered=issueFilter==='all'?issues:issues.filter(i=>i.status===issueFilter);
+  let h=`<div class="contacts-toolbar">
+    <button class="filter-btn f-all ${issueFilter==='all'?'active':''}" onclick="issueFilter='all';renderAll()">All (${issues.length})</button>
+    <button class="filter-btn ${issueFilter==='open'?'active':''}" style="${issueFilter==='open'?'background:#fee2e2;color:#dc2626;border-color:#fca5a5':''}" onclick="issueFilter='open';renderAll()"><span class="filter-dot dot-red"></span> Open (${openC})</button>
+    <button class="filter-btn ${issueFilter==='in-progress'?'active':''}" style="${issueFilter==='in-progress'?'background:#fef3c7;color:#a16207;border-color:#fde047':''}" onclick="issueFilter='in-progress';renderAll()"><span class="filter-dot dot-yellow"></span> In Progress (${ipC})</button>
+    <button class="filter-btn ${issueFilter==='resolved'?'active':''}" style="${issueFilter==='resolved'?'background:#dcfce7;color:#15803d;border-color:#86efac':''}" onclick="issueFilter='resolved';renderAll()"><span class="filter-dot dot-green"></span> Resolved (${resC})</button>
+    <div class="contacts-actions"><button class="add-issue-btn" onclick="openAddIssueModal()">+ Add Issue</button></div>
+  </div>`;
+  if(!filtered.length)return h+`<div class="contacts-empty" style="background:#fff;border-radius:10px;padding:48px;box-shadow:0 1px 3px rgba(0,0,0,.06)">No issues${issueFilter!=='all'?' with this status':''}. Click "+ Add Issue" to track something.</div>`;
+  filtered.forEach((iss,fi)=>{const ri=issues.indexOf(iss);const statusLabel={open:'Open','in-progress':'In Progress',resolved:'Resolved'};const priBadge=iss.priority==='high'?'<span style="color:#dc2626;font-weight:600">High</span>':iss.priority==='medium'?'<span style="color:#d97706;font-weight:600">Med</span>':'<span style="color:#6b7280">Low</span>';
+    h+=`<div class="issue-card status-${iss.status}">
+      <div class="issue-actions"><button class="row-action-btn edit" onclick="openEditIssueModal(${ri})" style="color:#9ca3af">✎</button><button class="row-action-btn" onclick="deleteIssue(${ri})">×</button></div>
+      <div class="issue-header"><div class="issue-id">Issue #${ri+1}</div><span class="issue-status-badge ${iss.status}" onclick="cycleIssueStatus(${ri})" title="Click to cycle">${statusLabel[iss.status]||iss.status}</span></div>
+      <div class="issue-title">${iss.title}</div>
+      ${iss.description?`<div class="issue-desc">${iss.description.replace(/\n/g,'<br>')}</div>`:''}
+      <div class="issue-meta">${priBadge}${iss.assigned?`<span>→ ${iss.assigned}</span>`:''}${iss.date?`<span>${iss.date}</span>`:''}</div>
+    </div>`});
+  return h
+}
+
+function renderConsultantsTab(deal){
+  const cs=deal.consultants,filled=cs.filter(c=>c.name||c.company).length;
+  let h=`<div class="contacts-toolbar"><div style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.3px">${filled} of ${cs.length} Roles Filled</div></div><div class="consultant-grid">`;
+  cs.forEach((c,i)=>{const isFilled=c.name||c.company;
+    h+=`<div class="consultant-card ${isFilled?'filled':''}">
+      <button class="consultant-edit-btn" onclick="openConsultantModal(${i})">${isFilled?'✎':'+'}</button>
+      <div class="consultant-role">${c.role}</div>
+      ${isFilled?`<div class="consultant-name">${c.name||'(no name)'}</div><div class="consultant-company">${c.company||''}</div><div class="consultant-contact">${c.email?`<a href="mailto:${c.email}">${c.email}</a><br>`:''}${c.phone||''}${c.notes?`<br><span style="color:#6b7280;font-style:italic">${c.notes}</span>`:''}</div>`:`<div class="consultant-empty">Click + to assign</div>`}
+    </div>`});
+  return h+`</div>`
+}
+
+function toggleSection(s){const h=document.querySelector(`#section-${s} .section-header`),b=document.getElementById(`body-${s}`);if(h)h.classList.toggle('collapsed');if(b)b.classList.toggle('collapsed')}
+function checkAllDeal(){const d=activeDeal();for(const s of[1,2,3,4])CHECKLIST[s].forEach((_,i)=>{d.checks[`${s}-${i}`]=true});saveDeals();renderAll()}
+function resetDeal(){activeDeal().checks={};saveDeals();renderAll()}
+
+loadDeals();renderAll();
+</script>
+</body>
+</html>
