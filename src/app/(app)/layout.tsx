@@ -2,6 +2,7 @@ import { ConfirmProvider } from "@/components/confirm/confirm-provider";
 import { FeedbackShell } from "@/components/feedback/feedback-shell";
 import { FeedbackZone } from "@/components/feedback/feedback-zone";
 import { PriorityRibbon } from "@/components/layout/priority-ribbon";
+import { Toaster } from "@/components/ui/sonner";
 
 export default function AppLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -14,6 +15,7 @@ export default function AppLayout({ children }: Readonly<{ children: React.React
           <div className="flex min-h-0 flex-1">{children}</div>
         </div>
       </FeedbackShell>
+      <Toaster position="bottom-right" />
     </ConfirmProvider>
   );
 }

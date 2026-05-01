@@ -100,15 +100,16 @@ export function FeedbackModal({ commitSha }: FeedbackModalProps) {
         <DialogHeader>
           <DialogTitle>Send feedback</DialogTitle>
           <DialogDescription>
-            Goes straight to Sean. Captures the section, page, and current build so it&rsquo;s easy
-            to act on.
+            Captures the section, page, and current build alongside your note so it&rsquo;s easy to
+            act on.
           </DialogDescription>
         </DialogHeader>
 
         {submitted ? (
           <div className="py-8 text-center">
             <div className="mb-2 text-2xl">✓</div>
-            <p className="text-sm font-medium text-gray-900">Thanks — got it.</p>
+            <p className="text-sm font-medium text-gray-900">Your feedback has been recorded.</p>
+            <p className="mt-1 text-xs text-gray-500">Thanks for taking the time.</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">

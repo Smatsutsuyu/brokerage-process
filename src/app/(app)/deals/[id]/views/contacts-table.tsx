@@ -1,9 +1,19 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Mail, Pencil, Phone, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Download,
+  Mail,
+  Pencil,
+  Phone,
+  Trash2,
+} from "lucide-react";
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
+import { PlannedAction } from "@/components/planned-action";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -61,19 +71,19 @@ const FILTER_META: Record<
     dot: null,
   },
   green: {
-    label: "Green",
+    label: "Interested",
     chip: "bg-green-100 text-green-800 border-green-300",
     rowBorder: "border-l-tier-green",
     dot: "bg-tier-green",
   },
   yellow: {
-    label: "Yellow",
+    label: "Evaluating",
     chip: "bg-yellow-100 text-yellow-800 border-yellow-300",
     rowBorder: "border-l-tier-yellow",
     dot: "bg-tier-yellow",
   },
   red: {
-    label: "Red",
+    label: "Immediate Pass",
     chip: "bg-red-100 text-red-800 border-red-300",
     rowBorder: "border-l-tier-red",
     dot: "bg-tier-red",
@@ -242,7 +252,28 @@ export function ContactsTable({ dealId, rows, leadOptions }: ContactsTableProps)
           );
         })}
 
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex flex-wrap gap-2">
+          <PlannedAction
+            label="Send OM blast"
+            icon={Mail}
+            feature="OM blast email"
+            description="Composes templated OM-distribution emails per buyer tier (Green / Yellow), opens a review screen, then sends via Resend."
+            phase="phase_2"
+          />
+          <PlannedAction
+            label="Send follow-up"
+            icon={Mail}
+            feature="Follow-up to non-responders"
+            description="Drafts a templated follow-up email to Green/Yellow buyers who have OM Sent but no offer received yet."
+            phase="phase_2"
+          />
+          <PlannedAction
+            label="Import from Excel"
+            icon={Download}
+            feature="Excel buyer import"
+            description="Upload a marketing list (.xlsx) and map columns to builders + contacts in one step. Skips duplicates, suggests tier from prior deals."
+            phase="phase_2"
+          />
           <Button size="sm" variant="outline" onClick={() => setAddBuilderOpen(true)}>
             + Add Builder
           </Button>

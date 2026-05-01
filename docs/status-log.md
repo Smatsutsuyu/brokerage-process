@@ -4,6 +4,62 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-01 (afternoon) — Contacts prototypes, planned-action placeholders, layout polish
+
+End-of-Phase-1 polish session. Two threads of work: (1) explore the Contacts UX with four parallel design proposals so Chris can pick a direction at next call, (2) flesh out the rest of the deal page with placeholder buttons for every Phase 2 feature so Chris can sign off on the design before any of it is built.
+
+### Done — Contacts UX prototypes (4 alternative tabs)
+- Pain points identified: two separate "Add Builder" / "Add Contact" buttons (schema leaking into UX), empty-row ghosts when a builder has no contacts, builder name repeating per contact, 13 columns forcing horizontal scroll, workflow is company-first but the table is contact-first
+- Built four alternative views as parallel tabs alongside the production Contacts tab — visible only when on Contacts or a prototype tab via an amber dashed strip:
+  - **A · Cards** — collapsible builder cards with contacts indented inside
+  - **B · Pane** — master/detail (builder list left, selected builder's detail right)
+  - **C · Grouped** — table with builder header rows spanning all columns, contacts indented underneath
+  - **D · Compact** — Linear-style dense rows, click to expand
+- All four share a single `loadBuyers()` query that returns nested `BuyerGroup → contacts[]` shape; no duplicate JOINs
+- Built combined `<AddBuyerModal>` for the prototypes — pick builder + optional first contact in one step (collapses the two-button workflow)
+- Required schema-shape change: `addBuilderToDeal` now returns `{ builderId, dealBuyerId }` so the combined modal can chain a contact insert without a server round-trip lookup
+- All four reuse existing `TierBadge`, `BuyerCheckbox`, `LeadPicker`, `AddContactModal` so live tier/lead/checkbox interactions work in every prototype
+- Filter chips changed from color names ("Green", "Yellow", "Red") to the descriptive labels they map to ("Interested", "Evaluating", "Immediate Pass") — applied across all four prototypes AND the production Contacts table for consistency
+- Wrapped the prototype switcher strip in a `FeedbackZone section="contacts-prototypes"` so Chris can leave focused notes on the prototype comparison
+
+### Done — Planned-action placeholders for design sign-off
+Goal: give Chris a clickable surface area that reflects every Phase 2 feature so he can sign off on the design before any of it is built.
+
+- New `<PlannedAction>` component: button styled with dashed outline + amber hover, triggers a Sonner toast on click describing the future feature and which phase it lands in. Standalone `toastComingSoon()` helper for non-button surfaces (dropdown items)
+- Mounted Sonner `<Toaster>` (bottom-right) in the `(app)` layout
+- **Per-checklist-item placeholders** — `planned-item-actions.ts` maps checklist item names → item-specific actions (e.g. "Send out OM/Blast" → ✉️ Send to buyers, "CFD Analysis" → 📄 Generate PDF, "Send out Q&A File" → 📄 Generate Q&A PDF + ✉️ Send). Plus universal **Upload** + **Link Dropbox** affordances on every row
+- **Q&A header buttons** — replaced the inert disabled "Generate PDF" / "Send email" buttons with live placeholders: Generate PDF, Distribute to buyers, Email selected buyers
+- **Contacts + 4 prototypes header** — added Send OM blast, Send follow-up, Import from Excel alongside + Add Buyer
+- **Issues header** — Export to Excel
+- **Consultants header** — Email roster
+- **Deal `⋯` menu** — new "Planned actions" section at the top: Generate Marketing Report, Compile offer package, Email status to Owner Team (above Edit/Delete)
+- Per-row actions on checklist items started as hover-reveal but switched to always-visible after Chris noted floaty appearance (same pattern fix as previous session)
+
+### Done — Polish based on Chris's testing
+- Toast description text darkened (was using Sonner's muted-foreground default which was too faint); phase tag bumped to bolder amber-700/semibold
+- New `align="far"` option on `FeedbackZone` (`-top-3 -right-5`) for cases where the corner is occupied by another control like a dropdown trigger — applied to deal-header so the bubble doesn't overlap the `⋯` menu. Initial value `-right-10` was too aggressive; pulled back per Chris's feedback
+- Q&A's `max-w-[800px]` constraint removed so all five tabs share the same horizontal footprint (no width-snap when switching tabs)
+- Main column padding tuned through three iterations: `px-10` → `px-6` → `px-8` per Chris
+- Added `[scrollbar-gutter:stable]` to all main columns so tabs that overflow vertically don't shift content sideways relative to tabs that fit on one screen
+- Feedback submission copy made more professional: confirmation now reads "Your feedback has been recorded." / "Thanks for taking the time." (was "Thanks — got it."); modal description no longer name-drops Sean
+
+### Decisions
+- **Auth/session lifetime documented:** Better Auth sessions live 7 days with sliding refresh on requests >1 day old. Active users effectively never get bounced; idle users are signed out at 7 days. No idle timeout, no absolute max — both are config-only changes if Chris wants stricter behavior later
+- **Prototype tabs treated as throwaway exploration**, not real features. Visually offset from the production tab nav (amber dashed strip with "FlaskConical" icon) so reviewers know they're alternatives, not new functionality
+- **Per-tab placeholder buttons over a separate "what's coming" doc.** Letting Chris see *where* each future affordance lives in the UI is more informative than a flat checklist of upcoming features
+- **Each placeholder names its concrete future feature** in the toast (not just "coming soon") so Chris can mentally validate the design against actual deliverables. Phase tag separates Phase 2 (document/email automation) from Phase 3 (polish/handoff) from "future engagement" (AI work)
+
+### Notes for future Sean
+- The `addBuilderToDeal` action now returns the new IDs — keep that contract if/when we wire up the production Contacts view to use the combined Add Buyer modal
+- `planned-item-actions.ts` matches by lowercased exact name. If we ever add new checklist items via UI (vs. seed), this mapping won't auto-update — items without a match just get the universal Upload + Link affordances, which is acceptable
+- Sonner toasts honor description as a React node — if we want richer "coming soon" content in future, the slot is already there
+- Prototype views use `useState`-based filtering and grouping; if the buyer list grows past ~50 they'd benefit from URL-state and virtualization, but that's beyond Phase 1
+
+### Blockers
+- None. Phase 1 functionally complete. Awaiting Lakebridge vendor accounts (Vercel, Neon, R2, Resend) to begin Phase 2 deployment + document/email work
+
+---
+
 ## 2026-05-01 — Profile page, schema cleanup, layout polish, and a sneaky BaseUI bug
 
 Big batch of cleanups and polish after the auth swap. Lots of small things that compound.

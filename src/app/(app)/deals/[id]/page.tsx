@@ -22,6 +22,12 @@ import { ChecklistView } from "./views/checklist-view";
 import { ConsultantsView } from "./views/consultants-view";
 import { ContactsView } from "./views/contacts-view";
 import { IssuesView } from "./views/issues-view";
+import {
+  PrototypeAView,
+  PrototypeBView,
+  PrototypeCView,
+  PrototypeDView,
+} from "./views/prototypes/prototype-views";
 import { QaView } from "./views/qa-view";
 
 
@@ -105,8 +111,8 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
       <FeedbackZone section="sidebar">
         <Sidebar activeDealId={id} />
       </FeedbackZone>
-      <main className="bg-brand-bg flex-1 overflow-y-auto px-10 py-8">
-        <FeedbackZone section="deal-header">
+      <main className="bg-brand-bg flex-1 overflow-y-auto px-8 py-8 [scrollbar-gutter:stable]">
+        <FeedbackZone section="deal-header" align="far">
           <DealHeader
             name={deal.name}
             subtitle={[
@@ -157,6 +163,10 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                 <ConsultantsView dealId={id} />
               </FeedbackZone>
             ),
+            "proto-a": <PrototypeAView dealId={id} />,
+            "proto-b": <PrototypeBView dealId={id} />,
+            "proto-c": <PrototypeCView dealId={id} />,
+            "proto-d": <PrototypeDView dealId={id} />,
           }}
         </DealTabs>
       </main>

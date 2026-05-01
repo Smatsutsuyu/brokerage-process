@@ -477,7 +477,7 @@ export async function addBuilderToDeal(input: {
   classification: "private" | "public";
   tier?: "green" | "yellow" | "red" | "not_selected";
   notes?: string;
-}) {
+}): Promise<{ builderId: string; dealBuyerId: string }> {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
 
@@ -486,7 +486,7 @@ export async function addBuilderToDeal(input: {
 
   // Single transaction so we don't end up with an orphan builder if the
   // deal_buyer insert fails.
-  await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     const [builder] = await tx
       .insert(builders)
       .values({
@@ -497,15 +497,21 @@ export async function addBuilderToDeal(input: {
       })
       .returning();
 
-    await tx.insert(dealBuyers).values({
-      orgId: org.id,
-      dealId: input.dealId,
-      builderId: builder.id,
-      tier: input.tier ?? "not_selected",
-    });
+    const [dealBuyer] = await tx
+      .insert(dealBuyers)
+      .values({
+        orgId: org.id,
+        dealId: input.dealId,
+        builderId: builder.id,
+        tier: input.tier ?? "not_selected",
+      })
+      .returning();
+
+    return { builderId: builder.id, dealBuyerId: dealBuyer.id };
   });
 
   revalidatePath(`/deals/${input.dealId}`);
+  return result;
 }
 
 // Verifies that an item belongs to the active deal — useful for any action

@@ -12,7 +12,7 @@ This file is the authoritative project context for Claude Code working on the La
 
 **Reviewing client feedback during the build**: Chris uses an in-app feedback widget (floating button + per-section 💬 icons) to leave notes while exercising the platform. Notes flow into the `feedback_items` Postgres table. Read them with `npm run feedback:report` (defaults to "new" items grouped by section, with build commit SHA so you can correlate against deployed code). Disabled via `NEXT_PUBLIC_FEEDBACK_ENABLED=false` for production launch. See `docs/local-development.md` for full mechanics including how to mark items reviewed/actioned.
 
-**Current phase:** Phase 1 (Foundation), week 1. Goal: scaffold and ship to a Vercel preview URL before doing anything else.
+**Current phase:** Phase 1 (Foundation) — **functionally complete as of 2026-05-01**, awaiting Lakebridge vendor accounts (Vercel, Neon, R2, Resend) for production deploy and Phase 2 kickoff. Phase 1 deliverables: hosted multi-user version of the prototype with Better Auth, hierarchical checklist, Buyer/Contact CRUD with tier tagging, Q&A workflow, Issues tracker, Consultant roster, profile + members admin pages, in-app feedback widget. Plus four parallel Contacts UX prototypes for client review and Phase 2 placeholder buttons throughout the deal page (Sonner toasts naming each future feature) so Chris can sign off on the design before Phase 2 begins.
 
 **Headline scope decisions (locked, do not revisit without explicit instruction):**
 
@@ -610,17 +610,20 @@ Also done as part of Day 6-7:
 
 By end of week 1: logged-in user, org context active, empty deal pages, all infrastructure in place. _(Auth deferred; everything else achieved.)_
 
-**Week 2-3: Build prototype-equivalent functionality.**
+**Week 2-3: Build prototype-equivalent functionality.** _(Done 2026-05-01.)_
 
-- Deal CRUD (create, edit, delete, list)
-- Hierarchical checklist UI matching Excel structure
-- Buyer/contact management with tier tagging
-- Q&A workflow (add, edit, approve)
-- Issues tracker
-- Consultant roster
-- All tied to real Postgres, faithful to prototype's UX
+- Deal CRUD (create, edit, delete, list) → **Done**
+- Hierarchical checklist UI matching Excel structure → **Done** (collapsible phases, auto-collapse when complete, dependency-enforcement structure ready in schema)
+- Buyer/contact management with tier tagging → **Done** (4-state tier: Green / Yellow / Red / Not Selected; lead picker; called/OM tracking)
+- Q&A workflow (add, edit, approve) → **Done** (locked-by-default after approval; one-click "approve all")
+- Issues tracker → **Done** (status, priority, assignee, identified/resolved dates)
+- Consultant roster → **Done** (11 roles with buyer/seller side, multiple firms per role)
+- Profile page + Members admin → **Done** (added during 2026-05-01 batch)
+- In-app feedback widget → **Done** (per-section 💬 affordances + floating button; `npm run feedback:report` reads it)
+- Four Contacts UX prototypes → **Done** (parallel tabs for client review)
+- Phase 2 placeholder buttons throughout → **Done** (Sonner-toast surface area for design sign-off before any Phase 2 code)
 
-End of Phase 1: hosted multi-user version of the prototype, ready for Chris's testing.
+End of Phase 1: hosted multi-user version of the prototype, ready for Chris's testing. **Awaiting Vercel/Neon/R2/Resend vendor accounts to deploy.**
 
 ## Working with This Document
 

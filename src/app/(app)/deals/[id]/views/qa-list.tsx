@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { CheckCircle2, FileText, Loader2, Mail, Plus } from "lucide-react";
 
+import { PlannedAction } from "@/components/planned-action";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -55,7 +56,7 @@ export function QaList({ dealId, items }: QaListProps) {
   }
 
   return (
-    <div className="qa-container max-w-[800px] space-y-4">
+    <div className="qa-container space-y-4">
       <div className="flex flex-wrap items-center gap-3 rounded-xl bg-white px-5 py-4 shadow-sm">
         <div className="text-xs font-semibold tracking-wider text-gray-500 uppercase">
           Q&amp;A status
@@ -80,24 +81,27 @@ export function QaList({ dealId, items }: QaListProps) {
             )}
             Approve all
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled
-            title="Templated PDF generation comes in Phase 2"
-          >
-            <FileText className="h-3.5 w-3.5" />
-            Generate PDF
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled
-            title="Resend email send comes in Phase 2"
-          >
-            <Mail className="h-3.5 w-3.5" />
-            Send email
-          </Button>
+          <PlannedAction
+            label="Generate PDF"
+            icon={FileText}
+            feature="Q&A File PDF"
+            description="Renders all approved Q&A items as a Land Advisors-branded PDF ready for distribution."
+            phase="phase_2"
+          />
+          <PlannedAction
+            label="Distribute to buyers"
+            icon={Mail}
+            feature="Q&A distribution email"
+            description="Emails the approved Q&A PDF to all buyers on this deal via Resend, with sent-status tracking per recipient."
+            phase="phase_2"
+          />
+          <PlannedAction
+            label="Email selected buyers"
+            icon={Mail}
+            feature="Targeted Q&A email"
+            description="Send the Q&A PDF to a custom subset of buyers (filter by tier, lead, etc.)."
+            phase="phase_2"
+          />
         </div>
       </div>
 

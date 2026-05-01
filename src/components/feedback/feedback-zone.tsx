@@ -17,7 +17,16 @@ type FeedbackZoneProps = {
   // "inside": affordance sits inside the corner. Use when the zone abuts a
   //   viewport edge (e.g. priority ribbon at top of screen) where "outside"
   //   would be clipped.
-  align?: "outside" | "inside";
+  // "far": floats further out diagonally — use when the corner is occupied by
+  //   another control (e.g. a dropdown menu trigger) that "outside" would
+  //   overlap.
+  align?: "outside" | "inside" | "far";
+};
+
+const POSITION_BY_ALIGN: Record<NonNullable<FeedbackZoneProps["align"]>, string> = {
+  outside: "-top-2 -right-2",
+  inside: "top-2 right-2",
+  far: "-top-3 -right-5",
 };
 
 // Wraps a meaningful section so Chris can leave feedback specifically about it.
@@ -26,7 +35,7 @@ type FeedbackZoneProps = {
 // with this zone — avoids visual noise across the page.
 export function FeedbackZone({ section, children, className, align = "outside" }: FeedbackZoneProps) {
   const { open } = useFeedback();
-  const positionClasses = align === "outside" ? "-top-2 -right-2" : "top-2 right-2";
+  const positionClasses = POSITION_BY_ALIGN[align];
   return (
     <div className={cn("group/feedback relative", className)}>
       {children}

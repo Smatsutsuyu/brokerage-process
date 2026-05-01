@@ -37,7 +37,7 @@ export default async function ProfilePage() {
   return (
     <>
       <Sidebar />
-      <main className="bg-brand-bg flex-1 overflow-y-auto px-10 py-8">
+      <main className="bg-brand-bg flex-1 overflow-y-auto px-8 py-8 [scrollbar-gutter:stable]">
         <header className="mb-6">
           <h1 className="text-[26px] leading-tight font-bold text-gray-900">My profile</h1>
           <p className="text-[13px] text-gray-400">

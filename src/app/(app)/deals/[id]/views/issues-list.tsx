@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Calendar, Loader2, Pencil, Trash2, User } from "lucide-react";
+import { Calendar, FileText, Loader2, Pencil, Trash2, User } from "lucide-react";
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
+import { PlannedAction } from "@/components/planned-action";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -101,7 +102,14 @@ export function IssuesList({ dealId, items, users }: IssuesListProps) {
             <span className="font-semibold tabular-nums">{resolved}</span> resolved
           </span>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex flex-wrap gap-2">
+          <PlannedAction
+            label="Export to Excel"
+            icon={FileText}
+            feature="Issues Tracking export"
+            description="Exports the open issues list as a formatted Excel file matching the Issues List report layout from the wireframe."
+            phase="phase_2"
+          />
           <Button size="sm" onClick={() => setAddOpen(true)}>
             + Add Issue
           </Button>

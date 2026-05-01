@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { Loader2, Mail, Pencil, Phone, Plus, StickyNote, Trash2 } from "lucide-react";
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
+import { PlannedAction } from "@/components/planned-action";
 import { cn } from "@/lib/utils";
 
 import { deleteConsultant, type ConsultantRole, type ConsultantSide } from "../actions";
@@ -73,6 +74,15 @@ export function ConsultantsList({ dealId, items }: ConsultantsListProps) {
         <div className="text-sm text-gray-700">
           <span className="font-semibold tabular-nums">{filledCount}</span> of{" "}
           <span className="tabular-nums">{CONSULTANT_ROLES.length}</span> roles filled
+        </div>
+        <div className="ml-auto flex flex-wrap gap-2">
+          <PlannedAction
+            label="Email roster"
+            icon={Mail}
+            feature="Email all consultants"
+            description="Drafts a templated update email to every consultant on this deal (filterable by buyer/seller side)."
+            phase="phase_2"
+          />
         </div>
       </div>
 

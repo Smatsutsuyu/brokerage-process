@@ -1,11 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import {
+  CalendarClock,
+  ChevronDown,
+  FileSpreadsheet,
+  FileText,
+  Link as LinkIcon,
+  Mail,
+  Upload,
+} from "lucide-react";
 
+import { PlannedAction } from "@/components/planned-action";
 import { cn } from "@/lib/utils";
 
 import { ChecklistCheckbox } from "./checklist-checkbox";
+import { getPlannedActionsForItem, type ItemActionKind } from "./planned-item-actions";
+
+const KIND_ICON: Record<ItemActionKind, typeof FileText> = {
+  "send-email": Mail,
+  "generate-doc": FileText,
+  "generate-xlsx": FileSpreadsheet,
+  "schedule-reminder": CalendarClock,
+};
 
 type Category = {
   id: string;
@@ -87,34 +104,73 @@ export function PhaseSection({
                 {catItems.length === 0 ? (
                   <div className="px-5 py-3 text-xs text-gray-400 italic">No items</div>
                 ) : (
-                  catItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className={cn(
-                        "flex items-center gap-3 border-b border-gray-100 px-5 py-3 last:border-b-0",
-                        item.completed && "bg-green-50",
-                      )}
-                    >
-                      <ChecklistCheckbox
-                        itemId={item.id}
-                        dealId={dealId}
-                        completed={item.completed}
-                      />
-                      <span
+                  catItems.map((item) => {
+                    const itemActions = getPlannedActionsForItem(item.name);
+                    return (
+                      <div
+                        key={item.id}
                         className={cn(
-                          "flex-1 text-[13px] font-normal leading-snug text-gray-700",
-                          item.completed && "text-gray-400 line-through",
+                          "flex items-center gap-3 border-b border-gray-100 px-5 py-3 last:border-b-0",
+                          item.completed && "bg-green-50",
                         )}
                       >
-                        {item.name}
-                      </span>
-                      {item.optional && (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap text-amber-800">
-                          optional
+                        <ChecklistCheckbox
+                          itemId={item.id}
+                          dealId={dealId}
+                          completed={item.completed}
+                        />
+                        <span
+                          className={cn(
+                            "flex-1 text-[13px] font-normal leading-snug text-gray-700",
+                            item.completed && "text-gray-400 line-through",
+                          )}
+                        >
+                          {item.name}
                         </span>
-                      )}
-                    </div>
-                  ))
+                        {item.optional && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap text-amber-800">
+                            optional
+                          </span>
+                        )}
+
+                        {/* Planned actions stay visible at all times — kept
+                            light/muted so they don't compete with the item
+                            name, but no floaty hover-reveal that makes other
+                            rows feel half-rendered. Item-specific actions
+                            (Generate / Send) render first, then the universal
+                            Upload + Link Dropbox affordances. */}
+                        <div className="flex items-center gap-0.5">
+                          {itemActions.map((a) => (
+                            <PlannedAction
+                              key={a.label}
+                              compact
+                              feature={a.feature}
+                              description={a.description}
+                              phase={a.phase}
+                              label={a.label}
+                              icon={KIND_ICON[a.kind]}
+                            />
+                          ))}
+                          <PlannedAction
+                            compact
+                            feature="Upload document"
+                            description="Uploads a file to Cloudflare R2 storage and attaches it to this checklist item. Supports versioning — every save creates a new version."
+                            phase="phase_2"
+                            label="Upload"
+                            icon={Upload}
+                          />
+                          <PlannedAction
+                            compact
+                            feature="Link Dropbox folder"
+                            description="Pastes a Dropbox folder URL to associate with this checklist item — no file replication, just a direct link."
+                            phase="phase_2"
+                            label="Link"
+                            icon={LinkIcon}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             );

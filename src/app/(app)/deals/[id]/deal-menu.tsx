@@ -1,9 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import {
+  FileStack,
+  FileText,
+  Mail,
+  MoreHorizontal,
+  Pencil,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
+import { toastComingSoon } from "@/components/planned-action";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,7 +57,53 @@ export function DealMenu({ deal }: DealMenuProps) {
         >
           <MoreHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuContent align="end" className="w-60">
+          <div className="flex items-center gap-1.5 border-b border-gray-100 px-2 py-1.5 text-[10px] font-bold tracking-wider text-amber-700 uppercase">
+            <Sparkles className="h-3 w-3" />
+            Planned actions
+          </div>
+          <DropdownMenuItem
+            onClick={() =>
+              toastComingSoon({
+                feature: "Marketing Report PDF",
+                description:
+                  "Renders the buyer list grouped by Green / Yellow / Red interest tier as a Land Advisors-branded PDF.",
+              })
+            }
+            className="text-[13px]"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Generate Marketing Report
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() =>
+              toastComingSoon({
+                feature: "Compiled offer package PDF",
+                description:
+                  "Merges the SOO matrix, underwriting summaries, revenue charts, and supporting docs into a single PDF for ownership review.",
+              })
+            }
+            className="text-[13px]"
+          >
+            <FileStack className="h-3.5 w-3.5" />
+            Compile offer package
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() =>
+              toastComingSoon({
+                feature: "Owner Team status update",
+                description:
+                  "Drafts a templated weekly/bi-weekly status email to the Owner Team summarizing checklist progress, new offers, and open issues.",
+              })
+            }
+            className="text-[13px]"
+          >
+            <Mail className="h-3.5 w-3.5" />
+            Email status to Owner Team
+          </DropdownMenuItem>
+
+          <div className="my-1 border-t border-gray-100" />
+
           <DropdownMenuItem onClick={() => setEditOpen(true)} className="text-[13px]">
             <Pencil className="h-3.5 w-3.5" />
             Edit deal
