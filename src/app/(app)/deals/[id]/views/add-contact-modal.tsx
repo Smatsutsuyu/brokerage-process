@@ -23,11 +23,22 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-import { addContact } from "../actions";
+import { addContact, updateContact } from "../actions";
 
 export type BuilderOption = {
   id: string;
   name: string;
+};
+
+export type EditingContact = {
+  contactId: string;
+  builderId: string;
+  firstName: string;
+  lastName: string;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
 };
 
 type AddContactModalProps = {
@@ -36,6 +47,8 @@ type AddContactModalProps = {
   dealId: string;
   builders: BuilderOption[];
   defaultBuilderId?: string;
+  // Pass an existing contact to put the modal in edit mode.
+  editing?: EditingContact;
 };
 
 export function AddContactModal({
@@ -44,41 +57,50 @@ export function AddContactModal({
   dealId,
   builders,
   defaultBuilderId,
+  editing,
 }: AddContactModalProps) {
-  const [builderId, setBuilderId] = useState<string>(defaultBuilderId ?? builders[0]?.id ?? "");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [title, setTitle] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [notes, setNotes] = useState("");
+  const isEdit = Boolean(editing);
+
+  const [builderId, setBuilderId] = useState<string>(
+    editing?.builderId ?? defaultBuilderId ?? builders[0]?.id ?? "",
+  );
+  const [firstName, setFirstName] = useState(editing?.firstName ?? "");
+  const [lastName, setLastName] = useState(editing?.lastName ?? "");
+  const [title, setTitle] = useState(editing?.title ?? "");
+  const [email, setEmail] = useState(editing?.email ?? "");
+  const [phone, setPhone] = useState(editing?.phone ?? "");
+  const [notes, setNotes] = useState(editing?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // Reset form fields after the close animation finishes — keeps the modal
-  // body from visually clearing mid-transition. Setting state inside an
-  // effect is intentional here (legitimate reset, not derived state).
   /* eslint-disable react-hooks/set-state-in-effect */
+  // Reset / re-prefill on open. When editing, pre-fill from `editing`.
+  // When adding, clear all fields. Runs after open transitions so the
+  // modal animates from a stable snapshot.
   useEffect(() => {
     if (!open) {
       const t = setTimeout(() => {
-        setFirstName("");
-        setLastName("");
-        setTitle("");
-        setEmail("");
-        setPhone("");
-        setNotes("");
         setError(null);
+        if (!editing) {
+          setFirstName("");
+          setLastName("");
+          setTitle("");
+          setEmail("");
+          setPhone("");
+          setNotes("");
+        }
       }, 150);
       return () => clearTimeout(t);
     }
-  }, [open]);
-
-  // Sync builder when the modal opens — handles the case where the parent
-  // changes defaultBuilderId between opens.
-  useEffect(() => {
-    if (open) setBuilderId(defaultBuilderId ?? builders[0]?.id ?? "");
-  }, [open, defaultBuilderId, builders]);
+    setBuilderId(editing?.builderId ?? defaultBuilderId ?? builders[0]?.id ?? "");
+    setFirstName(editing?.firstName ?? "");
+    setLastName(editing?.lastName ?? "");
+    setTitle(editing?.title ?? "");
+    setEmail(editing?.email ?? "");
+    setPhone(editing?.phone ?? "");
+    setNotes(editing?.notes ?? "");
+    setError(null);
+  }, [open, defaultBuilderId, builders, editing]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleSubmit(e: React.FormEvent) {
@@ -94,19 +116,32 @@ export function AddContactModal({
     }
     startTransition(async () => {
       try {
-        await addContact({
-          dealId,
-          builderId,
-          firstName,
-          lastName,
-          title,
-          email,
-          phone,
-          notes,
-        });
+        if (isEdit && editing) {
+          await updateContact({
+            dealId,
+            contactId: editing.contactId,
+            firstName,
+            lastName,
+            title,
+            email,
+            phone,
+            notes,
+          });
+        } else {
+          await addContact({
+            dealId,
+            builderId,
+            firstName,
+            lastName,
+            title,
+            email,
+            phone,
+            notes,
+          });
+        }
         onOpenChange(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not add contact.");
+        setError(err instanceof Error ? err.message : "Could not save contact.");
       }
     });
   }
@@ -115,17 +150,22 @@ export function AddContactModal({
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add Contact</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Contact" : "Add Contact"}</DialogTitle>
           <DialogDescription>
-            Add a person at a builder that&rsquo;s already on this deal. To add a brand-new builder
-            or one not yet on the deal, that flow is coming.
+            {isEdit
+              ? "Update this contact's details. To move them to a different builder, delete and re-add."
+              : "Add a person at a builder that's already on this deal."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="add-contact-builder">Builder</Label>
-            <Select value={builderId} onValueChange={(v) => setBuilderId(v ?? "")}>
+            <Select
+              value={builderId}
+              onValueChange={(v) => setBuilderId(v ?? "")}
+              disabled={isEdit}
+            >
               <SelectTrigger id="add-contact-builder">
                 <SelectValue placeholder="Pick a builder" />
               </SelectTrigger>
@@ -225,7 +265,7 @@ export function AddContactModal({
             </Button>
             <Button type="submit" disabled={isPending}>
               {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Save Contact
+              {isEdit ? "Save changes" : "Save Contact"}
             </Button>
           </DialogFooter>
         </form>

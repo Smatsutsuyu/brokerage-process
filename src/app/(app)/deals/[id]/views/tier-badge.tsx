@@ -15,28 +15,27 @@ import { updateBuyerTier } from "../actions";
 
 type Tier = "green" | "yellow" | "red" | "not_selected";
 
-// Short label appears in the in-row badge (limited cell width).
-// Descriptive label shows in the dropdown picker — matches the prototype's
-// "Green — Interested / Yellow — Evaluating / Red — Immediate Pass" wording
-// so the interest tiers are self-explanatory when changing them.
+// Badge text is the meaning ("Interested", not "Green") — the color already
+// conveys the tier; doubling up was redundant. Dropdown still shows the
+// "Green — Interested" form for full clarity when changing tier.
 const TIER_META: Record<
   Tier,
   { label: string; descriptive: string; badge: string; dot: string }
 > = {
   green: {
-    label: "Green",
+    label: "Interested",
     descriptive: "Green — Interested",
     badge: "bg-green-100 text-green-800",
     dot: "bg-tier-green",
   },
   yellow: {
-    label: "Yellow",
+    label: "Evaluating",
     descriptive: "Yellow — Evaluating",
     badge: "bg-yellow-100 text-yellow-800",
     dot: "bg-tier-yellow",
   },
   red: {
-    label: "Red",
+    label: "Immediate Pass",
     descriptive: "Red — Immediate Pass",
     badge: "bg-red-100 text-red-800",
     dot: "bg-tier-red",

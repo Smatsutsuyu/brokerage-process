@@ -1,13 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Mail, Phone } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Mail, Pencil, Phone, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-import { AddContactModal, type BuilderOption } from "./add-contact-modal";
+import { AddBuilderModal } from "./add-builder-modal";
+import {
+  AddContactModal,
+  type BuilderOption,
+  type EditingContact,
+} from "./add-contact-modal";
 import { BuyerCheckbox } from "./buyer-checkbox";
+import { DeleteContactDialog } from "./delete-contact-dialog";
 import { TierBadge } from "./tier-badge";
 
 type Tier = "green" | "yellow" | "red" | "not_selected";
@@ -21,10 +27,13 @@ export type BuyerRow = {
   builderName: string;
   builderClassification: "private" | "public";
   contactId: string | null;
+  contactFirstName: string | null;
+  contactLastName: string | null;
   contactName: string | null;
   contactTitle: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
+  contactNotes: string | null;
   leadName: string | null;
   omSent: boolean;
   called: boolean;
@@ -81,18 +90,16 @@ const TIER_RANK: Record<Tier, number> = {
   not_selected: 3,
 };
 
+// Only columns where ordering is meaningful are sortable. Free-text fields
+// like Title / Email / Phone / Comments don't sort usefully; omitted by design.
 type SortColumn =
   | "interest"
   | "builder"
   | "contact"
-  | "title"
-  | "email"
-  | "phone"
   | "type"
   | "lead"
   | "called"
-  | "om"
-  | "comments";
+  | "om";
 
 type SortDirection = "asc" | "desc";
 
@@ -110,6 +117,13 @@ function cmpTier(a: Tier, b: Tier): number {
   return TIER_RANK[a] - TIER_RANK[b];
 }
 
+// Compose "Last, First" for contact sort so last name is primary, first
+// name is the tiebreaker. Standard ordering for people lists.
+function contactSortKey(r: BuyerRow): string | null {
+  if (!r.contactLastName && !r.contactFirstName) return null;
+  return `${r.contactLastName ?? ""}, ${r.contactFirstName ?? ""}`;
+}
+
 function comparatorFor(column: SortColumn): (a: BuyerRow, b: BuyerRow) => number {
   switch (column) {
     case "interest":
@@ -117,13 +131,7 @@ function comparatorFor(column: SortColumn): (a: BuyerRow, b: BuyerRow) => number
     case "builder":
       return (a, b) => cmpText(a.builderName, b.builderName);
     case "contact":
-      return (a, b) => cmpText(a.contactName, b.contactName);
-    case "title":
-      return (a, b) => cmpText(a.contactTitle, b.contactTitle);
-    case "email":
-      return (a, b) => cmpText(a.contactEmail, b.contactEmail);
-    case "phone":
-      return (a, b) => cmpText(a.contactPhone, b.contactPhone);
+      return (a, b) => cmpText(contactSortKey(a), contactSortKey(b));
     case "type":
       return (a, b) => cmpText(a.builderClassification, b.builderClassification);
     case "lead":
@@ -132,8 +140,6 @@ function comparatorFor(column: SortColumn): (a: BuyerRow, b: BuyerRow) => number
       return (a, b) => cmpBool(a.called, b.called);
     case "om":
       return (a, b) => cmpBool(a.omSent, b.omSent);
-    case "comments":
-      return (a, b) => cmpText(a.comments, b.comments);
   }
 }
 
@@ -141,7 +147,10 @@ export function ContactsTable({ dealId, rows }: ContactsTableProps) {
   const [filter, setFilter] = useState<FilterValue>("all");
   const [sortBy, setSortBy] = useState<SortColumn>("builder");
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
-  const [addOpen, setAddOpen] = useState(false);
+  const [addContactOpen, setAddContactOpen] = useState(false);
+  const [addBuilderOpen, setAddBuilderOpen] = useState(false);
+  const [editing, setEditing] = useState<EditingContact | null>(null);
+  const [deleting, setDeleting] = useState<{ id: string; name: string | null } | null>(null);
 
   const builderOptions = useMemo<BuilderOption[]>(() => {
     const map = new Map<string, BuilderOption>();
@@ -215,9 +224,12 @@ export function ContactsTable({ dealId, rows }: ContactsTableProps) {
         })}
 
         <div className="ml-auto flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setAddBuilderOpen(true)}>
+            + Add Builder
+          </Button>
           <Button
             size="sm"
-            onClick={() => setAddOpen(true)}
+            onClick={() => setAddContactOpen(true)}
             disabled={builderOptions.length === 0}
             title={
               builderOptions.length === 0
@@ -231,10 +243,33 @@ export function ContactsTable({ dealId, rows }: ContactsTableProps) {
       </div>
 
       <AddContactModal
-        open={addOpen}
-        onOpenChange={setAddOpen}
+        open={addContactOpen}
+        onOpenChange={setAddContactOpen}
         dealId={dealId}
         builders={builderOptions}
+      />
+      <AddContactModal
+        open={editing !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+        dealId={dealId}
+        builders={builderOptions}
+        editing={editing ?? undefined}
+      />
+      <AddBuilderModal
+        open={addBuilderOpen}
+        onOpenChange={setAddBuilderOpen}
+        dealId={dealId}
+      />
+      <DeleteContactDialog
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        dealId={dealId}
+        contactId={deleting?.id ?? null}
+        contactName={deleting?.name ?? null}
       />
 
       <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
@@ -251,15 +286,9 @@ export function ContactsTable({ dealId, rows }: ContactsTableProps) {
               <SortHeader column="contact" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>
                 Contact
               </SortHeader>
-              <SortHeader column="title" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>
-                Title
-              </SortHeader>
-              <SortHeader column="email" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>
-                Email
-              </SortHeader>
-              <SortHeader column="phone" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>
-                Phone
-              </SortHeader>
+              <th className="px-3 py-2.5 text-left">Title</th>
+              <th className="px-3 py-2.5 text-left">Email</th>
+              <th className="px-3 py-2.5 text-left">Phone</th>
               <SortHeader column="type" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>
                 Type
               </SortHeader>
@@ -284,9 +313,7 @@ export function ContactsTable({ dealId, rows }: ContactsTableProps) {
               >
                 OM
               </SortHeader>
-              <SortHeader column="comments" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>
-                Comments
-              </SortHeader>
+              <th className="px-3 py-2.5 text-left">Comments</th>
               <th className="px-3 py-2.5"></th>
             </tr>
           </thead>
@@ -304,7 +331,7 @@ export function ContactsTable({ dealId, rows }: ContactsTableProps) {
                   <tr
                     key={row.key}
                     className={cn(
-                      "border-b border-gray-100 border-l-[3px] hover:bg-gray-50",
+                      "group border-b border-gray-100 border-l-[3px] hover:bg-gray-50",
                       meta.rowBorder,
                     )}
                   >
@@ -379,7 +406,43 @@ export function ContactsTable({ dealId, rows }: ContactsTableProps) {
                         <span className="text-gray-300">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5"></td>
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      {row.contactId && (
+                        <div className="flex justify-end gap-1 opacity-30 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditing({
+                                contactId: row.contactId!,
+                                builderId: row.builderId,
+                                firstName: row.contactFirstName ?? "",
+                                lastName: row.contactLastName ?? "",
+                                title: row.contactTitle,
+                                email: row.contactEmail,
+                                phone: row.contactPhone,
+                                notes: row.contactNotes,
+                              })
+                            }
+                            className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-blue-50 hover:text-blue-600"
+                            title="Edit contact"
+                            aria-label="Edit contact"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDeleting({ id: row.contactId!, name: row.contactName })
+                            }
+                            className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600"
+                            title="Delete contact"
+                            aria-label="Delete contact"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 );
               })

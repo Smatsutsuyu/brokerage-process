@@ -49,6 +49,8 @@ export async function ContactsView({ dealId }: ContactsViewProps) {
     builderName: r.builderName,
     builderClassification: r.builderClassification,
     contactId: r.contactId,
+    contactFirstName: r.contactFirstName,
+    contactLastName: r.contactLastName,
     contactName:
       r.contactFirstName || r.contactLastName
         ? `${r.contactFirstName ?? ""} ${r.contactLastName ?? ""}`.trim()
@@ -56,6 +58,7 @@ export async function ContactsView({ dealId }: ContactsViewProps) {
     contactTitle: r.contactTitle,
     contactEmail: r.contactEmail,
     contactPhone: r.contactPhone,
+    contactNotes: r.contactNotes,
     leadName:
       r.leadFirstName || r.leadLastName
         ? `${r.leadFirstName ?? ""} ${r.leadLastName ?? ""}`.trim()

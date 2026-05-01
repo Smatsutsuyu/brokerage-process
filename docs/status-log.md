@@ -4,6 +4,58 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-01 — Week 2 push: Contacts CRUD complete + Q&A + Issues + polish
+
+Three logical chunks landed in one session, all reachable from the deal page.
+
+### Done — Chunk 1: Contacts CRUD complete
+- **Edit Contact** — pencil icon in actions column → modal pre-filled with current values; reuses `AddContactModal` in edit mode (builder picker disabled, can't reassign builder via this flow). Server action `updateContact`.
+- **Delete Contact** — trash icon → small confirm dialog (`DeleteContactDialog`). Server action `deleteContact`.
+- **Add Builder modal** — new "+ Add Builder" button next to "+ Add Contact". Form: name, type (Private/Public), interest level (with descriptive labels), notes. Server action `addBuilderToDeal` runs in a single transaction (insert builder + insert deal_buyer atomically).
+- Edit/delete icons live in the actions column at low opacity, intensify on row hover.
+- Sortable columns narrowed to where it makes sense: Interest, Builder, Contact, Type, Lead, Called, OM. Removed sort from Title/Email/Phone/Comments (free-text sort isn't useful).
+- **Contact column sorts by last name**, then first name as tiebreaker — standard for people lists.
+- **Interest chip text changed** from color names ("Green") to descriptive meaning ("Interested" / "Evaluating" / "Immediate Pass" / "Not Selected"). The color already conveys the tier; doubling up was redundant. Dropdown options keep the "Green — Interested" form for full clarity when picking.
+
+### Done — Chunk 2: Q&A workflow tab
+- `qa-view.tsx` — server, fetches qa_items for the deal, ordered by created_at
+- `qa-list.tsx` — client; toolbar shows approved/pending counts + "Approve all", "Generate PDF" (Phase 2 placeholder), "Send email" (Phase 2 placeholder); empty-state card; "+ Add Q&A item" button
+- `qa-entry.tsx` — single entry component:
+  - **Pending entries**: inline editable Q + A textareas with auto-save on blur (only saves if dirty), small "Saving…" indicator
+  - **Approved entries**: read-only formatted display (Q in bold, A below), green-tinted card with green left border
+  - Per-entry actions: Approve button (disabled until Q + A both filled), Unapprove (returns to draft), Delete (with browser confirm)
+- Server actions: `addQaItem`, `updateQaItem`, `setQaApproved`, `deleteQaItem`, `approveAllQaItems`
+
+### Done — Chunk 3: Issues tracker tab
+- `issues-view.tsx` — server, fetches issues with assignee join (LEFT JOIN users); also fetches the org's user list for the assignee picker
+- `issues-list.tsx` — client; toolbar with open/in-progress/resolved counts; "+ Add Issue" button; empty-state card
+- `issue-status-badge.tsx` — clickable status badge with dropdown picker (Open / In Progress / Resolved); same pattern as TierBadge
+- `add-issue-modal.tsx` — form: title (required), description, status, priority, assigned (Unassigned + org user list), date identified (defaults to today). Reused for edit mode via `editing` prop.
+- Each issue card: status badge + priority chip in header; row actions (edit/delete) revealed on hover; status-colored left border (red/amber/green); assignee + identified date in meta footer
+- Server actions: `addIssue`, `updateIssue`, `setIssueStatus`, `deleteIssue`
+
+### Decisions
+- **Modal-based for Issues, inline-edit for Q&A.** Q&A entries naturally feel like they want inline editing (often dictation-style during a meeting); Issues feel like discrete records that warrant a deliberate "save" gesture.
+- **Auto-save on blur** for Q&A textareas, with dirty-checking so we don't fire writes on focus-only (no-change) blurs.
+- **Q&A approve gated on filled Q + A.** Prevents accidental approval of empty items.
+- **Add Builder is its own modal** (not inside Add Contact). Two separate flows, two clear buttons. Avoids a complex multi-mode form.
+- **`window.confirm()` for issue delete**, custom Dialog for contact delete. Inconsistency to revisit — could promote both to Dialog or use shadcn AlertDialog when installed. Minor.
+- **Drizzle `.returning({ id: x })` typed-column form doesn't work across our two-driver swap** — TypeScript narrows to the intersection. Switched to plain `.returning()` (returns all columns, harmless overhead at our row sizes).
+- **`addBuilderToDeal` uses a transaction** — atomic builder + deal_buyer creation. No orphan builders if the deal_buyer insert fails.
+
+### Notes for next steps
+- Consultants tab (still ComingSoon)
+- Deal CRUD: create new deal modal (currently disabled "+ New Deal" button), edit deal info, delete deal
+- Lead user reassignment in the Contacts table
+- Promote `window.confirm()` to a proper dialog for parity
+- Q&A: optional generated entry numbering (sequential per deal) instead of the index in the visible list
+- Q&A: "Generate PDF" and "Send email" wire-up — Phase 2
+
+### Blockers
+- None.
+
+---
+
 ## 2026-05-01 — Contacts: Add Contact modal (existing builder)
 
 ### Done

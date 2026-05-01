@@ -20,6 +20,8 @@ import { DealHeader } from "./deal-header";
 import { DealTabs } from "./deal-tabs";
 import { ChecklistView } from "./views/checklist-view";
 import { ContactsView } from "./views/contacts-view";
+import { IssuesView } from "./views/issues-view";
+import { QaView } from "./views/qa-view";
 
 const PHASE_LABELS: Record<string, string> = {
   phase_1: "Phase 1",
@@ -138,12 +140,12 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             ),
             qa: (
               <FeedbackZone section="deal-qa">
-                <ComingSoon label="Q&A workflow" />
+                <QaView dealId={id} />
               </FeedbackZone>
             ),
             issues: (
               <FeedbackZone section="deal-issues">
-                <ComingSoon label="Issues tracker" />
+                <IssuesView dealId={id} />
               </FeedbackZone>
             ),
             consultants: (
