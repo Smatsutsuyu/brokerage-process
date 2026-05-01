@@ -4,6 +4,68 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-01 — Phase 1 boundary: Consultants + Deal CRUD + Lead picker
+
+Three chunks shipped together — all five deal tabs are now functional, the sidebar can create deals, and the deal header has full lifecycle management. **Phase 1 is complete from a workflow-functionality standpoint.** Remaining Phase 1 work is polish + handoff prep; Phase 2 (document upload, document generation, email send) starts here.
+
+### Done — Chunk 1: Consultants tab
+- New server actions `addConsultant`, `updateConsultant`, `deleteConsultant`
+- `consultants-view.tsx` — server component fetching all consultants for the deal, ordered by role/side/firm
+- `consultants-list.tsx` — grid of 11 cards (one per CLAUDE.md role: landscape architect, civil engineer, soils engineer, cost-to-complete, HOA, dry utility, Phase I environmental, land use, biologist, architect, PSA attorney). Each card lists 0+ consultants assigned to that role.
+- Each consultant entry shows side badge (Buyer/Seller), firm name, contact name, email, phone, notes; edit + remove icons hover-revealed per entry; "+ add" affordance per role card
+- `consultant-modal.tsx` — add/edit form: role (preselected when adding from a card), side, firm, contact, email, phone, notes
+- "X of 11 roles filled" summary in the toolbar
+- Removed the now-unused `ComingSoon` placeholder from the deal page
+
+### Done — Chunk 2: Deal CRUD
+- New server actions in `src/app/(app)/deals/actions.ts`: `createDeal`, `updateDeal`, `deleteDeal` (delete redirects to `/`)
+- `deal-modal.tsx` — add/edit form with name, units, city, state, type (free text), phase/status, priority, notes; create flow auto-navigates to the new deal
+- `new-deal-button.tsx` — small client component wrapping the sidebar's "+ New Deal" button + modal trigger; replaces the previously disabled placeholder
+- `deal-menu.tsx` — three-dot dropdown in the deal header with **Edit deal** (opens DealModal in edit mode) and **Delete deal** (confirms via `useConfirm`, then deletes + redirects)
+- DealHeader updated to receive the `deal` prop and render the menu in the top-right of the title row
+
+### Done — Chunk 3: Lead user reassignment in Contacts
+- New server action `setBuyerLead` (sets `deal_buyers.lead_user_id`, supports null for unassigned)
+- `lead-picker.tsx` — dropdown showing org users + "Unassigned"; same pattern as TierBadge
+- Lead column in the contacts table replaced its plain-text display with the picker; reassign tier/lead inline without opening a modal
+- ContactsView now fetches the org user list (LEFT JOIN-style) and passes options through
+
+### Decisions
+- **Consultants are one-card-per-role** matching the prototype, but each card holds a list of consultants (not a single one). Aligns the schema's flexibility (multiple firms/sides per role) with the prototype's familiar visual.
+- **Deal page menu lives in the header**, not in the sidebar. Sidebar is for navigation; header is for the active context.
+- **Deal delete redirects to `/`** because the deleted deal's URL is now invalid. Done in the server action via `next/navigation`'s `redirect`.
+- **Lead picker dropdown is plain text** (not a colored badge) — leads aren't categorical; they're identity. Distinguishes visually from TierBadge.
+- **No bulk operations on consultants yet** (e.g., copy roster from a previous deal). Out of scope for Phase 1; revisit if Chris finds himself manually re-entering the same firms across deals.
+
+### Where we are
+**All five tabs functional:**
+- Checklist (interactive across 4 phases)
+- Contacts (sortable, multi-contact builders, tier change inline, called/OM toggles, add/edit/delete contact, add builder, lead reassignment inline)
+- Q&A (locked-by-default with Edit/Save/Cancel, approve/unapprove, approve all, delete, with PDF + email placeholders for Phase 2)
+- Issues (cards with status-colored borders, status change inline, add/edit/delete, assignee picker)
+- Consultants (11 role cards, add/edit/remove per consultant, Buyer/Seller side badges)
+
+**Deal management:**
+- Create deals from sidebar
+- Edit deal info from deal header
+- Delete deal (with redirect)
+- Sidebar shows deals with progress bars and priority indicators
+
+**In-app feedback widget** wired across 9 zones, `npm run feedback:report` for triage.
+
+### Notes for next steps (Phase 2)
+- Document upload (R2 storage)
+- Document viewer (PDF inline, Excel preview, image preview)
+- Document versioning (auto on save)
+- Templated outputs: Q&A File PDF (currently placeholder button), Marketing Report, Custom UW File
+- Resend email pipeline: sender domain verification, templated composition, in-platform review, send tracking
+- Land Advisors branding on generated PDFs
+
+### Blockers
+- None for Phase 1. Phase 2 needs Cloudflare R2 account + Resend account from Lakebridge.
+
+---
+
 ## 2026-05-01 — Week 2 push: Contacts CRUD complete + Q&A + Issues + polish
 
 Three logical chunks landed in one session, all reachable from the deal page.

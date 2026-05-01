@@ -16,6 +16,7 @@ import {
   type EditingContact,
 } from "./add-contact-modal";
 import { BuyerCheckbox } from "./buyer-checkbox";
+import { LeadPicker, type LeadOption } from "./lead-picker";
 import { TierBadge } from "./tier-badge";
 
 type Tier = "green" | "yellow" | "red" | "not_selected";
@@ -36,6 +37,7 @@ export type BuyerRow = {
   contactEmail: string | null;
   contactPhone: string | null;
   contactNotes: string | null;
+  leadUserId: string | null;
   leadName: string | null;
   omSent: boolean;
   called: boolean;
@@ -45,6 +47,7 @@ export type BuyerRow = {
 type ContactsTableProps = {
   dealId: string;
   rows: BuyerRow[];
+  leadOptions: LeadOption[];
 };
 
 const FILTER_META: Record<
@@ -145,7 +148,7 @@ function comparatorFor(column: SortColumn): (a: BuyerRow, b: BuyerRow) => number
   }
 }
 
-export function ContactsTable({ dealId, rows }: ContactsTableProps) {
+export function ContactsTable({ dealId, rows, leadOptions }: ContactsTableProps) {
   const [filter, setFilter] = useState<FilterValue>("all");
   const [sortBy, setSortBy] = useState<SortColumn>("builder");
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
@@ -383,8 +386,14 @@ export function ContactsTable({ dealId, rows }: ContactsTableProps) {
                     <td className="px-3 py-2.5 text-[10px] tracking-wider text-gray-500 uppercase">
                       {row.builderClassification}
                     </td>
-                    <td className="px-3 py-2.5 text-gray-600">
-                      {row.leadName ?? <span className="text-gray-300">—</span>}
+                    <td className="px-3 py-2.5">
+                      <LeadPicker
+                        dealId={dealId}
+                        dealBuyerId={row.dealBuyerId}
+                        currentUserId={row.leadUserId}
+                        currentName={row.leadName}
+                        options={leadOptions}
+                      />
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex justify-center">

@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
 
 import { db } from "@/db";
 import { deals, checklistItems, checklistCategories } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { LandAdvisorsLogo } from "@/components/brand/logo";
+import { NewDealButton } from "@/components/layout/new-deal-button";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type SidebarProps = {
@@ -44,16 +43,7 @@ export async function Sidebar({ activeDealId }: SidebarProps) {
 
       <div className="border-b border-gray-200 p-5">
         <div className="mb-3 text-xs font-bold tracking-wider text-gray-700 uppercase">Deals</div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full border-dashed text-xs font-medium"
-          disabled
-          title="Coming in week 2-3"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          New Deal
-        </Button>
+        <NewDealButton />
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">

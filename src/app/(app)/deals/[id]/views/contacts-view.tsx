@@ -1,15 +1,18 @@
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { builders, contacts, dealBuyers, users } from "@/db/schema";
+import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
 import { ContactsTable, type BuyerRow } from "./contacts-table";
+import type { LeadOption } from "./lead-picker";
 
 type ContactsViewProps = {
   dealId: string;
 };
 
 export async function ContactsView({ dealId }: ContactsViewProps) {
+  const org = await getCurrentOrg();
   // One row per (builder × contact). LEFT JOIN on contacts so a builder with
   // no contacts still surfaces — the deal_buyer association alone says "this
   // company is on the deal," which is meaningful even before names are added.
@@ -59,6 +62,7 @@ export async function ContactsView({ dealId }: ContactsViewProps) {
     contactEmail: r.contactEmail,
     contactPhone: r.contactPhone,
     contactNotes: r.contactNotes,
+    leadUserId: r.leadUserId,
     leadName:
       r.leadFirstName || r.leadLastName
         ? `${r.leadFirstName ?? ""} ${r.leadLastName ?? ""}`.trim()
@@ -70,5 +74,23 @@ export async function ContactsView({ dealId }: ContactsViewProps) {
     comments: r.contactNotes ?? r.comments,
   }));
 
-  return <ContactsTable dealId={dealId} rows={buyerRows} />;
+  const orgUsers = org
+    ? await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        })
+        .from(users)
+        .where(eq(users.orgId, org.id))
+        .orderBy(asc(users.lastName))
+    : [];
+
+  const leadOptions: LeadOption[] = orgUsers.map((u) => ({
+    id: u.id,
+    name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email,
+  }));
+
+  return <ContactsTable dealId={dealId} rows={buyerRows} leadOptions={leadOptions} />;
 }

@@ -8,6 +8,7 @@ import {
   builders,
   checklistCategories,
   checklistItems,
+  consultants,
   contacts,
   dealBuyers,
   issues,
@@ -81,6 +82,22 @@ export async function setBuyerOmSent(input: {
   await db
     .update(dealBuyers)
     .set({ omSentAt: input.omSent ? new Date() : null })
+    .where(and(eq(dealBuyers.id, input.dealBuyerId), eq(dealBuyers.orgId, org.id)));
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
+export async function setBuyerLead(input: {
+  dealBuyerId: string;
+  dealId: string;
+  leadUserId: string | null;
+}) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  await db
+    .update(dealBuyers)
+    .set({ leadUserId: input.leadUserId })
     .where(and(eq(dealBuyers.id, input.dealBuyerId), eq(dealBuyers.orgId, org.id)));
 
   revalidatePath(`/deals/${input.dealId}`);
@@ -360,6 +377,96 @@ export async function approveAllQaItems(input: { dealId: string }) {
         eq(qaItems.approved, false),
       ),
     );
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
+export type ConsultantRole =
+  | "landscape_architect"
+  | "civil_engineer"
+  | "soils_engineer"
+  | "cost_to_complete"
+  | "hoa"
+  | "dry_utility"
+  | "phase_1_environmental"
+  | "land_use"
+  | "biologist"
+  | "architect"
+  | "psa_attorney";
+
+export type ConsultantSide = "buyer" | "seller";
+
+export async function addConsultant(input: {
+  dealId: string;
+  role: ConsultantRole;
+  side: ConsultantSide;
+  firmName: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  notes?: string;
+}) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  const firmName = input.firmName.trim();
+  if (!firmName) throw new Error("Firm name is required");
+
+  await db.insert(consultants).values({
+    orgId: org.id,
+    dealId: input.dealId,
+    role: input.role,
+    side: input.side,
+    firmName,
+    contactName: input.contactName?.trim() || null,
+    contactEmail: input.contactEmail?.trim() || null,
+    contactPhone: input.contactPhone?.trim() || null,
+    notes: input.notes?.trim() || null,
+  });
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
+export async function updateConsultant(input: {
+  dealId: string;
+  consultantId: string;
+  role: ConsultantRole;
+  side: ConsultantSide;
+  firmName: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  notes?: string;
+}) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  const firmName = input.firmName.trim();
+  if (!firmName) throw new Error("Firm name is required");
+
+  await db
+    .update(consultants)
+    .set({
+      role: input.role,
+      side: input.side,
+      firmName,
+      contactName: input.contactName?.trim() || null,
+      contactEmail: input.contactEmail?.trim() || null,
+      contactPhone: input.contactPhone?.trim() || null,
+      notes: input.notes?.trim() || null,
+    })
+    .where(and(eq(consultants.id, input.consultantId), eq(consultants.orgId, org.id)));
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
+export async function deleteConsultant(input: { dealId: string; consultantId: string }) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  await db
+    .delete(consultants)
+    .where(and(eq(consultants.id, input.consultantId), eq(consultants.orgId, org.id)));
 
   revalidatePath(`/deals/${input.dealId}`);
 }

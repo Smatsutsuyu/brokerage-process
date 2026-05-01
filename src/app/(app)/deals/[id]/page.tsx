@@ -19,6 +19,7 @@ import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { DealHeader } from "./deal-header";
 import { DealTabs } from "./deal-tabs";
 import { ChecklistView } from "./views/checklist-view";
+import { ConsultantsView } from "./views/consultants-view";
 import { ContactsView } from "./views/contacts-view";
 import { IssuesView } from "./views/issues-view";
 import { QaView } from "./views/qa-view";
@@ -124,6 +125,17 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             statusLabel={PHASE_LABELS[deal.status] ?? deal.status}
             priority={deal.priority}
             progressPct={pct}
+            deal={{
+              dealId: deal.id,
+              name: deal.name,
+              units: deal.units,
+              city: deal.city,
+              state: deal.state,
+              type: deal.type,
+              status: deal.status,
+              priority: deal.priority,
+              notes: deal.notes,
+            }}
           />
         </FeedbackZone>
         <DealTabs counts={counts}>
@@ -150,7 +162,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             ),
             consultants: (
               <FeedbackZone section="deal-consultants">
-                <ComingSoon label="Consultant roster" />
+                <ConsultantsView dealId={id} />
               </FeedbackZone>
             ),
           }}
@@ -160,13 +172,3 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   );
 }
 
-function ComingSoon({ label }: { label: string }) {
-  return (
-    <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
-      <h2 className="mb-1 text-base font-semibold text-gray-700">{label}</h2>
-      <p className="text-sm text-gray-500">
-        Built in week 2-3 of Phase 1. Schema and infrastructure are in place.
-      </p>
-    </div>
-  );
-}

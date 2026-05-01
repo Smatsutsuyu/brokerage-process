@@ -2,15 +2,19 @@ import { Star } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 
+import { DealMenu } from "./deal-menu";
+import type { EditingDeal } from "../deal-modal";
+
 type DealHeaderProps = {
   name: string;
   subtitle: string;
   statusLabel: string;
   priority: "low" | "medium" | "high";
   progressPct: number;
+  deal: EditingDeal;
 };
 
-export function DealHeader({ name, subtitle, statusLabel, priority, progressPct }: DealHeaderProps) {
+export function DealHeader({ name, subtitle, statusLabel, priority, progressPct, deal }: DealHeaderProps) {
   return (
     <header className="mb-5">
       <div className="mb-1 flex items-center gap-3">
@@ -24,6 +28,9 @@ export function DealHeader({ name, subtitle, statusLabel, priority, progressPct 
         <Badge variant="secondary" className="ml-1">
           {statusLabel}
         </Badge>
+        <div className="ml-auto">
+          <DealMenu deal={deal} />
+        </div>
       </div>
       <p className="text-[13px] text-gray-400">{subtitle}</p>
 
