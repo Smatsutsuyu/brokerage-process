@@ -4,6 +4,57 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-01 — Vendor reduction: dropped Clerk + Sentry, added Better Auth
+
+After discussion with the user about vendor count for an internal tool: Lakebridge will manage 5 vendor accounts instead of 7. Per-vendor cost (account, dashboard learning curve, billing surprises, security boundaries) compounds; for 5-10 users at this scale, Clerk's value-add (orgs primitive, drop-in UI) is mostly build-time win for me, not ops win for Lakebridge.
+
+### Done — Sentry removed
+- Uninstalled `@sentry/nextjs`. No config files were ever added (only the package).
+- Updated CLAUDE.md stack table — error visibility now relies on Vercel function logs, which are sufficient at this scale.
+
+### Done — Clerk → Better Auth swap
+- Uninstalled `@clerk/nextjs`. Removed ClerkProvider TODO from root layout (was never wired anyway).
+- Installed `better-auth`. Configured with email/password, Drizzle adapter pointing at our Postgres, 7-day session, `nextCookies()` plugin for Server Action support.
+- New auth schema (`src/db/schema/auth.ts`): `auth_user`, `auth_session`, `auth_account`, `auth_verification`. All tables prefixed `auth_*` to keep them visually grouped and avoid collision with our `users` table.
+- `users.clerk_user_id` renamed to `users.auth_user_id` (text, unique, **nullable** — owner can pre-create a membership row before invitee first signs in).
+- Added `users.disabled_at` for soft account disable (separate from delete; preserves historical FK references).
+- New API route handler at `/api/auth/[...all]/route.ts` (Better Auth's catch-all).
+- New middleware at `src/middleware.ts` (must be in src/, not root, when using src directory). Cookie presence check redirects unauthenticated users to `/sign-in?from=<path>`. Allows `/sign-in` and `/api/auth/*` through.
+- New `/sign-in` page with email/password form via `signIn.email()`.
+- `getCurrentUser()` and `getCurrentOrg()` rewritten to read Better Auth session via `auth.api.getSession({ headers })`. Sidebar, deal pages, contacts view, etc. all use these — no callsite changes.
+- Sidebar footer now shows current user with a dropdown for sign out + (owner-only) Members link.
+- New `/admin/members` page (owner-only, `dynamic = "force-dynamic"`):
+  - List of all org members with role, status (active/disabled), "You" badge for the current user
+  - "Invite member" modal: name, email, role, auto-generated initial password (regenerable). On success, shows credentials for the owner to share out-of-band.
+  - Inline role change via dropdown
+  - Disable / re-enable toggle (with confirm dialog for disable)
+  - Owner can't change their own role or disable their own account
+- Seed updated: creates Chris's Better Auth account using `auth.api.signUpEmail()` (so the password gets hashed correctly), then inserts the matching `users` row with `authUserId` linked. Dev credentials: `cshiota@lakebridgecap.com` / `lakebridge-dev-password`.
+
+### Decisions
+- **Better Auth (self-hosted) over WorkOS / Auth0 / Auth.js / roll-your-own.** Modern TypeScript-first DX, runs entirely on our Postgres, supports the primitives we need (email/password, sessions, OAuth-ready for Google later), no vendor lock-in.
+- **`auth_*` table naming** rather than letting Better Auth use `user`/`session`/etc. (which would collide with our existing `users` table). Required schema customization passed to drizzleAdapter.
+- **Auth user separate from app user.** Same pattern we had with Clerk — Better Auth manages identity (auth_user); our `users` table handles org membership + role. They join via `auth_user_id`.
+- **Invite-only with owner-issued initial passwords**, not open sign-up. The /sign-up UI doesn't exist; owner uses /admin/members to add people. **Caveat:** the `/api/auth/sign-up/email` endpoint is technically still reachable (we couldn't use Better Auth's `disableSignUp: true` because it blocks our own server-side seed/invite calls). **TODO before production launch:** add Better Auth's admin plugin OR a server-side guard that rejects sign-up requests not originating from the members admin page. Tracked here.
+- **Soft disable, not hard delete** for member deactivation. Preserves all the FK references (lead_user_id, completed_by, approved_by, etc.) which would otherwise null out and lose audit-relevant attribution.
+- **Middleware does cookie-presence check only**, not full session validation. Validation happens in server code via `auth.api.getSession()`. Faster middleware, single source of truth for "what does signed-in mean."
+- **Schema sync via `db:push --force`** rather than generating a clean migration. The `clerkUserId → authUserId` rename triggers an interactive prompt drizzle-kit can't satisfy in non-TTY shells. Migration history can be squashed before production cutover.
+
+### Notes for next steps
+- Wire Google OAuth in Better Auth (single config addition + GOOGLE_CLIENT_ID/SECRET env vars). Punted because Lakebridge can decide later whether Google is required or email/password is enough.
+- Add a `/profile` page so users can change their own password (currently only achievable via SQL).
+- Harden the open `/api/auth/sign-up/email` endpoint before going live (see Decisions).
+- Audit log entries for member changes (role / disable). Schema supports it; not yet wired.
+
+### Bug fix discovered along the way
+- Stale dev server on port 3000 was serving compiled-out-of-date code, which had me chasing a ghost in middleware redirect logic. Killed via `taskkill /PID /F`. Worth knowing for future hot-reload weirdness — when localhost behavior doesn't match the source, check `ss -lntp | grep :3000` for an orphan.
+- Middleware must be at `src/middleware.ts` when using the `src/` directory layout, not project root. Originally placed at root; moved.
+
+### Blockers
+- None. Auth is enforced; Lakebridge can't go live until they have at least one Lakebridge-domain admin account, but locally we're fully functional.
+
+---
+
 ## 2026-05-01 — Phase 1 boundary: Consultants + Deal CRUD + Lead picker
 
 Three chunks shipped together — all five deal tabs are now functional, the sidebar can create deals, and the deal header has full lifecycle management. **Phase 1 is complete from a workflow-functionality standpoint.** Remaining Phase 1 work is polish + handoff prep; Phase 2 (document upload, document generation, email send) starts here.

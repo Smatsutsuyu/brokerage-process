@@ -110,6 +110,17 @@ You likely have another Postgres running (a system service or another project). 
 **Schema looks out of sync with the code**
 Easiest fix: `npm run db:reset && npm run db:migrate`. Loses all local data.
 
+## Signing in locally
+
+After `npm run db:seed`, sign in at [http://localhost:3000/sign-in](http://localhost:3000/sign-in) with:
+
+- **Email**: `cshiota@lakebridgecap.com`
+- **Password**: `lakebridge-dev-password`
+
+(Defined in `src/db/seed.ts`.)
+
+To add more local members: sign in as Chris (owner role), open the user menu in the sidebar footer, click **Members**, then **Invite member**. The dialog generates an initial password you can share with the new user.
+
 ## In-app feedback (review tool)
 
 While Chris is exercising the platform during the build, he can leave in-app feedback that gets stored in Postgres for Sean to triage.

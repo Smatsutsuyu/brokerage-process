@@ -1,8 +1,21 @@
-import { db } from "@/db";
+import { headers } from "next/headers";
+import { eq } from "drizzle-orm";
 
-// Placeholder until Clerk is wired. Returns the first user in the DB
-// (Chris's seeded user). Once Clerk middleware is enforcing auth, replace
-// this with a lookup by clerk_user_id from auth() / currentUser().
+import { db } from "@/db";
+import { users } from "@/db/schema";
+
+import { auth } from "./auth";
+
+// Resolves the signed-in user. Returns null when there's no session, or when
+// the auth user has no app-level membership row (which shouldn't happen
+// after the owner invites them, but we guard anyway).
 export async function getCurrentUser() {
-  return db.query.users.findFirst();
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) return null;
+  const row = await db.query.users.findFirst({
+    where: eq(users.authUserId, session.user.id),
+  });
+  if (!row) return null;
+  if (row.disabledAt) return null;
+  return row;
 }

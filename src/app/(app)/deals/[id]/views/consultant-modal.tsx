@@ -30,7 +30,7 @@ import {
   type ConsultantSide,
 } from "../actions";
 
-import { CONSULTANT_ROLES } from "./consultants-list";
+import { CONSULTANT_ROLES, ROLE_LABEL, SIDE_LABEL } from "./consultant-roles";
 
 export type EditingConsultant = {
   consultantId: string;
@@ -49,15 +49,6 @@ type ConsultantModalProps = {
   dealId: string;
   defaultRole?: ConsultantRole;
   editing?: EditingConsultant;
-};
-
-const ROLE_LABEL = Object.fromEntries(
-  CONSULTANT_ROLES.map((r) => [r.value, r.label]),
-) as Record<ConsultantRole, string>;
-
-const SIDE_LABEL: Record<ConsultantSide, string> = {
-  buyer: "Buyer-side",
-  seller: "Seller-side",
 };
 
 export function ConsultantModal({

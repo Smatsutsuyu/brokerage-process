@@ -162,10 +162,10 @@ The platform's internal UI can use either Lakebridge or Land Advisors branding (
 | Hosting        | Vercel Pro                                                          | $20/month, required (Hobby tier prohibits commercial use)                        |
 | Database       | Neon Postgres                                                       | Free tier (0.5 GB) sufficient for years; Launch tier ($19) when needed           |
 | File Storage   | Cloudflare R2                                                       | Free tier (10 GB), no egress fees, S3-compatible                                 |
-| Auth           | Clerk                                                               | Free tier (50K MAU), use Clerk's organizations primitive                         |
+| Auth           | **Better Auth** (self-hosted)                                       | Switched from Clerk 2026-05-01. Runs on our Postgres via Drizzle adapter; no vendor account, full UI control. Member management via in-app `/admin/members` page (owner-gated). |
 | AI             | Anthropic API direct                                                | Claude Sonnet 4.6 for substantive generation, Haiku 4.5 for emails/short outputs |
 | Email          | Resend                                                              | Free tier (3K/month, 100/day) sufficient                                         |
-| Monitoring     | Sentry                                                              | Free tier (5K errors/month)                                                      |
+| Monitoring     | **Vercel Logs** (Sentry removed)                                    | Sentry removed 2026-05-01 to reduce vendor count. Vercel function logs cover error visibility for an internal tool of this scale. Revisit if errors become hard to triage. |
 | PDF Generation | React-PDF (`@react-pdf/renderer`)                                   | Server-side, fast, no Chromium dependency                                        |
 
 ### Multi-Tenancy

@@ -1,9 +1,17 @@
-import { db } from "@/db";
+import { eq } from "drizzle-orm";
 
-// Placeholder until Clerk is wired. Returns the first org in the DB.
-// Once Clerk middleware is enforcing auth, replace this with:
-//   - Read the Clerk org ID from auth() / currentUser()
-//   - Look up the org row by clerk_org_id
+import { db } from "@/db";
+import { organizations } from "@/db/schema";
+
+import { getCurrentUser } from "./get-current-user";
+
+// Resolves the signed-in user's org. Single-tenant for now (one Lakebridge
+// org), but the lookup goes through the user → org_id link so adding a
+// second org later wouldn't require touching every caller.
 export async function getCurrentOrg() {
-  return db.query.organizations.findFirst();
+  const user = await getCurrentUser();
+  if (!user) return null;
+  return db.query.organizations.findFirst({
+    where: eq(organizations.id, user.orgId),
+  });
 }

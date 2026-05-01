@@ -2,11 +2,16 @@
 // See package.json db:seed script.
 import { eq, inArray, sql } from "drizzle-orm";
 
+import { auth } from "@/lib/auth/auth";
+
 import { db, schema } from "./index";
+
+const DEV_PASSWORD = "lakebridge-dev-password";
 
 async function main() {
   console.log("Wiping existing data...");
   // Order matters for FK cascade. Truncate everything; identity columns reset.
+  // Auth tables are wiped too so we can re-create Chris's account fresh.
   await db.execute(sql`TRUNCATE TABLE
     audit_log,
     documents,
@@ -21,10 +26,14 @@ async function main() {
     builders,
     deals,
     users,
-    organizations
+    organizations,
+    auth_session,
+    auth_account,
+    auth_verification,
+    auth_user
     RESTART IDENTITY CASCADE`);
 
-  console.log("Seeding organization + user...");
+  console.log("Seeding organization...");
   const [org] = await db
     .insert(schema.organizations)
     .values({
@@ -34,11 +43,24 @@ async function main() {
     })
     .returning();
 
+  console.log(
+    `Creating Chris's auth account (sign in locally with cshiota@lakebridgecap.com / ${DEV_PASSWORD})...`,
+  );
+  // Use Better Auth's API so the password gets hashed correctly (rather than
+  // hand-inserting into auth_account ourselves).
+  const signUpResult = await auth.api.signUpEmail({
+    body: {
+      name: "Chris Shiota",
+      email: "cshiota@lakebridgecap.com",
+      password: DEV_PASSWORD,
+    },
+  });
+
   const [chris] = await db
     .insert(schema.users)
     .values({
       orgId: org.id,
-      clerkUserId: "user_dev_chris",
+      authUserId: signUpResult.user.id,
       email: "cshiota@lakebridgecap.com",
       firstName: "Chris",
       lastName: "Shiota",

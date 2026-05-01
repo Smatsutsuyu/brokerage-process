@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Loader2, Mail, Pencil, Phone, Plus, Trash2 } from "lucide-react";
+import { Loader2, Mail, Pencil, Phone, Plus, StickyNote, Trash2 } from "lucide-react";
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { deleteConsultant, type ConsultantRole, type ConsultantSide } from "../actions";
 
 import { ConsultantModal, type EditingConsultant } from "./consultant-modal";
+import { CONSULTANT_ROLES, SIDE_META } from "./consultant-roles";
 
 export type ConsultantRow = {
   id: string;
@@ -24,25 +25,6 @@ export type ConsultantRow = {
 type ConsultantsListProps = {
   dealId: string;
   items: ConsultantRow[];
-};
-
-export const CONSULTANT_ROLES: Array<{ value: ConsultantRole; label: string }> = [
-  { value: "landscape_architect", label: "Landscape Architect" },
-  { value: "civil_engineer", label: "Civil Engineer" },
-  { value: "soils_engineer", label: "Soils Engineer" },
-  { value: "cost_to_complete", label: "Cost to Complete Consultant" },
-  { value: "hoa", label: "HOA Consultant" },
-  { value: "dry_utility", label: "Dry Utility Consultant" },
-  { value: "phase_1_environmental", label: "Phase I Environmental Consultant" },
-  { value: "land_use", label: "Land Use Consultant" },
-  { value: "biologist", label: "Biologist" },
-  { value: "architect", label: "Architect" },
-  { value: "psa_attorney", label: "PSA Attorney" },
-];
-
-const SIDE_META: Record<ConsultantSide, { label: string; chip: string }> = {
-  buyer: { label: "Buyer", chip: "bg-blue-100 text-blue-700" },
-  seller: { label: "Seller", chip: "bg-emerald-100 text-emerald-700" },
 };
 
 export function ConsultantsList({ dealId, items }: ConsultantsListProps) {
@@ -94,7 +76,7 @@ export function ConsultantsList({ dealId, items }: ConsultantsListProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3.5">
+      <div className="space-y-3">
         {CONSULTANT_ROLES.map((role) => {
           const roleItems = byRole.get(role.value) ?? [];
           const isFilled = roleItems.length > 0;
@@ -114,7 +96,7 @@ export function ConsultantsList({ dealId, items }: ConsultantsListProps) {
                 <button
                   type="button"
                   onClick={() => setAdding({ role: role.value })}
-                  className="flex h-6 w-6 items-center justify-center rounded text-gray-400 opacity-0 hover:bg-blue-50 hover:text-blue-600 group-hover:opacity-100"
+                  className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-blue-50 hover:text-blue-600"
                   title={`Add ${role.label.toLowerCase()}`}
                   aria-label={`Add ${role.label.toLowerCase()}`}
                 >
@@ -131,92 +113,27 @@ export function ConsultantsList({ dealId, items }: ConsultantsListProps) {
                   No consultant yet — click to add
                 </button>
               ) : (
-                <div className="space-y-2.5">
-                  {roleItems.map((item) => {
-                    const sideMeta = SIDE_META[item.side];
-                    const isDeleting = deletingId === item.id;
-                    return (
-                      <div
-                        key={item.id}
-                        className={cn("group/item relative", isDeleting && "opacity-50")}
-                      >
-                        <div className="mb-1 flex items-center gap-1.5">
-                          <span
-                            className={cn(
-                              "rounded-full px-1.5 py-px text-[9px] font-semibold tracking-wider uppercase",
-                              sideMeta.chip,
-                            )}
-                          >
-                            {sideMeta.label}
-                          </span>
-                          <span className="flex-1 text-[15px] font-semibold text-gray-900">
-                            {item.firmName}
-                          </span>
-                          <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setEditing({
-                                  consultantId: item.id,
-                                  role: item.role,
-                                  side: item.side,
-                                  firmName: item.firmName,
-                                  contactName: item.contactName,
-                                  contactEmail: item.contactEmail,
-                                  contactPhone: item.contactPhone,
-                                  notes: item.notes,
-                                })
-                              }
-                              className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-blue-50 hover:text-blue-600"
-                              title="Edit consultant"
-                              aria-label="Edit consultant"
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(item)}
-                              disabled={isDeleting}
-                              className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600"
-                              title="Remove consultant"
-                              aria-label="Remove consultant"
-                            >
-                              {isDeleting ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-3 w-3" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                        {item.contactName && (
-                          <div className="text-[13px] text-gray-700">{item.contactName}</div>
-                        )}
-                        <div className="space-y-0.5 text-[12px] leading-relaxed text-gray-500">
-                          {item.contactEmail && (
-                            <a
-                              href={`mailto:${item.contactEmail}`}
-                              className="inline-flex items-center gap-1 hover:text-blue-600"
-                            >
-                              <Mail className="h-3 w-3" />
-                              {item.contactEmail}
-                            </a>
-                          )}
-                          {item.contactPhone && (
-                            <div className="inline-flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {item.contactPhone}
-                            </div>
-                          )}
-                          {item.notes && (
-                            <div className="mt-1 text-[11px] text-gray-400 italic">
-                              {item.notes}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="space-y-1.5">
+                  {roleItems.map((item) => (
+                    <ConsultantEntry
+                      key={item.id}
+                      item={item}
+                      isDeleting={deletingId === item.id}
+                      onEdit={() =>
+                        setEditing({
+                          consultantId: item.id,
+                          role: item.role,
+                          side: item.side,
+                          firmName: item.firmName,
+                          contactName: item.contactName,
+                          contactEmail: item.contactEmail,
+                          contactPhone: item.contactPhone,
+                          notes: item.notes,
+                        })
+                      }
+                      onDelete={() => handleDelete(item)}
+                    />
+                  ))}
                 </div>
               )}
             </article>
@@ -240,6 +157,123 @@ export function ConsultantsList({ dealId, items }: ConsultantsListProps) {
         dealId={dealId}
         editing={editing ?? undefined}
       />
+    </div>
+  );
+}
+
+type ConsultantEntryProps = {
+  item: ConsultantRow;
+  isDeleting: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+};
+
+function ConsultantEntry({ item, isDeleting, onEdit, onDelete }: ConsultantEntryProps) {
+  const [showNote, setShowNote] = useState(false);
+  const sideMeta = SIDE_META[item.side];
+  const hasContact = Boolean(item.contactEmail || item.contactPhone);
+  const hasNote = Boolean(item.notes?.trim());
+
+  return (
+    <div
+      className={cn(
+        "group/item rounded-lg border border-gray-100 bg-gray-50/40",
+        isDeleting && "opacity-50",
+      )}
+    >
+      <div className="flex items-start gap-2 px-2.5 py-1.5">
+        <div className="flex flex-shrink-0 flex-col items-center gap-1">
+          <span
+            className={cn(
+              "mt-0.5 rounded-full px-1.5 py-px text-[9px] font-semibold tracking-wider uppercase",
+              sideMeta.chip,
+            )}
+          >
+            {sideMeta.label}
+          </span>
+          {hasNote && (
+            <button
+              type="button"
+              onClick={() => setShowNote((v) => !v)}
+              aria-expanded={showNote}
+              aria-label={showNote ? "Hide note" : "Show note"}
+              title={showNote ? "Hide note" : "Show note"}
+              className={cn(
+                "flex h-6 w-6 items-center justify-center rounded transition-colors",
+                showNote
+                  ? "bg-amber-100 text-amber-700"
+                  : "text-amber-500 hover:bg-amber-50 hover:text-amber-700",
+              )}
+            >
+              <StickyNote className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-[14px] font-semibold text-gray-900 select-text">
+              {item.firmName}
+            </span>
+            {item.contactName && (
+              <span className="truncate text-[12px] text-gray-500 select-text">
+                · {item.contactName}
+              </span>
+            )}
+          </div>
+          {hasContact && (
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] text-gray-500">
+              {item.contactEmail && (
+                <a
+                  href={`mailto:${item.contactEmail}`}
+                  className="inline-flex items-center gap-1 hover:text-blue-600"
+                >
+                  <Mail className="h-3 w-3" />
+                  <span className="select-text">{item.contactEmail}</span>
+                </a>
+              )}
+              {item.contactPhone && (
+                <span className="inline-flex items-center gap-1 select-text">
+                  <Phone className="h-3 w-3" />
+                  {item.contactPhone}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-blue-50 hover:text-blue-600"
+            title="Edit consultant"
+            aria-label="Edit consultant"
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={isDeleting}
+            className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600"
+            title="Remove consultant"
+            aria-label="Remove consultant"
+          >
+            {isDeleting ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Trash2 className="h-3 w-3" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {hasNote && showNote && (
+        <div className="border-t border-gray-200 px-3 py-2">
+          <div className="max-h-32 overflow-y-auto rounded bg-white px-2 py-1.5 text-[11px] leading-relaxed text-gray-600 italic select-text">
+            {item.notes}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

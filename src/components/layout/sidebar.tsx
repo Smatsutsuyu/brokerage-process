@@ -5,7 +5,9 @@ import { deals, checklistItems, checklistCategories } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { LandAdvisorsLogo } from "@/components/brand/logo";
 import { NewDealButton } from "@/components/layout/new-deal-button";
+import { UserMenu } from "@/components/layout/user-menu";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
+import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { cn } from "@/lib/utils";
 
 type SidebarProps = {
@@ -13,7 +15,7 @@ type SidebarProps = {
 };
 
 export async function Sidebar({ activeDealId }: SidebarProps) {
-  const org = await getCurrentOrg();
+  const [org, me] = await Promise.all([getCurrentOrg(), getCurrentUser()]);
 
   const dealRows = org
     ? await db
@@ -95,6 +97,18 @@ export async function Sidebar({ activeDealId }: SidebarProps) {
           })
         )}
       </nav>
+
+      {me && (
+        <div className="border-t border-gray-200 p-2">
+          <UserMenu
+            name={
+              `${me.firstName ?? ""} ${me.lastName ?? ""}`.trim() || me.email
+            }
+            email={me.email}
+            role={me.role}
+          />
+        </div>
+      )}
     </aside>
   );
 }

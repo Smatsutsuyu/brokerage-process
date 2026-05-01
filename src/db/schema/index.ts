@@ -11,3 +11,4 @@ export * from "./consultants";
 export * from "./documents";
 export * from "./audit-log";
 export * from "./feedback";
+export * from "./auth";
