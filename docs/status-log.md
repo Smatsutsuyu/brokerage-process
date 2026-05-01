@@ -4,6 +4,168 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-01 — Contacts: prototype columns + sortable headers + called/OM toggles
+
+### Done
+- **Contacts table now matches the prototype's 13-column layout**: `# / Interest / Builder / Contact / Title / Email / Phone / Type / Lead / Called / OM / Comments / (actions)`. Previously had 7 columns with Interest at the end.
+- **Interest dropdown labels restored to prototype's descriptive form**: "Green — Interested" / "Yellow — Evaluating" / "Red — Immediate Pass" / "Not Selected on Deal". In-row badges keep the short label so the cell stays compact.
+- **Sortable column headers across all 11 sortable columns** (everything except # and the actions placeholder).
+  - Click a header → first click sets ascending, second flips to descending. Different column resets to ascending.
+  - Active column shows ↑/↓ icon; idle columns show a muted ↕ to signal sortability.
+  - Default sort: Builder asc.
+  - Sort + filter compose — `#` reflects position in the visible (filtered + sorted) set.
+  - Comparators: text uses `localeCompare`, nulls/empty always sort last regardless of direction; tiers use a fixed rank (green/yellow/red/not_selected); booleans rank false-then-true.
+- **Called and OM Sent are now interactive checkboxes**, not just display.
+  - New server actions: `setBuyerCalled` and `setBuyerOmSent` — flip the timestamp to `now()` or `null`.
+  - New client component: `views/buyer-checkbox.tsx` — same `useTransition` + spinner pattern as `ChecklistCheckbox`.
+
+### Decisions
+- **Two-state sort cycle (asc → desc → asc)**, not three-state (asc → desc → no-sort). Three-state is hard to remember; two-state is predictable. Resetting to a "no sort" doesn't add value when there's always a sensible default (Builder asc).
+- **Checkboxes write a timestamp, not a boolean.** Schema stores `calledAt` / `omSentAt` as nullable timestamps — gives us "when did this happen" for free, surfaceable in tooltips/reports later. Booleans for the UI are derived (`!!omSentAt`).
+- **Comments column uses `line-clamp-2`** (truncates after 2 lines, max-width xs). Matches the prototype's intent — comments shouldn't blow up the row height.
+- **Empty actions column is a `<th></th>` placeholder** to reserve the slot. Edit/delete buttons land in the next slice.
+
+### Notes for next steps
+- Add Contact modal (pick existing builder OR create new builder + first contact)
+- Edit / Delete contact (icons in the actions column)
+- Lead user reassignment (currently shows seeded value only)
+- Comments inline edit (click to edit?)
+
+### Blockers
+- None.
+
+---
+
+## 2026-05-01 — Contacts: multi-contact builders + inline tier change
+
+### Done
+- **Seed updated to demonstrate multiple contacts per builder.** Lennar now has 2 contacts (Mark Sustana + Jennifer Lee), Toll Brothers has 2 (Sarah Pham + Michael Chen), Shea Homes stays at 1 (David Kim) so both cases are visible. Schema and query already supported this — only the seed needed adjustment.
+- **Inline tier change is live.** Click any tier badge in the Contacts table → dropdown menu appears with all 4 tiers (Green / Yellow / Red / Not Selected). Pick a tier → server action updates `deal_buyers.tier` → `revalidatePath` refreshes the page.
+- New: `src/app/(app)/deals/[id]/views/tier-badge.tsx` — client component using shadcn `DropdownMenu` (just installed); shows current tier with colored dot + chevron, spinner during the round-trip
+- New action `updateBuyerTier` in `actions.ts` — scoped by `org_id` for tenant isolation, same pattern as `toggleChecklistItem`
+- Installed `src/components/ui/dropdown-menu.tsx` via shadcn add
+
+### Decisions
+- **Dropdown picker over click-to-cycle.** Cycling (green → yellow → red → not_selected → green) is annoying when going from "red" back to "green" — needs 2 clicks. Direct picker is one click + one selection regardless of source/target.
+- **Tier filter chips and the badge use the same `TIER_META` shape but in two files.** Slight duplication (chip vs badge styling). Acceptable — extracting a shared util is over-DRY at this scale.
+- **`onSelect` instead of `onClick`** on DropdownMenuItem — radix/baseui menu primitives use onSelect for keyboard + mouse uniformly.
+
+### Notes for next steps
+- Add Contact modal (pick existing builder OR create new builder + first contact)
+- Edit / Delete contact (less urgent than add)
+- "OM Sent" / "Called" status flags surfaced in the table (schema already has them)
+- Lead user reassignment (currently shows seeded value only)
+
+### Blockers
+- None.
+
+---
+
+## 2026-05-01 — Contacts/Buyers tab (read-only) + DB pool fix
+
+### Done
+- **Contacts tab is functional.** Replaced the "Coming soon" placeholder with a real read-only view of buyers on each deal.
+  - `src/app/(app)/deals/[id]/views/contacts-view.tsx` — server component, fetches one row per (builder × contact) joining `deal_buyers → builders → contacts → users` (lead). Uses LEFT JOIN on contacts so builders without named contacts still appear.
+  - `src/app/(app)/deals/[id]/views/contacts-table.tsx` — client component, renders the prototype-style table (Builder / Contact / Title / Email / Phone / Lead / Tier) with tier-colored left border on each row.
+  - Filter chips above the table: All / Green / Yellow / Red / Not Selected — each with a live count, client-side filtering via `useState`.
+  - "+ Add Contact" button placeholder (disabled with tooltip) — CRUD comes next slice.
+- **Postgres connection pool fix.** Build was hitting "too many clients already" because each Next.js build worker spun up a fresh `postgres()` client with the default 10-connection pool. Two changes:
+  - `src/db/index.ts` now wraps the `postgres()` client in a `globalThis` singleton with `max: 5` per instance, so dev hot-reload and build workers reuse the same pool.
+  - `src/app/(app)/page.tsx` exports `dynamic = "force-dynamic"` (the home page reads org-scoped data; never appropriate to prerender statically).
+
+### Decisions
+- **Read-only first, CRUD in a follow-up slice.** Establishes the rendering pattern, lets you visually confirm the layout matches Chris's prototype, then we add modals for create/edit/delete.
+- **One row per `(builder × contact)`**, not one per builder. Matches the prototype and reflects the real workflow ("which person at Lennar do I email?"). A builder with three contacts gets three rows, all sharing the same tier badge.
+- **Tier badges are display-only for now.** Click-to-cycle tier change comes with the CRUD slice.
+- **Connection-pool singleton via `globalThis`** — standard Next.js pattern for any DB client. Dev hot-reload would otherwise leak a new pool on every file change. Belt-and-suspenders with the `max: 5` cap.
+
+### Notes for next steps
+- Add Contact / Edit / Delete modals — server actions + client components, same pattern as the checklist toggle
+- Tier change inline (click badge → cycle, or dropdown)
+- "Lead" column should let you assign a team member (currently shows the seeded value only)
+- "OM Sent" / "Called" status flags from the schema are loaded but not yet surfaced in the table
+
+### Blockers
+- None.
+
+---
+
+## 2026-05-01 — Feedback widget polish (Chris review pass 1)
+
+### Done
+- **Affordance no longer overlaps section corner content.** Default `<FeedbackZone>` position changed from `top-2 right-2` (inside corner) to `-top-2 -right-2` (just outside corner). Was colliding with the chevron on the checklist's first phase header.
+- **`align="inside"` escape hatch** added to FeedbackZone — for zones that abut the viewport edge (e.g. priority ribbon at top of screen) where the outside-corner position would clip. Applied to the priority-ribbon zone.
+- **Severity dropdown labels shortened** to single words (Nit / Suggestion / Bug / Blocker). The dash-separated explainer text was overflowing the dropdown trigger. Schema enum values unchanged — historical data still consistent.
+- **Email field removed from feedback modal.** `getCurrentUser()` already populates `userEmail` on the server side from the user record (currently the seeded Chris user, the auth-context user once Clerk wires). Single source of truth, less for Chris to type.
+
+---
+
+## 2026-05-01 — In-app feedback widget for Chris's review
+
+### Done
+- New `feedback_items` Postgres table (org_id, user_id, user_email, section, page_path, commit_sha, severity enum, comment, status enum, timestamps)
+- Two new enums: `feedback_severity` (nit/suggestion/bug/blocker), `feedback_status` (new/reviewed/actioned/wontfix)
+- Migration `0001_dizzy_wind_dancer.sql` generated and applied
+- Build-time commit SHA capture in `next.config.ts` — pulls `VERCEL_GIT_COMMIT_SHA` first, else `git rev-parse HEAD`, exposed as `NEXT_PUBLIC_COMMIT_SHA`
+- Env additions: `NEXT_PUBLIC_FEEDBACK_ENABLED` (boolean, default true), `NEXT_PUBLIC_COMMIT_SHA` (string, default "unknown")
+- `getCurrentUser()` placeholder helper alongside `getCurrentOrg()` — both return first row from DB until Clerk wires real auth context
+- Feedback module under `src/components/feedback/`:
+  - `actions.ts` — `submitFeedback` server action with input validation (5000 char cap, trim, slice page/section)
+  - `feedback-context.tsx` — React context for sharing modal open state + active section
+  - `feedback-modal.tsx` — shadcn Dialog form, captures section/page/commit/severity/comment/email, success state with auto-close
+  - `feedback-button.tsx` — floating bottom-right button for general feedback
+  - `feedback-zone.tsx` — wrapper component, hover reveals corner 💬 icon for section-specific feedback
+  - `feedback-shell.tsx` — server component, env-gated; mounts provider/button/modal when enabled, transparently passes children through when disabled
+- Wired `<FeedbackShell>` into `(app)/layout.tsx`
+- Sprinkled `<FeedbackZone>` around 9 sections: priority-ribbon, sidebar (×2 — home + deal page), home-empty-state, deal-header, deal-checklist, deal-contacts, deal-qa, deal-issues, deal-consultants
+- Report script `src/scripts/feedback-report.ts` with `npm run feedback:report` — markdown output grouped by section, severity-sorted within section, supports `--status=new|reviewed|actioned|wontfix|open|all` and `--out=<path>`
+- Verified end-to-end: floating button + 4 zones present in homepage HTML, 4 zones present in deal page HTML; submitted 3 test rows via SQL, report rendered them grouped/sorted correctly; lint and build pass clean
+- Docs updated: `docs/local-development.md` has full feedback section (how it works, reading reports, marking reviewed, disabling for prod, full removal steps); CLAUDE.md Quick Start references it
+
+### Decisions
+- **Section-level granularity, not component-level.** ~10 zones across the platform, not hundreds. Per the design discussion, Chris cares about workflow areas, not React components.
+- **Env-gated, not removed.** `NEXT_PUBLIC_FEEDBACK_ENABLED=false` flips the whole module to a no-op for production. Removal procedure is documented but unnecessary if env flag is sufficient.
+- **Self-hosted in Postgres**, not piped to Linear/Slack/Sentry. Self-contained, no external accounts, easy to remove. If feedback volume grows past manual triage, can layer integrations later.
+- **No screenshots in v1.** `getDisplayMedia()` permissions are a UX hassle. Page URL + section name + commit SHA gives me enough to find the spot. Add later if Chris's feedback is hard to interpret.
+- **Severity over priority.** "Nit / Suggestion / Bug / Blocker" maps better to UX feedback than "Low / Medium / High."
+- **`useFeedback` returns a no-op context outside `FeedbackContextProvider`** so `FeedbackZone` can render safely when feedback is disabled without throwing.
+- **Server action input is validated and clamped** (trim, length cap, slice on bounded string fields). Belt-and-suspenders against malformed payloads.
+
+### Notes for next steps
+- Admin UI for marking items reviewed/actioned is deferred — for now use SQL via `psql`. Worth building if/when feedback volume justifies it.
+- Once Clerk wires real users, the `userEmail` field becomes optional cleanup (auth context provides it).
+
+### Blockers
+- None.
+
+---
+
+## 2026-05-01 — Week 2 start: checklist interactivity + full 4-phase seed
+
+### Done
+- **Server actions pattern established.** `src/app/(app)/deals/[id]/actions.ts` with `toggleChecklistItem`, scoped by `org_id` so a forged item ID can't reach across tenants. Uses `revalidatePath` to refresh the page after a write.
+- **Interactive checkbox** (`views/checklist-checkbox.tsx`) — client component with `useTransition` for pending state, swaps to a spinner during the round-trip, optimistic-feeling latency.
+- **Seed expanded to all four phases** — previously only Phase 1 was seeded. Now all 4 phases (Phase 1 going to market, Phase 2 marketing process, Phase 3 ownership summary of offers, Phase 4 deal management) populated per CLAUDE.md.
+- **Phase 1 keeps the 5 hierarchical categories** Chris's CLAUDE.md sketches (Listing & Buyer Setup, Third Party Marketing Reports, Valuation, Marketing Documents, Underwriting & OM). Phases 2-4 use a single "Items" bucket since CLAUDE.md doesn't break those down further.
+- Dev server verified end-to-end: deal page returns 200, all four phase headers render (with descriptive subtitles e.g. "Phase 1 — Going to Market"), Phase 1's 5 categories all render with their items, completed items styled correctly, no errors in Next.js log.
+
+### Decisions
+- **Hierarchical UI kept** (Phase → Category → Items). Briefly considered flattening to match the prototype more literally, but user clarified the hierarchical design is fine — original CLAUDE.md decision stands.
+- **Server actions over API routes** for mutations. Idiomatic for App Router; one-file colocated with the page; type-safe; auto-revalidation via `revalidatePath`.
+- **`useTransition` for pending state** rather than `useOptimistic`. Toggle is fast and simple; optimistic update would complicate rollback handling for negligible UX gain at our scale.
+- **Phase descriptive labels in the UI** ("Phase 1 — Going to Market") instead of bare "Phase 1". Costs nothing, makes the workflow legible to a new user. Sourced from CLAUDE.md's "Business Domain" section.
+- **`assertItemOnDeal` helper** in actions.ts — kept around for any future action that takes an itemId and needs to confirm cross-deal isolation.
+
+### Notes for next steps
+- Checklist dependency enforcement (per CLAUDE.md note 15: "block items until prerequisites are checked") not yet implemented. Schema supports it via `checklist_item_dependencies`; UI work + seed examples needed.
+- Other tabs (Contacts, Q&A, Issues, Consultants) still placeholder. Same server-actions pattern will apply.
+- Deal create/edit not yet built (sidebar's "+ New Deal" button is disabled with a tooltip).
+
+### Blockers
+- None. Real Clerk keys would unblock auth context (currently `getCurrentOrg` returns first org as a placeholder), but unblocking is not blocking.
+
+---
+
 ## 2026-04-30 — Day 6-7: App shell + Clerk skeleton
 
 ### Done

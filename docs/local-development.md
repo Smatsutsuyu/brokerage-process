@@ -109,3 +109,52 @@ You likely have another Postgres running (a system service or another project). 
 
 **Schema looks out of sync with the code**
 Easiest fix: `npm run db:reset && npm run db:migrate`. Loses all local data.
+
+## In-app feedback (review tool)
+
+While Chris is exercising the platform during the build, he can leave in-app feedback that gets stored in Postgres for Sean to triage.
+
+**How it works**
+
+- Floating "Feedback" button bottom-right of every page → captures general/page-level notes.
+- Hover over any major section (sidebar, priority ribbon, deal header, each tab) → a small 💬 icon appears in the corner. Click it to comment specifically on that section.
+- Each submission captures: section name, page URL, build commit SHA, severity (nit/suggestion/bug/blocker), comment, and submitter email.
+- Stored in the `feedback_items` table.
+
+**Reading feedback**
+
+```bash
+# Default: show all "new" items grouped by section
+npm run feedback:report
+
+# All items including reviewed/actioned/wontfix
+npm run feedback:report -- --status=all
+
+# Items still needing attention (new + reviewed)
+npm run feedback:report -- --status=open
+
+# Write to a file
+npm run feedback:report -- --out=docs/feedback-2026-05-01.md
+```
+
+**Marking items reviewed/actioned**
+
+For now, update directly via SQL (admin UI deferred):
+
+```bash
+docker exec -it brokerage-postgres psql -U postgres -d brokerage_dev
+# UPDATE feedback_items SET status = 'reviewed', reviewed_at = now() WHERE id = '...';
+# UPDATE feedback_items SET status = 'actioned', actioned_at = now() WHERE id = '...';
+```
+
+**Disabling for production**
+
+Set `NEXT_PUBLIC_FEEDBACK_ENABLED=false` in the production environment (Vercel dashboard). The entire feedback module becomes a no-op — button hides, zones render their children only, no feedback table writes possible from the UI. To strip from the codebase entirely post-handoff:
+
+1. Delete `src/components/feedback/`
+2. Delete `src/scripts/feedback-report.ts`
+3. Delete `src/db/schema/feedback.ts` and the two `feedback_*` enums in `enums.ts`
+4. Generate a migration to drop the table
+5. Remove `<FeedbackShell>` and `<FeedbackZone>` references from `src/app/(app)/layout.tsx` and the deal pages
+6. Remove `NEXT_PUBLIC_FEEDBACK_ENABLED`, `NEXT_PUBLIC_COMMIT_SHA` from `src/lib/env.ts` and `.env.example`
+7. Remove the SHA capture from `next.config.ts`

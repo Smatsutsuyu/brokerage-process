@@ -10,6 +10,8 @@ This file is the authoritative project context for Claude Code working on the La
 
 **To run the platform locally**, see [docs/local-development.md](docs/local-development.md). TL;DR: `npm install`, `npm run db:up`, `npm run db:migrate`, `npm run dev`. Local Postgres runs in Docker; Clerk/Resend keys can stay as placeholders until those accounts are live.
 
+**Reviewing client feedback during the build**: Chris uses an in-app feedback widget (floating button + per-section 💬 icons) to leave notes while exercising the platform. Notes flow into the `feedback_items` Postgres table. Read them with `npm run feedback:report` (defaults to "new" items grouped by section, with build commit SHA so you can correlate against deployed code). Disabled via `NEXT_PUBLIC_FEEDBACK_ENABLED=false` for production launch. See `docs/local-development.md` for full mechanics including how to mark items reviewed/actioned.
+
 **Current phase:** Phase 1 (Foundation), week 1. Goal: scaffold and ship to a Vercel preview URL before doing anything else.
 
 **Headline scope decisions (locked, do not revisit without explicit instruction):**

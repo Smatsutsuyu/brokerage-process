@@ -45,3 +45,17 @@ export const consultantRoleEnum = pgEnum("consultant_role", [
 ]);
 
 export const documentStatusEnum = pgEnum("document_status", ["draft", "final"]);
+
+export const feedbackSeverityEnum = pgEnum("feedback_severity", [
+  "nit",
+  "suggestion",
+  "bug",
+  "blocker",
+]);
+
+export const feedbackStatusEnum = pgEnum("feedback_status", [
+  "new",
+  "reviewed",
+  "actioned",
+  "wontfix",
+]);

@@ -10,3 +10,4 @@ export * from "./issues";
 export * from "./consultants";
 export * from "./documents";
 export * from "./audit-log";
+export * from "./feedback";

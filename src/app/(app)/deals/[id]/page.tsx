@@ -12,12 +12,14 @@ import {
   issues,
   qaItems,
 } from "@/db/schema";
+import { FeedbackZone } from "@/components/feedback/feedback-zone";
 import { Sidebar } from "@/components/layout/sidebar";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
 import { DealHeader } from "./deal-header";
 import { DealTabs } from "./deal-tabs";
 import { ChecklistView } from "./views/checklist-view";
+import { ContactsView } from "./views/contacts-view";
 
 const PHASE_LABELS: Record<string, string> = {
   phase_1: "Phase 1",
@@ -103,28 +105,52 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
 
   return (
     <>
-      <Sidebar activeDealId={id} />
+      <FeedbackZone section="sidebar">
+        <Sidebar activeDealId={id} />
+      </FeedbackZone>
       <main className="bg-brand-bg flex-1 overflow-y-auto px-10 py-8">
-        <DealHeader
-          name={deal.name}
-          subtitle={[
-            [deal.city, deal.state].filter(Boolean).join(", ") || "No location",
-            `${counts.checklist.done}/${counts.checklist.total} checklist`,
-            `${counts.contacts} contacts`,
-            `${counts.qa.approved}/${counts.qa.total} Q&A`,
-            `${counts.issuesOpen} open issues`,
-          ].join(" · ")}
-          statusLabel={PHASE_LABELS[deal.status] ?? deal.status}
-          priority={deal.priority}
-          progressPct={pct}
-        />
+        <FeedbackZone section="deal-header">
+          <DealHeader
+            name={deal.name}
+            subtitle={[
+              [deal.city, deal.state].filter(Boolean).join(", ") || "No location",
+              `${counts.checklist.done}/${counts.checklist.total} checklist`,
+              `${counts.contacts} contacts`,
+              `${counts.qa.approved}/${counts.qa.total} Q&A`,
+              `${counts.issuesOpen} open issues`,
+            ].join(" · ")}
+            statusLabel={PHASE_LABELS[deal.status] ?? deal.status}
+            priority={deal.priority}
+            progressPct={pct}
+          />
+        </FeedbackZone>
         <DealTabs counts={counts}>
           {{
-            checklist: <ChecklistView categories={categories} items={items} />,
-            contacts: <ComingSoon label="Contacts management" />,
-            qa: <ComingSoon label="Q&A workflow" />,
-            issues: <ComingSoon label="Issues tracker" />,
-            consultants: <ComingSoon label="Consultant roster" />,
+            checklist: (
+              <FeedbackZone section="deal-checklist">
+                <ChecklistView dealId={id} categories={categories} items={items} />
+              </FeedbackZone>
+            ),
+            contacts: (
+              <FeedbackZone section="deal-contacts">
+                <ContactsView dealId={id} />
+              </FeedbackZone>
+            ),
+            qa: (
+              <FeedbackZone section="deal-qa">
+                <ComingSoon label="Q&A workflow" />
+              </FeedbackZone>
+            ),
+            issues: (
+              <FeedbackZone section="deal-issues">
+                <ComingSoon label="Issues tracker" />
+              </FeedbackZone>
+            ),
+            consultants: (
+              <FeedbackZone section="deal-consultants">
+                <ComingSoon label="Consultant roster" />
+              </FeedbackZone>
+            ),
           }}
         </DealTabs>
       </main>

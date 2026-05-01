@@ -59,6 +59,7 @@ async function main() {
     .returning();
 
   await db.insert(schema.contacts).values([
+    // Lennar — two contacts (multi-contact case)
     {
       orgId: org.id,
       builderId: builderRows[0].id,
@@ -70,6 +71,16 @@ async function main() {
     },
     {
       orgId: org.id,
+      builderId: builderRows[0].id,
+      firstName: "Jennifer",
+      lastName: "Lee",
+      title: "Director of Acquisitions",
+      email: "jlee@lennar.com",
+      phone: "(949) 555-0111",
+    },
+    // Toll Brothers — two contacts (multi-contact case)
+    {
+      orgId: org.id,
       builderId: builderRows[1].id,
       firstName: "Sarah",
       lastName: "Pham",
@@ -77,6 +88,16 @@ async function main() {
       email: "spham@tollbrothers.com",
       phone: "(949) 555-0102",
     },
+    {
+      orgId: org.id,
+      builderId: builderRows[1].id,
+      firstName: "Michael",
+      lastName: "Chen",
+      title: "Senior Land Manager",
+      email: "mchen@tollbrothers.com",
+      phone: "(949) 555-0112",
+    },
+    // Shea Homes — one contact
     {
       orgId: org.id,
       builderId: builderRows[3].id,
@@ -125,74 +146,137 @@ async function main() {
     { orgId: org.id, dealId: lakeview.id, builderId: builderRows[3].id, tier: "not_selected" },
   ]);
 
-  console.log("Seeding checklist (Phase 1)...");
-  // Categorize Phase 1 items per CLAUDE.md hierarchical structure.
-  const phase1Categories = [
+  console.log("Seeding checklist (all four phases per CLAUDE.md, hierarchical)...");
+  // Items are CLAUDE.md verbatim. Phase 1 uses the category groupings the
+  // discovery section sketches (Valuation, Third Party Marketing Reports,
+  // Marketing Documents, plus Listing & Buyer Setup and Underwriting & OM
+  // for items not covered by Chris's sketched categories). Phases 2-4 use a
+  // single "Items" bucket since CLAUDE.md doesn't break them down further;
+  // categories can be added per Chris's preference later without schema work.
+  const phaseSpec: Array<{
+    phase: "phase_1" | "phase_2" | "phase_3" | "phase_4";
+    categories: Array<{ name: string; items: Array<string | { name: string; optional?: boolean }> }>;
+  }> = [
     {
-      name: "Listing & Buyer Setup",
-      items: ["Listing Agreement", "Initial List of Potential Buyers"],
-    },
-    {
-      name: "Third Party Marketing Reports",
-      items: [
-        { name: "HOA Budget" },
-        { name: "Cost to Complete (CTC)" },
-        { name: "CFD Analysis" },
-        { name: "Market Study", optional: true },
+      phase: "phase_1",
+      categories: [
+        {
+          name: "Listing & Buyer Setup",
+          items: ["Listing Agreement", "Initial List of Potential Buyers"],
+        },
+        {
+          name: "Third Party Marketing Reports",
+          items: [
+            "HOA Budget",
+            "Cost to Complete",
+            "CFD Analysis",
+            { name: "Market Study", optional: true },
+          ],
+        },
+        {
+          name: "Valuation",
+          items: ["Premium Analysis", "Valuation"],
+        },
+        {
+          name: "Marketing Documents",
+          items: [
+            "Entitlement Schedule",
+            { name: "Development Schedule", optional: true },
+            "Entitlement Summary",
+          ],
+        },
+        {
+          name: "Underwriting & OM",
+          items: [
+            "Custom Underwriting File for Deal",
+            "Offering Memorandum",
+            "Marketing Report (Green/Yellow/Red buyer categorization)",
+            "Determine PSA Attorney (drafting preference)",
+          ],
+        },
       ],
     },
     {
-      name: "Valuation",
-      items: ["Premium Analysis", "Valuation"],
-    },
-    {
-      name: "Marketing Documents",
-      items: [
-        { name: "Entitlement Schedule" },
-        { name: "Development Schedule", optional: true },
-        { name: "Entitlement Summary" },
+      phase: "phase_2",
+      categories: [
+        {
+          name: "Items",
+          items: [
+            "Send out OM / Blast (personalized by buyer tier)",
+            "Request In-Person Meeting with Top (Green) Buyers",
+            "Coordinate a Q&A File",
+            "Send out Q&A File",
+            { name: "Share Market Study", optional: true },
+            "Email Notification of Offers Due (X days before)",
+            "Day-of Reminder",
+            "Automated follow-up to Green & Yellow buyers whose offers haven't come in",
+          ],
+        },
       ],
     },
     {
-      name: "Underwriting & OM",
-      items: [
-        "Custom Underwriting File for Deal",
-        "Offering Memorandum",
-        "Marketing Report (Green/Yellow/Red)",
-        "Determine PSA Attorney",
+      phase: "phase_3",
+      categories: [
+        {
+          name: "Items",
+          items: [
+            "Schedule Meeting with Ownership",
+            "Create Initial Summary (send out as received)",
+            "Review Underwriting Sheets for clarification",
+            "Run LOI through AI → SOO Matrix",
+            "Run UW Sheets through AI → Revenue Charts & UW Summary",
+            "PDF everything together",
+            "Create Recommendation memo (Pro/Con of each offer)",
+          ],
+        },
+      ],
+    },
+    {
+      phase: "phase_4",
+      categories: [
+        {
+          name: "Items",
+          items: [
+            "Share All Due Diligence",
+            "Kick Off PSA",
+            "Kickoff Call",
+            "Bi-Weekly Meeting Schedule for DD",
+            "Determine CTC Date",
+            "Issues Tracking Sheet (living document)",
+            "Consultant Roster",
+          ],
+        },
       ],
     },
   ];
 
   for (const deal of [riverside, lakeview]) {
-    for (const [catIdx, cat] of phase1Categories.entries()) {
-      const [category] = await db
-        .insert(schema.checklistCategories)
-        .values({
-          orgId: org.id,
-          dealId: deal.id,
-          phase: "phase_1",
-          name: cat.name,
-          sortOrder: catIdx,
-        })
-        .returning();
+    let phaseIdx = 0;
+    for (const spec of phaseSpec) {
+      for (const [catIdx, cat] of spec.categories.entries()) {
+        const [category] = await db
+          .insert(schema.checklistCategories)
+          .values({
+            orgId: org.id,
+            dealId: deal.id,
+            phase: spec.phase,
+            name: cat.name,
+            sortOrder: phaseIdx * 100 + catIdx,
+          })
+          .returning();
 
-      const itemRows = cat.items.map((it, idx) => {
-        if (typeof it === "string") {
-          return { orgId: org.id, categoryId: category.id, name: it, sortOrder: idx };
-        }
-        return {
-          orgId: org.id,
-          categoryId: category.id,
-          name: it.name,
-          optional: it.optional ?? false,
-          sortOrder: idx,
-        };
-      });
-      await db.insert(schema.checklistItems).values(itemRows);
+        const itemRows = cat.items.map((it, idx) => {
+          const base = { orgId: org.id, categoryId: category.id, sortOrder: idx };
+          return typeof it === "string"
+            ? { ...base, name: it }
+            : { ...base, name: it.name, optional: it.optional ?? false };
+        });
+        await db.insert(schema.checklistItems).values(itemRows);
+      }
+      phaseIdx++;
     }
 
-    // Mark a few items complete on Riverside so the progress bar isn't 0%.
+    // Mark a few Phase 1 items complete on Riverside so progress isn't 0%.
     if (deal.id === riverside.id) {
       const all = await db
         .select({ id: schema.checklistItems.id, name: schema.checklistItems.name })
@@ -202,18 +286,15 @@ async function main() {
           eq(schema.checklistItems.categoryId, schema.checklistCategories.id),
         )
         .where(eq(schema.checklistCategories.dealId, riverside.id));
-      const toComplete = all
-        .filter((i) =>
-          [
-            "Listing Agreement",
-            "Initial List of Potential Buyers",
-            "HOA Budget",
-            "Cost to Complete (CTC)",
-            "Premium Analysis",
-            "Offering Memorandum",
-          ].includes(i.name),
-        )
-        .map((i) => i.id);
+      const completedNames = new Set([
+        "Listing Agreement",
+        "Initial List of Potential Buyers",
+        "HOA Budget",
+        "Cost to Complete",
+        "Premium Analysis",
+        "Offering Memorandum",
+      ]);
+      const toComplete = all.filter((i) => completedNames.has(i.name)).map((i) => i.id);
       if (toComplete.length > 0) {
         await db
           .update(schema.checklistItems)

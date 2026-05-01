@@ -2,9 +2,13 @@ import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+import { ChecklistCheckbox } from "./checklist-checkbox";
+
+type Phase = "phase_1" | "phase_2" | "phase_3" | "phase_4";
+
 type Category = {
   id: string;
-  phase: "phase_1" | "phase_2" | "phase_3" | "phase_4";
+  phase: Phase;
   name: string;
   sortOrder: number;
 };
@@ -19,18 +23,21 @@ type Item = {
 };
 
 type ChecklistViewProps = {
+  dealId: string;
   categories: Category[];
   items: Item[];
 };
 
-const PHASE_META: Record<Category["phase"], { label: string; bg: string; chip: string }> = {
-  phase_1: { label: "Phase 1", bg: "bg-phase-1", chip: "bg-blue-600" },
-  phase_2: { label: "Phase 2", bg: "bg-phase-2", chip: "bg-green-600" },
-  phase_3: { label: "Phase 3", bg: "bg-phase-3", chip: "bg-purple-600" },
-  phase_4: { label: "Phase 4", bg: "bg-phase-4", chip: "bg-orange-600" },
+const PHASE_META: Record<Phase, { label: string; bg: string }> = {
+  phase_1: { label: "Phase 1 — Going to Market", bg: "bg-phase-1" },
+  phase_2: { label: "Phase 2 — Marketing Process", bg: "bg-phase-2" },
+  phase_3: { label: "Phase 3 — Ownership Summary of Offers", bg: "bg-phase-3" },
+  phase_4: { label: "Phase 4 — Deal Management", bg: "bg-phase-4" },
 };
 
-export function ChecklistView({ categories, items }: ChecklistViewProps) {
+const PHASES: Phase[] = ["phase_1", "phase_2", "phase_3", "phase_4"];
+
+export function ChecklistView({ dealId, categories, items }: ChecklistViewProps) {
   if (categories.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
@@ -43,8 +50,7 @@ export function ChecklistView({ categories, items }: ChecklistViewProps) {
     );
   }
 
-  // Group categories by phase, then items by category.
-  const byPhase = new Map<Category["phase"], Category[]>();
+  const byPhase = new Map<Phase, Category[]>();
   for (const cat of categories) {
     const list = byPhase.get(cat.phase) ?? [];
     list.push(cat);
@@ -57,33 +63,26 @@ export function ChecklistView({ categories, items }: ChecklistViewProps) {
     itemsByCategory.set(item.categoryId, list);
   }
 
-  const phases: Category["phase"][] = ["phase_1", "phase_2", "phase_3", "phase_4"];
-
   return (
     <div className="space-y-6">
-      {phases.map((phase) => {
+      {PHASES.map((phase) => {
         const phaseCats = byPhase.get(phase) ?? [];
         if (phaseCats.length === 0) return null;
         const meta = PHASE_META[phase];
-        const allItemsInPhase = phaseCats.flatMap((c) => itemsByCategory.get(c.id) ?? []);
-        const phaseDone = allItemsInPhase.filter((i) => i.completed).length;
-        const phaseTotal = allItemsInPhase.length;
+        const phaseItems = phaseCats.flatMap((c) => itemsByCategory.get(c.id) ?? []);
+        const phaseDone = phaseItems.filter((i) => i.completed).length;
+        const phaseTotal = phaseItems.length;
 
         return (
           <section key={phase} className="overflow-hidden rounded-xl shadow-sm">
-            <header
-              className={cn(
-                "flex items-center justify-between px-5 py-3.5 text-white",
-                meta.bg,
-              )}
-            >
+            <header className={cn("flex items-center justify-between px-5 py-3.5 text-white", meta.bg)}>
               <h2 className="flex items-center gap-2 text-sm font-semibold">
                 <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-white/90 uppercase">
                   {meta.label}
                 </span>
               </h2>
               <div className="flex items-center gap-3">
-                <span className="text-xs font-medium text-white/70">
+                <span className="text-xs font-medium tabular-nums text-white/70">
                   {phaseDone}/{phaseTotal}
                 </span>
                 <ChevronDown className="h-4 w-4 text-white/60" />
@@ -109,19 +108,14 @@ export function ChecklistView({ categories, items }: ChecklistViewProps) {
                             item.completed && "bg-green-50",
                           )}
                         >
-                          <div
-                            className={cn(
-                              "flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded border-2 transition-colors",
-                              item.completed
-                                ? "border-green-500 bg-green-500 text-white"
-                                : "border-gray-300",
-                            )}
-                          >
-                            {item.completed && <span className="text-[10px] font-bold">✓</span>}
-                          </div>
+                          <ChecklistCheckbox
+                            itemId={item.id}
+                            dealId={dealId}
+                            completed={item.completed}
+                          />
                           <span
                             className={cn(
-                              "flex-1 text-[13px] font-normal text-gray-700",
+                              "flex-1 text-[13px] font-normal leading-snug text-gray-700",
                               item.completed && "text-gray-400 line-through",
                             )}
                           >
