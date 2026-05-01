@@ -4,6 +4,49 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-04-30 — Day 6-7: App shell + Clerk skeleton
+
+### Done
+- Read prototype HTML carefully — UI source of truth (sidebar 260px white, dark navy priority ribbon up top with amber accent, main content with deal header + 5-tab nav, phase color coding navy/green/purple/orange)
+- Brand foundation: Inter font, Land Advisors logo SVG component (layered mountain in ink box + wordmark), brand CSS vars in `globals.css` consumed via Tailwind v4 utilities
+- Clerk middleware skeleton (`middleware.ts`) — `clerkMiddleware()` passthrough; no route protection until real keys land
+- App shell:
+  - `src/app/(app)/layout.tsx` — priority ribbon + sidebar/main flex
+  - `src/components/layout/priority-ribbon.tsx` — top dark navy bar listing pinned high-priority deals
+  - `src/components/layout/sidebar.tsx` — Land Advisors brand + deal list with progress bars + priority star indicators
+- Pages:
+  - `/` — empty state "No deal selected"
+  - `/deals/[id]` — deal header with status badge + priority star + overall progress bar, 5-tab nav (Checklist active, others "Coming in week 2-3")
+  - `src/app/(app)/deals/[id]/views/checklist-view.tsx` — phase-grouped categories with items, color-coded headers, completed strikethrough
+- Seed script (`src/db/seed.ts`) populating Lakebridge org, Chris's user, builders, contacts, 2 sample deals, full Phase 1 checklist, sample Q&A/issues/consultants
+- `npm run db:seed` using `tsx --env-file=.env.local` (Node's native env-file flag, avoids dotenv module-hoisting issues)
+- Verified: dev server runs at `localhost:3000`, both `/` and `/deals/[id]` return 200, no errors in Next.js log, all data flows from real Postgres queries
+
+### Decisions
+- **ClerkProvider intentionally NOT in root layout yet.** With placeholder `pk_test_placeholder`, Clerk SDK throws at init time. Middleware import is fine (lazy validation per request). Inline TODO in `src/app/layout.tsx` shows the snippet to drop in once real keys arrive.
+- **Tab switching is client-side state**, not URL routes. Used React `useState` with the prototype's underlined-tab visual pattern. Per-tab routes (`/deals/[id]/checklist` etc.) deferred to week 2-3 if SEO/bookmarking demands it.
+- **Sidebar deal list aggregates checklist progress in a single SQL query** with two LEFT JOINs to `checklist_categories` and `checklist_items`, computing total + done counts via `count() filter` aggregates. One query for the whole sidebar, scales fine at 20-50 deals.
+- **`getCurrentOrg()` placeholder returns the first org in the DB.** Single-tenant for now. Once Clerk middleware enforces auth, swap to read the Clerk org from `auth()` and look up by `clerk_org_id`.
+- **Switched font Geist → Inter** to match the prototype.
+- **`tsx --env-file` over `dotenv.config()`** in scripts. ES module imports hoist; `import { db } ...` triggers `env.ts` validation BEFORE any subsequent `dotenv.config()` runs. Node's `--env-file` flag pre-populates `process.env` before any module loads.
+- **Brand colors as CSS vars** consumed by Tailwind v4 utilities (`bg-brand-navy`, `text-brand-accent`, `bg-phase-1`, etc.). No `tailwind.config.js` needed — v4's `@theme` block generates utilities directly from CSS vars.
+- **Disabled "+ New Deal" button** in sidebar with tooltip "Coming in week 2-3" — visible affordance for the eventual feature without functional UI yet.
+
+### Deferred / Pending
+- Clerk org/app provisioning (sign-in, sign-up flows) — pending Lakebridge Clerk account
+- Webhook to sync Clerk users to local `users` table — pending Clerk
+- CRUD operations on all entities (Deal create/edit, Contacts management, Q&A workflow, Issues tracker, Consultants roster) — week 2-3
+- Document upload/generation — Phase 2
+- Email send via Resend — Phase 2
+
+### Blockers
+- None active for week 2-3 work. Real Clerk keys would unblock sign-in flow but not block UI development.
+
+### Repo state
+- All committed locally; awaiting user review before pushing.
+
+---
+
 ## 2026-04-30 — Local development environment (Docker Postgres)
 
 ### Done
@@ -32,6 +75,10 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ### Blockers
 - None. Local dev fully unblocked.
+
+### Repo state
+- Commit `3bfaee9` pushed to `origin/main` covering Day 2 + Day 3 prep + Day 4-5 schema + local dev environment.
+- Also fixed `.gitignore` to allow `.env.example` through (was caught by `.env*`).
 
 ---
 

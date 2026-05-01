@@ -580,16 +580,33 @@ Migration `src/db/migrations/0000_modern_dorian_gray.sql` generated locally. Wil
 
 Run migrations. Seed a single Lakebridge org and Chris's user for development. _(Pending Neon access.)_
 
-**Day 6-7: Configure Clerk and build app shell.**
+**Day 6-7: Configure Clerk and build app shell.** _(App shell + deal selector built 2026-04-30; Clerk wiring partial, blocked on real keys.)_
 
-- Configure Clerk for Lakebridge organization with email + Google sign-in
-- Wire Clerk middleware to gate all routes except sign-in
-- Sync Clerk users to local users table on sign-in (webhook)
-- Build app shell: sidebar nav (deals list, settings), top header (org switcher hidden for now, user menu), main content area
-- Build deal selector that loads deals from DB
-- Confirm sign-in flow works end-to-end
+- Configure Clerk for Lakebridge organization with email + Google sign-in → **Blocked** (Lakebridge Clerk account)
+- Wire Clerk middleware to gate all routes except sign-in → **Partial** (`middleware.ts` exists with `clerkMiddleware()` passthrough; no `auth.protect()` calls until real keys land)
+- Sync Clerk users to local users table on sign-in (webhook) → **Blocked** (needs Clerk webhooks)
+- Build app shell: sidebar nav, top header, main content area → **Done**
+  - `src/app/(app)/layout.tsx` — priority ribbon + sidebar/main flex container
+  - `src/components/layout/priority-ribbon.tsx` — top dark navy bar showing pinned high-priority deals (matches prototype's amber-on-navy aesthetic)
+  - `src/components/layout/sidebar.tsx` — 260px white sidebar with Land Advisors logo, "Deals" header, deal list with name + city/state + checklist progress bar + priority star
+  - `src/components/brand/logo.tsx` — Land Advisors logo SVG (layered mountain in dark ink box + wordmark)
+- Build deal selector that loads deals from DB → **Done**. Sidebar queries deals + checklist progress aggregated from real Postgres rows.
+- Confirm sign-in flow works end-to-end → **Deferred** (needs real Clerk keys)
 
-By end of week 1: logged-in user, org context active, empty deal pages, all infrastructure in place.
+Also done as part of Day 6-7:
+- `src/app/(app)/page.tsx` — empty state when no deal is selected ("No deal selected — Pick a deal from the sidebar...")
+- `src/app/(app)/deals/[id]/page.tsx` — deal detail view with deal header (name, status badge, priority star, location/counts subtitle), overall progress bar, and 5-tab nav (Checklist, Contacts, Q&A, Issues, Consultants)
+- `src/app/(app)/deals/[id]/deal-tabs.tsx` — client component for tab switching (matches prototype's underlined-tab pattern with count badges)
+- `src/app/(app)/deals/[id]/views/checklist-view.tsx` — phase-grouped checklist with category subheaders, completed-item styling, optional badges, color-coded phase headers (navy/green/purple/orange per prototype)
+- Other tabs render "Coming in week 2-3" placeholders for now
+- `src/lib/auth/get-current-org.ts` — placeholder helper that returns the first org in the DB; will be replaced with auth-context lookup when Clerk is wired
+- `src/db/seed.ts` — seeds Lakebridge org, Chris's user, 5 builders + 3 contacts, 2 deals (Riverside Estates Phase 2 high-priority + Lakeview Heights), 6 deal_buyers, full Phase 1 hierarchical checklist (5 categories, 14 items per deal, 6 marked complete on Riverside), 2 Q&A items, 2 issues, 2 consultants
+- `db:seed` npm script using `tsx --env-file=.env.local` (Node's native env-file flag avoids ES module hoisting issues with `dotenv.config()`)
+- Brand CSS vars added to `globals.css`: `--color-brand-bg`, `--color-brand-ink`, `--color-brand-navy`, `--color-brand-accent`, `--color-brand-blue`, `--color-phase-1` through `--color-phase-4`, `--color-tier-green/yellow/red`. Tailwind v4 generates utility classes (`bg-brand-bg`, `text-brand-accent`, etc.) from these.
+- Switched font from Geist to Inter (matches prototype)
+- ClerkProvider intentionally not wrapping the root layout yet — placeholder `pk_test_placeholder` would throw at Clerk SDK init. Documented inline in `src/app/layout.tsx` with the snippet to drop in once real keys arrive.
+
+By end of week 1: logged-in user, org context active, empty deal pages, all infrastructure in place. _(Auth deferred; everything else achieved.)_
 
 **Week 2-3: Build prototype-equivalent functionality.**
 

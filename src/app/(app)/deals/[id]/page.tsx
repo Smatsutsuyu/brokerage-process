@@ -1,0 +1,144 @@
+import { notFound } from "next/navigation";
+import { and, count, eq, sql } from "drizzle-orm";
+
+import { db } from "@/db";
+import {
+  checklistCategories,
+  checklistItems,
+  consultants,
+  contacts,
+  dealBuyers,
+  deals,
+  issues,
+  qaItems,
+} from "@/db/schema";
+import { Sidebar } from "@/components/layout/sidebar";
+import { getCurrentOrg } from "@/lib/auth/get-current-org";
+
+import { DealHeader } from "./deal-header";
+import { DealTabs } from "./deal-tabs";
+import { ChecklistView } from "./views/checklist-view";
+
+const PHASE_LABELS: Record<string, string> = {
+  phase_1: "Phase 1",
+  phase_2: "Phase 2",
+  phase_3: "Phase 3",
+  phase_4: "Phase 4",
+  closed: "Closed",
+  cancelled: "Cancelled",
+};
+
+export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const org = await getCurrentOrg();
+  if (!org) notFound();
+
+  const deal = await db.query.deals.findFirst({
+    where: and(eq(deals.id, id), eq(deals.orgId, org.id)),
+  });
+  if (!deal) notFound();
+
+  const categories = await db
+    .select({
+      id: checklistCategories.id,
+      phase: checklistCategories.phase,
+      name: checklistCategories.name,
+      sortOrder: checklistCategories.sortOrder,
+    })
+    .from(checklistCategories)
+    .where(eq(checklistCategories.dealId, id))
+    .orderBy(checklistCategories.phase, checklistCategories.sortOrder);
+
+  const items = await db
+    .select({
+      id: checklistItems.id,
+      categoryId: checklistItems.categoryId,
+      name: checklistItems.name,
+      optional: checklistItems.optional,
+      completed: checklistItems.completed,
+      sortOrder: checklistItems.sortOrder,
+    })
+    .from(checklistItems)
+    .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
+    .where(eq(checklistCategories.dealId, id))
+    .orderBy(checklistItems.sortOrder);
+
+  const [contactsCount] = await db
+    .select({ n: count() })
+    .from(contacts)
+    .innerJoin(dealBuyers, eq(dealBuyers.builderId, contacts.builderId))
+    .where(eq(dealBuyers.dealId, id));
+
+  const [qaTotal] = await db
+    .select({
+      total: count(),
+      approved: sql<number>`count(*) filter (where ${qaItems.approved} = true)::int`,
+    })
+    .from(qaItems)
+    .where(eq(qaItems.dealId, id));
+
+  const [issuesOpen] = await db
+    .select({
+      open: sql<number>`count(*) filter (where ${issues.status} = 'open')::int`,
+    })
+    .from(issues)
+    .where(eq(issues.dealId, id));
+
+  const [consultantsFilled] = await db
+    .select({ n: count() })
+    .from(consultants)
+    .where(eq(consultants.dealId, id));
+
+  const totalItems = items.length;
+  const doneItems = items.filter((i) => i.completed).length;
+  const pct = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
+
+  const counts = {
+    checklist: { done: doneItems, total: totalItems },
+    contacts: contactsCount?.n ?? 0,
+    qa: { approved: Number(qaTotal?.approved ?? 0), total: Number(qaTotal?.total ?? 0) },
+    issuesOpen: Number(issuesOpen?.open ?? 0),
+    consultants: consultantsFilled?.n ?? 0,
+  };
+
+  return (
+    <>
+      <Sidebar activeDealId={id} />
+      <main className="bg-brand-bg flex-1 overflow-y-auto px-10 py-8">
+        <DealHeader
+          name={deal.name}
+          subtitle={[
+            [deal.city, deal.state].filter(Boolean).join(", ") || "No location",
+            `${counts.checklist.done}/${counts.checklist.total} checklist`,
+            `${counts.contacts} contacts`,
+            `${counts.qa.approved}/${counts.qa.total} Q&A`,
+            `${counts.issuesOpen} open issues`,
+          ].join(" · ")}
+          statusLabel={PHASE_LABELS[deal.status] ?? deal.status}
+          priority={deal.priority}
+          progressPct={pct}
+        />
+        <DealTabs counts={counts}>
+          {{
+            checklist: <ChecklistView categories={categories} items={items} />,
+            contacts: <ComingSoon label="Contacts management" />,
+            qa: <ComingSoon label="Q&A workflow" />,
+            issues: <ComingSoon label="Issues tracker" />,
+            consultants: <ComingSoon label="Consultant roster" />,
+          }}
+        </DealTabs>
+      </main>
+    </>
+  );
+}
+
+function ComingSoon({ label }: { label: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
+      <h2 className="mb-1 text-base font-semibold text-gray-700">{label}</h2>
+      <p className="text-sm text-gray-500">
+        Built in week 2-3 of Phase 1. Schema and infrastructure are in place.
+      </p>
+    </div>
+  );
+}
