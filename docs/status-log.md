@@ -4,6 +4,34 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-01 — Contacts: Add Contact modal (existing builder)
+
+### Done
+- **"+ Add Contact" button is functional.** Clicking opens a modal that creates a new contact at an existing builder on the deal.
+  - New server action `addContact` — validates required first/last name, confirms the builder is on the deal (prevents adding contacts to builders not in the deal), inserts into `contacts`, revalidates the page.
+  - New client component `views/add-contact-modal.tsx` — shadcn Dialog with builder picker (existing-only for v1), first/last name (required), title/email/phone/comments (optional), inline error display, pending state during submit.
+  - Builder dropdown derived client-side from existing rows — unique builders that are already on the deal.
+  - Contacts notes (`contacts.notes`) now displayed in the Comments column, falling back to `deal_buyers.comments` for builders without an individual contact yet.
+
+### Decisions
+- **V1 scope: existing builders only.** Most common case (Lennar/Toll already each have 2 contacts; adding a 3rd is the typical workflow). "Add new builder" and "Add buyer not yet on this deal" are deliberately deferred.
+- **Comments column shows `contacts.notes` first, `deal_buyers.comments` as fallback.** Per-contact notes are more granular and fit better with the multi-contact model. The deal-buyer-level comment field stays in the schema for cases where the buyer isn't yet a person.
+- **Server-side validation that the builder is on the deal.** Forged builder IDs from the client can't slip through and add contacts to arbitrary deals.
+- **Form reset on close, not on open.** Setting state in `useEffect` is generally discouraged in React 19, but form-reset on dialog close is a legitimate use of effects (not derived state). Bracketed with eslint-disable for the file.
+- **Tier and Lead intentionally NOT in this modal.** Tier change is already inline in the table (TierBadge dropdown); separate modal field would create two ways to do the same thing. Lead reassignment is its own concern.
+
+### Notes for next steps
+- Add Builder modal (or extend Add Contact with a "+ create new builder" path)
+- Edit / Delete contact (icons in the actions column placeholder)
+- Lead user reassignment
+- Q&A workflow (next tab)
+- Issues tracker (after Q&A)
+
+### Blockers
+- None.
+
+---
+
 ## 2026-05-01 — Contacts: prototype columns + sortable headers + called/OM toggles
 
 ### Done

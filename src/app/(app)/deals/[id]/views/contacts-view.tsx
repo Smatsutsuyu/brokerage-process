@@ -29,6 +29,7 @@ export async function ContactsView({ dealId }: ContactsViewProps) {
       contactTitle: contacts.title,
       contactEmail: contacts.email,
       contactPhone: contacts.phone,
+      contactNotes: contacts.notes,
       leadUserId: dealBuyers.leadUserId,
       leadFirstName: users.firstName,
       leadLastName: users.lastName,
@@ -61,7 +62,9 @@ export async function ContactsView({ dealId }: ContactsViewProps) {
         : null,
     omSent: r.omSentAt !== null,
     called: r.calledAt !== null,
-    comments: r.comments,
+    // Prefer per-contact notes when present; fall back to deal_buyer comments
+    // (used when a builder is on the deal but has no individual contact yet).
+    comments: r.contactNotes ?? r.comments,
   }));
 
   return <ContactsTable dealId={dealId} rows={buyerRows} />;

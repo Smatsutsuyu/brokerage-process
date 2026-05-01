@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { checklistCategories, checklistItems, dealBuyers } from "@/db/schema";
+import { builders, checklistCategories, checklistItems, contacts, dealBuyers } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
 export async function toggleChecklistItem(input: {
@@ -73,6 +73,55 @@ export async function setBuyerOmSent(input: {
     .update(dealBuyers)
     .set({ omSentAt: input.omSent ? new Date() : null })
     .where(and(eq(dealBuyers.id, input.dealBuyerId), eq(dealBuyers.orgId, org.id)));
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
+export type AddContactInput = {
+  dealId: string;
+  builderId: string;
+  firstName: string;
+  lastName: string;
+  title?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+};
+
+export async function addContact(input: AddContactInput) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  const firstName = input.firstName.trim();
+  const lastName = input.lastName.trim();
+  if (!firstName || !lastName) throw new Error("First and last name are required");
+
+  // Confirm the builder belongs to this org and is a buyer on this deal —
+  // prevents adding a contact for a builder that isn't actually on this deal.
+  const [link] = await db
+    .select({ id: dealBuyers.id })
+    .from(dealBuyers)
+    .innerJoin(builders, eq(dealBuyers.builderId, builders.id))
+    .where(
+      and(
+        eq(dealBuyers.dealId, input.dealId),
+        eq(dealBuyers.builderId, input.builderId),
+        eq(builders.orgId, org.id),
+      ),
+    )
+    .limit(1);
+  if (!link) throw new Error("Builder is not a buyer on this deal");
+
+  await db.insert(contacts).values({
+    orgId: org.id,
+    builderId: input.builderId,
+    firstName,
+    lastName,
+    title: input.title?.trim() || null,
+    email: input.email?.trim() || null,
+    phone: input.phone?.trim() || null,
+    notes: input.notes?.trim() || null,
+  });
 
   revalidatePath(`/deals/${input.dealId}`);
 }

@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { AddContactModal, type BuilderOption } from "./add-contact-modal";
 import { BuyerCheckbox } from "./buyer-checkbox";
 import { TierBadge } from "./tier-badge";
 
@@ -140,6 +141,15 @@ export function ContactsTable({ dealId, rows }: ContactsTableProps) {
   const [filter, setFilter] = useState<FilterValue>("all");
   const [sortBy, setSortBy] = useState<SortColumn>("builder");
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
+  const [addOpen, setAddOpen] = useState(false);
+
+  const builderOptions = useMemo<BuilderOption[]>(() => {
+    const map = new Map<string, BuilderOption>();
+    for (const r of rows) {
+      if (!map.has(r.builderId)) map.set(r.builderId, { id: r.builderId, name: r.builderName });
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows]);
 
   const tierCounts = useMemo(() => {
     const counts: Record<FilterValue, number> = {
@@ -205,11 +215,27 @@ export function ContactsTable({ dealId, rows }: ContactsTableProps) {
         })}
 
         <div className="ml-auto flex gap-2">
-          <Button size="sm" disabled title="Coming soon">
+          <Button
+            size="sm"
+            onClick={() => setAddOpen(true)}
+            disabled={builderOptions.length === 0}
+            title={
+              builderOptions.length === 0
+                ? "Add a builder to the deal first"
+                : "Add a contact at an existing builder"
+            }
+          >
             + Add Contact
           </Button>
         </div>
       </div>
+
+      <AddContactModal
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        dealId={dealId}
+        builders={builderOptions}
+      />
 
       <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
         <table className="w-full border-collapse text-[13px]">
