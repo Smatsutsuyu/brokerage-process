@@ -30,6 +30,13 @@ const SHORT_SHA_LEN = 7;
 
 type Severity = "nit" | "suggestion" | "bug" | "blocker";
 
+const SEVERITY_LABEL: Record<Severity, string> = {
+  nit: "Nit",
+  suggestion: "Suggestion",
+  bug: "Bug",
+  blocker: "Blocker",
+};
+
 type FeedbackModalProps = {
   commitSha: string;
 };
@@ -123,10 +130,10 @@ export function FeedbackModal({ commitSha }: FeedbackModalProps) {
               <Label htmlFor="feedback-severity">Severity</Label>
               <Select
                 value={severity}
-                onValueChange={(v) => setSeverity(v as Severity)}
+                onValueChange={(v) => v && setSeverity(v as Severity)}
               >
                 <SelectTrigger id="feedback-severity">
-                  <SelectValue />
+                  <SelectValue>{SEVERITY_LABEL[severity]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="nit">Nit</SelectItem>

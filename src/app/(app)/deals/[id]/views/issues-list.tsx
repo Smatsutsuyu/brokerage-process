@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Calendar, Loader2, Pencil, Trash2, User } from "lucide-react";
 
+import { useConfirm } from "@/components/confirm/confirm-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -59,13 +60,20 @@ export function IssuesList({ dealId, items, users }: IssuesListProps) {
   const [editing, setEditing] = useState<EditingIssue | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [, startDelete] = useTransition();
+  const confirm = useConfirm();
 
   const open = items.filter((i) => i.status === "open").length;
   const inProgress = items.filter((i) => i.status === "in_progress").length;
   const resolved = items.filter((i) => i.status === "resolved").length;
 
-  function handleDelete(id: string) {
-    if (!window.confirm("Delete this issue?")) return;
+  async function handleDelete(id: string, title: string) {
+    const ok = await confirm({
+      title: "Delete this issue?",
+      description: `"${title}" will be permanently removed.`,
+      confirmLabel: "Delete",
+      variant: "destructive",
+    });
+    if (!ok) return;
     setDeletingId(id);
     startDelete(async () => {
       await deleteIssue({ dealId, issueId: id });
@@ -158,7 +166,7 @@ export function IssuesList({ dealId, items, users }: IssuesListProps) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDelete(item.id)}
+                      onClick={() => handleDelete(item.id, item.title)}
                       disabled={isDeleting}
                       className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600"
                       title="Delete issue"

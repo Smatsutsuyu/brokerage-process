@@ -167,7 +167,9 @@ export function AddContactModal({
               disabled={isEdit}
             >
               <SelectTrigger id="add-contact-builder">
-                <SelectValue placeholder="Pick a builder" />
+                <SelectValue placeholder="Pick a builder">
+                  {builders.find((b) => b.id === builderId)?.name ?? "Pick a builder"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {builders.map((b) => (

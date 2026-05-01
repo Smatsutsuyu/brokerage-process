@@ -47,6 +47,19 @@ type AddIssueModalProps = {
 
 const NO_ASSIGNEE = "__none__";
 
+const STATUS_LABEL: Record<IssueStatus, string> = {
+  open: "Open",
+  in_progress: "In Progress",
+  resolved: "Resolved",
+};
+
+const PRIORITY_LABEL: Record<IssuePriority, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  urgent: "Urgent",
+};
+
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -175,7 +188,7 @@ export function AddIssueModal({ open, onOpenChange, dealId, users, editing }: Ad
               <Label htmlFor="add-issue-status">Status</Label>
               <Select value={status} onValueChange={(v) => v && setStatus(v as IssueStatus)}>
                 <SelectTrigger id="add-issue-status">
-                  <SelectValue />
+                  <SelectValue>{STATUS_LABEL[status]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="open">Open</SelectItem>
@@ -191,7 +204,7 @@ export function AddIssueModal({ open, onOpenChange, dealId, users, editing }: Ad
                 onValueChange={(v) => v && setPriority(v as IssuePriority)}
               >
                 <SelectTrigger id="add-issue-priority">
-                  <SelectValue />
+                  <SelectValue>{PRIORITY_LABEL[priority]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="low">Low</SelectItem>
@@ -211,7 +224,11 @@ export function AddIssueModal({ open, onOpenChange, dealId, users, editing }: Ad
                 onValueChange={(v) => setAssignedUserId(v ?? NO_ASSIGNEE)}
               >
                 <SelectTrigger id="add-issue-assignee">
-                  <SelectValue />
+                  <SelectValue>
+                    {assignedUserId === NO_ASSIGNEE
+                      ? "Unassigned"
+                      : (users.find((u) => u.id === assignedUserId)?.name ?? "Unassigned")}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_ASSIGNEE}>Unassigned</SelectItem>

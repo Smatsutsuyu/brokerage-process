@@ -34,6 +34,18 @@ type AddBuilderModalProps = {
 type Classification = "private" | "public";
 type Tier = "green" | "yellow" | "red" | "not_selected";
 
+const CLASSIFICATION_LABEL: Record<Classification, string> = {
+  private: "Private",
+  public: "Public",
+};
+
+const TIER_LABEL: Record<Tier, string> = {
+  green: "Green — Interested",
+  yellow: "Yellow — Evaluating",
+  red: "Red — Immediate Pass",
+  not_selected: "Not Selected on Deal",
+};
+
 export function AddBuilderModal({ open, onOpenChange, dealId }: AddBuilderModalProps) {
   const [name, setName] = useState("");
   const [classification, setClassification] = useState<Classification>("private");
@@ -104,7 +116,7 @@ export function AddBuilderModal({ open, onOpenChange, dealId }: AddBuilderModalP
                 onValueChange={(v) => v && setClassification(v as Classification)}
               >
                 <SelectTrigger id="add-builder-class">
-                  <SelectValue />
+                  <SelectValue>{CLASSIFICATION_LABEL[classification]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="private">Private</SelectItem>
@@ -116,7 +128,7 @@ export function AddBuilderModal({ open, onOpenChange, dealId }: AddBuilderModalP
               <Label htmlFor="add-builder-tier">Interest level</Label>
               <Select value={tier} onValueChange={(v) => v && setTier(v as Tier)}>
                 <SelectTrigger id="add-builder-tier">
-                  <SelectValue />
+                  <SelectValue>{TIER_LABEL[tier]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="green">Green — Interested</SelectItem>

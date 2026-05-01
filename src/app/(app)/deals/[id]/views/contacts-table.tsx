@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Mail, Pencil, Phone, Trash2 } from "lucide-react";
 
+import { useConfirm } from "@/components/confirm/confirm-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+import { deleteContact } from "../actions";
 
 import { AddBuilderModal } from "./add-builder-modal";
 import {
@@ -13,7 +16,6 @@ import {
   type EditingContact,
 } from "./add-contact-modal";
 import { BuyerCheckbox } from "./buyer-checkbox";
-import { DeleteContactDialog } from "./delete-contact-dialog";
 import { TierBadge } from "./tier-badge";
 
 type Tier = "green" | "yellow" | "red" | "not_selected";
@@ -150,7 +152,21 @@ export function ContactsTable({ dealId, rows }: ContactsTableProps) {
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [addBuilderOpen, setAddBuilderOpen] = useState(false);
   const [editing, setEditing] = useState<EditingContact | null>(null);
-  const [deleting, setDeleting] = useState<{ id: string; name: string | null } | null>(null);
+  const [, startDelete] = useTransition();
+  const confirm = useConfirm();
+
+  async function handleDeleteContact(contactId: string, name: string | null) {
+    const ok = await confirm({
+      title: "Delete contact?",
+      description: `${name ?? "This contact"} will be removed. The builder stays on the deal.`,
+      confirmLabel: "Delete",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    startDelete(async () => {
+      await deleteContact({ dealId, contactId });
+    });
+  }
 
   const builderOptions = useMemo<BuilderOption[]>(() => {
     const map = new Map<string, BuilderOption>();
@@ -261,15 +277,6 @@ export function ContactsTable({ dealId, rows }: ContactsTableProps) {
         open={addBuilderOpen}
         onOpenChange={setAddBuilderOpen}
         dealId={dealId}
-      />
-      <DeleteContactDialog
-        open={deleting !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleting(null);
-        }}
-        dealId={dealId}
-        contactId={deleting?.id ?? null}
-        contactName={deleting?.name ?? null}
       />
 
       <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
@@ -432,7 +439,7 @@ export function ContactsTable({ dealId, rows }: ContactsTableProps) {
                           <button
                             type="button"
                             onClick={() =>
-                              setDeleting({ id: row.contactId!, name: row.contactName })
+                              handleDeleteContact(row.contactId!, row.contactName)
                             }
                             className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600"
                             title="Delete contact"
