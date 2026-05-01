@@ -4,6 +4,83 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-01 — Profile page, schema cleanup, layout polish, and a sneaky BaseUI bug
+
+Big batch of cleanups and polish after the auth swap. Lots of small things that compound.
+
+### Done — Profile page + UserLink replacing UserMenu
+- New `/profile` page: edit name (single field, written to `auth_user.name`), change password (Better Auth's `changePassword` API with current/new/confirm validation), sign out
+- Sidebar bottom-left user element is now a clickable Link to `/profile` (replaces the old dropdown). Active-route highlight when on /profile.
+- `user-menu.tsx` deleted in favor of `user-link.tsx`
+- Sign out moved to a dedicated section on the profile page
+
+### Done — Sidebar Admin section + active-route highlight
+- New `<SidebarNavLink>` client component reads `usePathname()` and applies blue border + tint when active (same treatment as active deal cards)
+- Members link gets a visible "ADMIN → Members" section in the sidebar (above the user link), owner-gated
+- No more digging through dropdowns to find admin
+
+### Done — Stale-cookie recovery
+- `/sign-in` redirects to `/` when already authed
+- `/` and `/deals/[id]` redirect to `/sign-in` when `getCurrentUser()` returns null (cookie present but session invalid — e.g., DB wiped while browser was open, secret rotated, member disabled)
+
+### Done — Users table consolidation (Option A)
+After a design conversation about whether the two-table user model (auth_user + users) was earning its complexity for our scale, dropped duplication. Schema now keeps each fact in one place:
+- `users` table: just (id, orgId, authUserId, role, disabledAt, timestamps) — six fields. Dropped `email`, `firstName`, `lastName`.
+- Identity fields (name, email) read from `auth_user` via JOIN
+- `getCurrentUser()` does the JOIN once and returns a flat `CurrentUser` shape — every consumer downstream is unaware of the two-table layout
+- Profile name edit writes to `auth_user.name` only — no sync needed
+- Members list, invite modal, issues view, contacts view all updated to JOIN through `users → auth_user`
+
+### Done — middleware → proxy rename
+- Next.js 16 deprecated the `middleware` file convention in favor of `proxy`. Renamed `src/middleware.ts → src/proxy.ts` and the function `middleware → proxy`. Identical behavior, deprecation warning gone.
+
+### Done — Deal model trimming
+- **Priority** simplified from `low/medium/high` to `normal/high` (prototype's two-state model). Schema enum, modal options, type definitions all aligned.
+- **Status/phase field dropped from deals entirely.** Was a separate enum carried on the deal row; never matched the prototype which only modeled name/location/priority. Workflow phase is implicit in the checklist now.
+- **Sidebar phase chip** computed at query time: per-phase incomplete-required-item counts, lowest phase with any remaining required items wins. "Complete" chip when everything's done. Colors mirror the phase header colors in the checklist view.
+
+### Done — Checklist phases are collapsible
+- Phase headers are clickable buttons that toggle expand/collapse
+- Auto-collapsed on mount when every item in the phase is complete (frees screen real estate for in-progress phases)
+- Manual toggle thereafter — completing the last item mid-session doesn't auto-collapse out from under the user
+
+### Done — Profile page polish + sign-in subtitle restored
+- Removed redundant subtext from Email and Role fields on profile (the user can read; no need to over-explain)
+- Sign-in page subtitle ("Lakebridge Capital deal lifecycle platform") restored
+
+### Done — Layout / scrollbar fix
+- Body was `min-h-full` (≥ viewport, can grow). Any sub-pixel rounding or negative-margin element triggered a page-level scrollbar.
+- Changed to `h-full overflow-hidden`. Body locked to exactly the viewport. Internal scroll containers (sidebar nav, main, modals) handle their own overflow within bounds.
+
+### Bug — BaseUI `Menu.Item` uses `onClick`, not `onSelect`
+The big one. Six DropdownMenuItem usages were silently no-ops:
+- Sign out
+- Members link in user dropdown
+- Change member role
+- Change buyer tier (TierBadge)
+- Change issue status (IssueStatusBadge)
+- Lead reassignment (LeadPicker)
+- Deal Edit / Delete (DealMenu)
+
+shadcn's DropdownMenuItem wraps BaseUI's `MenuPrimitive.Item`, which exposes `onClick` (not `onSelect` like Radix does). My `onSelect={...}` props were spread to the underlying `<div>`, which has no native `onSelect` event, and silently disappeared. Fix: `sed -i 's/onSelect=/onClick=/g'` across all six files.
+
+**Lesson for the file:** when shadcn switched its base library from Radix to BaseUI (`base-nova` preset), prop signatures shifted in subtle ways. Two known gotchas now:
+1. `<SelectValue>` doesn't auto-derive from selected SelectItem children — must pass display label explicitly
+2. `<DropdownMenuItem>` uses `onClick` not `onSelect`
+
+Worth checking other primitives if anything similar comes up.
+
+### Bug — Stale dev server on port 3000 masking middleware
+Spent a frustrating hour chasing a "middleware not running" ghost. Cause: a stale `next dev` process bound to port 3000 from before the auth swap. New `npm run dev` started on 3001 and my browser was hitting the old 3000 server. Detection: the "Port 3000 in use, using 3001 instead" log line. Resolution: `taskkill /PID <PID> /F`. Documented in `docs/local-development.md` troubleshooting section.
+
+### Bug — Middleware location requires `src/`
+When the project uses the `src/` directory layout, `middleware.ts` (now `proxy.ts`) must be at `src/proxy.ts`, NOT at the project root. Originally placed at root and ignored. Documented.
+
+### Blockers
+- None.
+
+---
+
 ## 2026-05-01 — Vendor reduction: dropped Clerk + Sentry, added Better Auth
 
 After discussion with the user about vendor count for an internal tool: Lakebridge will manage 5 vendor accounts instead of 7. Per-vendor cost (account, dashboard learning curve, billing surprises, security boundaries) compounds; for 5-10 users at this scale, Clerk's value-add (orgs primitive, drop-in UI) is mostly build-time win for me, not ops win for Lakebridge.

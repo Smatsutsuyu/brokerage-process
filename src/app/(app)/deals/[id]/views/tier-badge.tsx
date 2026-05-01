@@ -92,7 +92,7 @@ export function TierBadge({ dealBuyerId, dealId, tier }: TierBadgeProps) {
           return (
             <DropdownMenuItem
               key={option}
-              onSelect={() => handleSelect(option)}
+              onClick={() => handleSelect(option)}
               className="flex items-center gap-2 text-[13px]"
             >
               <span className={cn("h-2 w-2 rounded-full", meta.dot)} />

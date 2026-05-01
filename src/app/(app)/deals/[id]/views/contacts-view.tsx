@@ -1,7 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { builders, contacts, dealBuyers, users } from "@/db/schema";
+import { authUser, builders, contacts, dealBuyers, users } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
 import { ContactsTable, type BuyerRow } from "./contacts-table";
@@ -16,6 +16,7 @@ export async function ContactsView({ dealId }: ContactsViewProps) {
   // One row per (builder × contact). LEFT JOIN on contacts so a builder with
   // no contacts still surfaces — the deal_buyer association alone says "this
   // company is on the deal," which is meaningful even before names are added.
+  // Lead user → users → auth_user, both LEFT so an unassigned lead is fine.
   const rows = await db
     .select({
       dealBuyerId: dealBuyers.id,
@@ -34,13 +35,13 @@ export async function ContactsView({ dealId }: ContactsViewProps) {
       contactPhone: contacts.phone,
       contactNotes: contacts.notes,
       leadUserId: dealBuyers.leadUserId,
-      leadFirstName: users.firstName,
-      leadLastName: users.lastName,
+      leadName: authUser.name,
     })
     .from(dealBuyers)
     .innerJoin(builders, eq(dealBuyers.builderId, builders.id))
     .leftJoin(contacts, eq(contacts.builderId, builders.id))
     .leftJoin(users, eq(users.id, dealBuyers.leadUserId))
+    .leftJoin(authUser, eq(authUser.id, users.authUserId))
     .where(eq(dealBuyers.dealId, dealId))
     .orderBy(builders.name, contacts.lastName);
 
@@ -63,10 +64,7 @@ export async function ContactsView({ dealId }: ContactsViewProps) {
     contactPhone: r.contactPhone,
     contactNotes: r.contactNotes,
     leadUserId: r.leadUserId,
-    leadName:
-      r.leadFirstName || r.leadLastName
-        ? `${r.leadFirstName ?? ""} ${r.leadLastName ?? ""}`.trim()
-        : null,
+    leadName: r.leadName,
     omSent: r.omSentAt !== null,
     called: r.calledAt !== null,
     // Prefer per-contact notes when present; fall back to deal_buyer comments
@@ -78,18 +76,18 @@ export async function ContactsView({ dealId }: ContactsViewProps) {
     ? await db
         .select({
           id: users.id,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          email: users.email,
+          name: authUser.name,
+          email: authUser.email,
         })
         .from(users)
+        .innerJoin(authUser, eq(authUser.id, users.authUserId))
         .where(eq(users.orgId, org.id))
-        .orderBy(asc(users.lastName))
+        .orderBy(asc(authUser.name))
     : [];
 
   const leadOptions: LeadOption[] = orgUsers.map((u) => ({
     id: u.id,
-    name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email,
+    name: u.name || u.email,
   }));
 
   return <ContactsTable dealId={dealId} rows={buyerRows} leadOptions={leadOptions} />;

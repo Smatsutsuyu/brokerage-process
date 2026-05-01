@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-import { createDeal, updateDeal, type DealPriority, type DealStatus } from "./actions";
+import { createDeal, updateDeal, type DealPriority } from "./actions";
 
 export type EditingDeal = {
   dealId: string;
@@ -33,7 +33,6 @@ export type EditingDeal = {
   city: string | null;
   state: string | null;
   type: string | null;
-  status: DealStatus;
   priority: DealPriority;
   notes: string | null;
 };
@@ -44,18 +43,8 @@ type DealModalProps = {
   editing?: EditingDeal;
 };
 
-const STATUS_LABEL: Record<DealStatus, string> = {
-  phase_1: "Phase 1 — Going to Market",
-  phase_2: "Phase 2 — Marketing Process",
-  phase_3: "Phase 3 — Ownership Summary of Offers",
-  phase_4: "Phase 4 — Deal Management",
-  closed: "Closed",
-  cancelled: "Cancelled",
-};
-
 const PRIORITY_LABEL: Record<DealPriority, string> = {
-  low: "Low",
-  medium: "Medium",
+  normal: "Normal",
   high: "High Priority",
 };
 
@@ -68,8 +57,7 @@ export function DealModal({ open, onOpenChange, editing }: DealModalProps) {
   const [city, setCity] = useState(editing?.city ?? "");
   const [state, setState] = useState(editing?.state ?? "");
   const [type, setType] = useState(editing?.type ?? "");
-  const [status, setStatus] = useState<DealStatus>(editing?.status ?? "phase_1");
-  const [priority, setPriority] = useState<DealPriority>(editing?.priority ?? "medium");
+  const [priority, setPriority] = useState<DealPriority>(editing?.priority ?? "normal");
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -85,8 +73,7 @@ export function DealModal({ open, onOpenChange, editing }: DealModalProps) {
           setCity("");
           setState("");
           setType("");
-          setStatus("phase_1");
-          setPriority("medium");
+          setPriority("normal");
           setNotes("");
         }
       }, 150);
@@ -97,8 +84,7 @@ export function DealModal({ open, onOpenChange, editing }: DealModalProps) {
     setCity(editing?.city ?? "");
     setState(editing?.state ?? "");
     setType(editing?.type ?? "");
-    setStatus(editing?.status ?? "phase_1");
-    setPriority(editing?.priority ?? "medium");
+    setPriority(editing?.priority ?? "normal");
     setNotes(editing?.notes ?? "");
     setError(null);
   }, [open, editing]);
@@ -118,7 +104,7 @@ export function DealModal({ open, onOpenChange, editing }: DealModalProps) {
       return;
     }
 
-    const payload = { name, units: unitsNum, city, state, type, status, priority, notes };
+    const payload = { name, units: unitsNum, city, state, type, priority, notes };
 
     startTransition(async () => {
       try {
@@ -212,38 +198,20 @@ export function DealModal({ open, onOpenChange, editing }: DealModalProps) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-2">
-              <Label htmlFor="deal-status">Phase / status</Label>
-              <Select value={status} onValueChange={(v) => v && setStatus(v as DealStatus)}>
-                <SelectTrigger id="deal-status">
-                  <SelectValue>{STATUS_LABEL[status]}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(STATUS_LABEL) as DealStatus[]).map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {STATUS_LABEL[s]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="deal-priority">Priority</Label>
-              <Select
-                value={priority}
-                onValueChange={(v) => v && setPriority(v as DealPriority)}
-              >
-                <SelectTrigger id="deal-priority">
-                  <SelectValue>{PRIORITY_LABEL[priority]}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High Priority</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid gap-2">
+            <Label htmlFor="deal-priority">Priority</Label>
+            <Select
+              value={priority}
+              onValueChange={(v) => v && setPriority(v as DealPriority)}
+            >
+              <SelectTrigger id="deal-priority">
+                <SelectValue>{PRIORITY_LABEL[priority]}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="normal">Normal</SelectItem>
+                <SelectItem value="high">High Priority</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid gap-2">

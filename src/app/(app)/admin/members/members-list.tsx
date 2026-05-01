@@ -20,8 +20,7 @@ import { InviteMemberModal } from "./invite-member-modal";
 export type MemberRow = {
   id: string;
   email: string;
-  firstName: string | null;
-  lastName: string | null;
+  name: string;
   role: Role;
   disabled: boolean;
   createdAt: string;
@@ -148,7 +147,7 @@ export function MembersList({ currentUserId, members }: MembersListProps) {
                           {ROLES.map((r) => (
                             <DropdownMenuItem
                               key={r}
-                              onSelect={() => handleRoleChange(member.id, r)}
+                              onClick={() => handleRoleChange(member.id, r)}
                               className="flex flex-col items-start gap-0.5"
                             >
                               <span className="text-[13px] font-semibold">{ROLE_LABEL[r]}</span>
@@ -204,5 +203,5 @@ export function MembersList({ currentUserId, members }: MembersListProps) {
 }
 
 function memberName(member: MemberRow): string {
-  return `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim() || member.email;
+  return member.name || member.email;
 }

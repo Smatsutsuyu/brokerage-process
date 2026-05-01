@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { authUser, users } from "@/db/schema";
 import { auth } from "@/lib/auth/auth";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
@@ -20,8 +20,7 @@ async function requireOwner() {
 
 export async function inviteMember(input: {
   email: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   role: Role;
   initialPassword: string;
 }): Promise<void> {
@@ -30,36 +29,29 @@ export async function inviteMember(input: {
   if (!org) throw new Error("No organization context");
 
   const email = input.email.trim().toLowerCase();
-  const firstName = input.firstName.trim();
-  const lastName = input.lastName.trim();
+  const name = input.name.trim();
   if (!email) throw new Error("Email is required");
-  if (!firstName || !lastName) throw new Error("First and last name are required");
+  if (!name) throw new Error("Name is required");
   if (input.initialPassword.length < 8) {
     throw new Error("Initial password must be at least 8 characters");
   }
 
-  // Reject duplicates inside this org. (auth_user.email has its own unique
-  // index, which would surface as a database error otherwise.)
-  const existing = await db.query.users.findFirst({
-    where: and(eq(users.orgId, org.id), eq(users.email, email)),
+  // Reject duplicates by checking auth_user (which holds email + has its own
+  // unique index on email anyway, so this is a friendlier error message).
+  const existingAuth = await db.query.authUser.findFirst({
+    where: eq(authUser.email, email),
   });
-  if (existing) throw new Error("A member with that email already exists");
+  if (existingAuth) throw new Error("A member with that email already exists");
 
-  // Use Better Auth to create the credential — it hashes the password for us.
+  // Use Better Auth to create the credential — it hashes the password for us
+  // and creates the auth_user + auth_account rows.
   const result = await auth.api.signUpEmail({
-    body: {
-      name: `${firstName} ${lastName}`,
-      email,
-      password: input.initialPassword,
-    },
+    body: { name, email, password: input.initialPassword },
   });
 
   await db.insert(users).values({
     orgId: org.id,
     authUserId: result.user.id,
-    email,
-    firstName,
-    lastName,
     role: input.role,
   });
 

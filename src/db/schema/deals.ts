@@ -1,8 +1,11 @@
 import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
-import { dealPriorityEnum, dealStatusEnum } from "./enums";
+import { dealPriorityEnum } from "./enums";
 import { organizations } from "./organizations";
 
+// No phase/status field — workflow phase is implicit in the checklist
+// (each item lives in a phase). Sidebar derives a "current phase" chip
+// from incomplete items.
 export const deals = pgTable("deals", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id")
@@ -13,8 +16,7 @@ export const deals = pgTable("deals", {
   city: text("city"),
   state: text("state"),
   type: text("type"),
-  status: dealStatusEnum("status").notNull().default("phase_1"),
-  priority: dealPriorityEnum("priority").notNull().default("medium"),
+  priority: dealPriorityEnum("priority").notNull().default("normal"),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })

@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { and, count, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -24,19 +24,13 @@ import { ContactsView } from "./views/contacts-view";
 import { IssuesView } from "./views/issues-view";
 import { QaView } from "./views/qa-view";
 
-const PHASE_LABELS: Record<string, string> = {
-  phase_1: "Phase 1",
-  phase_2: "Phase 2",
-  phase_3: "Phase 3",
-  phase_4: "Phase 4",
-  closed: "Closed",
-  cancelled: "Cancelled",
-};
 
 export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const org = await getCurrentOrg();
-  if (!org) notFound();
+  // Cookie present but session invalid (rotated secret, deleted user, disabled
+  // member) — bounce to sign-in instead of showing a confusing 404.
+  if (!org) redirect("/sign-in");
 
   const deal = await db.query.deals.findFirst({
     where: and(eq(deals.id, id), eq(deals.orgId, org.id)),
@@ -122,7 +116,6 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
               `${counts.qa.approved}/${counts.qa.total} Q&A`,
               `${counts.issuesOpen} open issues`,
             ].join(" · ")}
-            statusLabel={PHASE_LABELS[deal.status] ?? deal.status}
             priority={deal.priority}
             progressPct={pct}
             deal={{
@@ -132,7 +125,6 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
               city: deal.city,
               state: deal.state,
               type: deal.type,
-              status: deal.status,
               priority: deal.priority,
               notes: deal.notes,
             }}

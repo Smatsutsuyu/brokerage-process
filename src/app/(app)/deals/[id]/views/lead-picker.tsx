@@ -58,7 +58,7 @@ export function LeadPicker({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-44">
         <DropdownMenuItem
-          onSelect={() => handleSelect(null)}
+          onClick={() => handleSelect(null)}
           className="flex items-center gap-2 text-[13px] text-gray-600"
         >
           <span className="flex-1 italic">Unassigned</span>
@@ -67,7 +67,7 @@ export function LeadPicker({
         {options.map((option) => (
           <DropdownMenuItem
             key={option.id}
-            onSelect={() => handleSelect(option.id)}
+            onClick={() => handleSelect(option.id)}
             className="flex items-center gap-2 text-[13px]"
           >
             <span className="flex-1">{option.name}</span>

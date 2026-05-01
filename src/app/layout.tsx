@@ -27,7 +27,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="bg-brand-bg text-brand-ink min-h-full">{children}</body>
+      {/* Body is locked to viewport height with no document-level scroll —
+          internal scroll containers (sidebar nav, main, modal bodies) handle
+          overflow within their own bounds. Prevents a "ghost" page scrollbar
+          when sub-pixel rounding makes app content appear marginally too tall. */}
+      <body className="bg-brand-bg text-brand-ink h-full overflow-hidden">{children}</body>
     </html>
   );
 }

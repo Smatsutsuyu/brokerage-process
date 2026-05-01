@@ -1,7 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { issues, users } from "@/db/schema";
+import { authUser, issues, users } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
 import { IssuesList, type IssueRow, type UserOption } from "./issues-list";
@@ -13,6 +13,8 @@ type IssuesViewProps = {
 export async function IssuesView({ dealId }: IssuesViewProps) {
   const org = await getCurrentOrg();
 
+  // Issue → users (assignee) → auth_user (display name + email).
+  // Both joins are LEFT so unassigned issues still come back.
   const rows = await db
     .select({
       id: issues.id,
@@ -21,12 +23,12 @@ export async function IssuesView({ dealId }: IssuesViewProps) {
       status: issues.status,
       priority: issues.priority,
       assignedUserId: issues.assignedUserId,
-      assigneeFirstName: users.firstName,
-      assigneeLastName: users.lastName,
+      assigneeName: authUser.name,
       identifiedAt: issues.identifiedAt,
     })
     .from(issues)
     .leftJoin(users, eq(users.id, issues.assignedUserId))
+    .leftJoin(authUser, eq(authUser.id, users.authUserId))
     .where(eq(issues.dealId, dealId))
     .orderBy(asc(issues.identifiedAt));
 
@@ -34,13 +36,13 @@ export async function IssuesView({ dealId }: IssuesViewProps) {
     ? await db
         .select({
           id: users.id,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          email: users.email,
+          name: authUser.name,
+          email: authUser.email,
         })
         .from(users)
+        .innerJoin(authUser, eq(authUser.id, users.authUserId))
         .where(eq(users.orgId, org.id))
-        .orderBy(asc(users.lastName))
+        .orderBy(asc(authUser.name))
     : [];
 
   const items: IssueRow[] = rows.map((r) => ({
@@ -50,16 +52,13 @@ export async function IssuesView({ dealId }: IssuesViewProps) {
     status: r.status,
     priority: r.priority,
     assignedUserId: r.assignedUserId,
-    assigneeName:
-      r.assigneeFirstName || r.assigneeLastName
-        ? `${r.assigneeFirstName ?? ""} ${r.assigneeLastName ?? ""}`.trim()
-        : null,
+    assigneeName: r.assigneeName,
     identifiedAt: r.identifiedAt.toISOString(),
   }));
 
   const userOptions: UserOption[] = orgUsers.map((u) => ({
     id: u.id,
-    name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email,
+    name: u.name || u.email,
   }));
 
   return <IssuesList dealId={dealId} items={items} users={userOptions} />;

@@ -110,14 +110,31 @@ You likely have another Postgres running (a system service or another project). 
 **Schema looks out of sync with the code**
 Easiest fix: `npm run db:reset && npm run db:migrate`. Loses all local data.
 
+**Dev server seems to ignore code changes / sign-in does nothing**
+Likely a stale `next dev` process is bound to port 3000 and your new server bound to 3001. Symptom in the new server's log: `Port 3000 is in use by process <PID>, using available port 3001 instead`. Browsers and bookmarks will keep hitting the stale 3000.
+
+```bash
+# Find the stale process (cmd shows PID at the end)
+netstat -ano | findstr :3000
+
+# Kill it (use the PID from the previous command)
+taskkill /PID <PID> /F
+
+# Or, in PowerShell:
+Get-NetTCPConnection -LocalPort 3000 | Select-Object OwningProcess
+Stop-Process -Id <PID> -Force
+```
+
+Then restart `npm run dev`. The new server will bind to 3000 cleanly.
+
 ## Signing in locally
 
-After `npm run db:seed`, sign in at [http://localhost:3000/sign-in](http://localhost:3000/sign-in) with:
+After `npm run db:seed`, sign in at [http://localhost:3000/sign-in](http://localhost:3000/sign-in) with either:
 
-- **Email**: `cshiota@lakebridgecap.com`
-- **Password**: `lakebridge-dev-password`
+- `cshiota@lakebridgecap.com` / `lakebridge-dev-password` (Chris, owner)
+- `seanesparza@gmail.com` / `Abcd1234!` (Sean, owner)
 
-(Defined in `src/db/seed.ts`.)
+Both accounts have `owner` role on the seeded Lakebridge org. Defined in `src/db/seed.ts`.
 
 To add more local members: sign in as Chris (owner role), open the user menu in the sidebar footer, click **Members**, then **Invite member**. The dialog generates an initial password you can share with the new user.
 

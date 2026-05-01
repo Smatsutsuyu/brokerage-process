@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { authUser, users } from "@/db/schema";
 import { Sidebar } from "@/components/layout/sidebar";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
@@ -26,22 +26,22 @@ export default async function MembersPage() {
   const rows = await db
     .select({
       id: users.id,
-      email: users.email,
-      firstName: users.firstName,
-      lastName: users.lastName,
+      authUserId: users.authUserId,
       role: users.role,
       disabledAt: users.disabledAt,
       createdAt: users.createdAt,
+      email: authUser.email,
+      name: authUser.name,
     })
     .from(users)
+    .innerJoin(authUser, eq(users.authUserId, authUser.id))
     .where(eq(users.orgId, org.id))
-    .orderBy(asc(users.lastName), asc(users.firstName));
+    .orderBy(asc(authUser.name));
 
   const members: MemberRow[] = rows.map((r) => ({
     id: r.id,
     email: r.email,
-    firstName: r.firstName,
-    lastName: r.lastName,
+    name: r.name,
     role: r.role,
     disabled: r.disabledAt !== null,
     createdAt: r.createdAt.toISOString(),

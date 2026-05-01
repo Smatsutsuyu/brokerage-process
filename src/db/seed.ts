@@ -43,12 +43,12 @@ async function main() {
     })
     .returning();
 
-  console.log(
-    `Creating Chris's auth account (sign in locally with cshiota@lakebridgecap.com / ${DEV_PASSWORD})...`,
-  );
-  // Use Better Auth's API so the password gets hashed correctly (rather than
+  console.log("Creating dev auth accounts...");
+  console.log(`  - cshiota@lakebridgecap.com / ${DEV_PASSWORD}`);
+  console.log("  - seanesparza@gmail.com / Abcd1234!");
+  // Use Better Auth's API so passwords get hashed correctly (rather than
   // hand-inserting into auth_account ourselves).
-  const signUpResult = await auth.api.signUpEmail({
+  const chrisAuth = await auth.api.signUpEmail({
     body: {
       name: "Chris Shiota",
       email: "cshiota@lakebridgecap.com",
@@ -56,16 +56,28 @@ async function main() {
     },
   });
 
+  const seanAuth = await auth.api.signUpEmail({
+    body: {
+      name: "Sean Esparza",
+      email: "seanesparza@gmail.com",
+      password: "Abcd1234!",
+    },
+  });
+
   const [chris] = await db
     .insert(schema.users)
-    .values({
-      orgId: org.id,
-      authUserId: signUpResult.user.id,
-      email: "cshiota@lakebridgecap.com",
-      firstName: "Chris",
-      lastName: "Shiota",
-      role: "owner",
-    })
+    .values([
+      {
+        orgId: org.id,
+        authUserId: chrisAuth.user.id,
+        role: "owner",
+      },
+      {
+        orgId: org.id,
+        authUserId: seanAuth.user.id,
+        role: "owner",
+      },
+    ])
     .returning();
 
   console.log("Seeding builders + contacts...");
@@ -142,7 +154,6 @@ async function main() {
         city: "Riverside",
         state: "CA",
         type: "Finished lots",
-        status: "phase_2",
         priority: "high",
       },
       {
@@ -152,8 +163,7 @@ async function main() {
         city: "Temecula",
         state: "CA",
         type: "Paper lots",
-        status: "phase_1",
-        priority: "medium",
+        priority: "normal",
       },
     ])
     .returning();

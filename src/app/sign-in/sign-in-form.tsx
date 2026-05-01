@@ -69,9 +69,6 @@ export function SignInForm() {
         {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
         Sign in
       </Button>
-      <p className="text-center text-xs text-gray-400">
-        Need access? Ask Chris to add you from the admin panel.
-      </p>
     </form>
   );
 }

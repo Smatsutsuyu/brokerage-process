@@ -8,8 +8,7 @@ import { db } from "@/db";
 import { deals } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
-export type DealStatus = "phase_1" | "phase_2" | "phase_3" | "phase_4" | "closed" | "cancelled";
-export type DealPriority = "low" | "medium" | "high";
+export type DealPriority = "normal" | "high";
 
 export type DealInput = {
   name: string;
@@ -17,7 +16,6 @@ export type DealInput = {
   city?: string;
   state?: string;
   type?: string;
-  status: DealStatus;
   priority: DealPriority;
   notes?: string;
 };
@@ -38,7 +36,6 @@ export async function createDeal(input: DealInput): Promise<string> {
       city: input.city?.trim() || null,
       state: input.state?.trim() || null,
       type: input.type?.trim() || null,
-      status: input.status,
       priority: input.priority,
       notes: input.notes?.trim() || null,
     })
@@ -66,7 +63,6 @@ export async function updateDeal(
       city: input.city?.trim() || null,
       state: input.state?.trim() || null,
       type: input.type?.trim() || null,
-      status: input.status,
       priority: input.priority,
       notes: input.notes?.trim() || null,
     })

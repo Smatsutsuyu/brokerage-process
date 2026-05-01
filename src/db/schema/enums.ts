@@ -2,16 +2,13 @@ import { pgEnum } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum("user_role", ["owner", "broker", "analyst", "viewer"]);
 
-export const dealStatusEnum = pgEnum("deal_status", [
-  "phase_1",
-  "phase_2",
-  "phase_3",
-  "phase_4",
-  "closed",
-  "cancelled",
-]);
+// Deals don't carry a phase/status field — workflow phase is implicit in the
+// checklist (each item lives in a phase). Matches the prototype, which only
+// modeled name/location/priority on the deal entity itself.
 
-export const dealPriorityEnum = pgEnum("deal_priority", ["low", "medium", "high"]);
+// Matches the prototype's two-state priority model. If we ever need a third
+// tier ("low"/"deferred"), Chris will tell us — keeping the surface tight.
+export const dealPriorityEnum = pgEnum("deal_priority", ["normal", "high"]);
 
 export const builderClassificationEnum = pgEnum("builder_classification", ["private", "public"]);
 

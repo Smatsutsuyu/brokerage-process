@@ -56,7 +56,7 @@ export function IssueStatusBadge({ dealId, issueId, status }: IssueStatusBadgePr
         {ORDER.map((option) => (
           <DropdownMenuItem
             key={option}
-            onSelect={() => handleSelect(option)}
+            onClick={() => handleSelect(option)}
             className="text-[13px]"
           >
             {STATUS_META[option].label}

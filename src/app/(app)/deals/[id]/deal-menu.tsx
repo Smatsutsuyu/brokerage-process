@@ -49,12 +49,12 @@ export function DealMenu({ deal }: DealMenuProps) {
           <MoreHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem onSelect={() => setEditOpen(true)} className="text-[13px]">
+          <DropdownMenuItem onClick={() => setEditOpen(true)} className="text-[13px]">
             <Pencil className="h-3.5 w-3.5" />
             Edit deal
           </DropdownMenuItem>
           <DropdownMenuItem
-            onSelect={handleDelete}
+            onClick={handleDelete}
             className="text-[13px] text-red-600 focus:bg-red-50 focus:text-red-700"
           >
             <Trash2 className="h-3.5 w-3.5" />

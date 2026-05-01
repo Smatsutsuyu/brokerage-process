@@ -49,8 +49,7 @@ function generatePassword(): string {
 
 export function InviteMemberModal({ open, onOpenChange }: InviteMemberModalProps) {
   const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [name, setName] = useState("");
   const [role, setRole] = useState<Role>("broker");
   const [initialPassword, setInitialPassword] = useState(generatePassword());
   const [error, setError] = useState<string | null>(null);
@@ -61,8 +60,7 @@ export function InviteMemberModal({ open, onOpenChange }: InviteMemberModalProps
     if (!open) {
       const t = setTimeout(() => {
         setEmail("");
-        setFirstName("");
-        setLastName("");
+        setName("");
         setRole("broker");
         setInitialPassword(generatePassword());
         setError(null);
@@ -75,7 +73,7 @@ export function InviteMemberModal({ open, onOpenChange }: InviteMemberModalProps
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!email.trim() || !firstName.trim() || !lastName.trim()) {
+    if (!email.trim() || !name.trim()) {
       setError("Email and name are required.");
       return;
     }
@@ -85,7 +83,7 @@ export function InviteMemberModal({ open, onOpenChange }: InviteMemberModalProps
     }
     startTransition(async () => {
       try {
-        await inviteMember({ email, firstName, lastName, role, initialPassword });
+        await inviteMember({ email, name, role, initialPassword });
         setCreated({ email: email.trim().toLowerCase(), password: initialPassword });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not invite member.");
@@ -135,26 +133,16 @@ export function InviteMemberModal({ open, onOpenChange }: InviteMemberModalProps
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label htmlFor="invite-first">First name</Label>
-                <Input
-                  id="invite-first"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="invite-last">Last name</Label>
-                <Input
-                  id="invite-last"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                />
-              </div>
+            <div className="grid gap-2">
+              <Label htmlFor="invite-name">Name</Label>
+              <Input
+                id="invite-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Jane Doe"
+                required
+                autoFocus
+              />
             </div>
 
             <div className="grid gap-2">
