@@ -5,11 +5,33 @@
 //   npm run feedback:report                  → all "new" items
 //   npm run feedback:report -- --status=all  → every item
 //   npm run feedback:report -- --out=docs/feedback-2026-05-01.md
+//   DATABASE_URL=postgres://... npm run feedback:report  → run against any DB
+//
+// This script intentionally bypasses @/db (which imports @/lib/env and
+// requires every prod env var). It only needs DATABASE_URL — no auth secret,
+// no Resend key — so we construct a thin Drizzle client directly. Makes
+// one-off ops use against prod or any other Postgres a one-liner.
 import { writeFileSync } from "node:fs";
+import { neon } from "@neondatabase/serverless";
 import { asc, desc, eq, inArray } from "drizzle-orm";
+import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
+import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 
-import { db } from "@/db";
 import { feedbackItems, type FeedbackItem } from "@/db/schema";
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  console.error(
+    "DATABASE_URL is required. Set it inline (e.g. `DATABASE_URL=... npm run feedback:report`) or via .env.local.",
+  );
+  process.exit(1);
+}
+
+const isNeon = databaseUrl.includes("neon.tech");
+const db = isNeon
+  ? drizzleNeon({ client: neon(databaseUrl), casing: "snake_case" })
+  : drizzlePostgres(postgres(databaseUrl, { max: 1 }), { casing: "snake_case" });
 
 type StatusFilter = "new" | "reviewed" | "actioned" | "wontfix" | "open" | "all";
 
