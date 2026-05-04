@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
 
@@ -18,9 +19,14 @@ export type CurrentUser = {
   name: string;
 };
 
+// Wrapped in React's cache() so multiple callers within a single request
+// (page + sidebar + auth helpers) share one DB round-trip + one Better Auth
+// session lookup. Cache is per-request, not cross-request.
+export const getCurrentUser = cache(_getCurrentUser);
+
 // Resolves the signed-in user. Returns null when there's no session, when
 // the membership row is missing, or when the member is disabled.
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+async function _getCurrentUser(): Promise<CurrentUser | null> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return null;
 

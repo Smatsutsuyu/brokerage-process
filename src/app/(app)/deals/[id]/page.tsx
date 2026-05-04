@@ -38,61 +38,71 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   // member) — bounce to sign-in instead of showing a confusing 404.
   if (!org) redirect("/sign-in");
 
-  const deal = await db.query.deals.findFirst({
-    where: and(eq(deals.id, id), eq(deals.orgId, org.id)),
-  });
+  // All queries are independent — fire them in parallel so total latency is
+  // ~1 RTT instead of 7. The deal existence check happens after the batch so
+  // we don't need a serial dependency just to short-circuit on notFound.
+  const [deal, categories, items, contactsCountRow, qaTotalRow, issuesOpenRow, consultantsFilledRow] =
+    await Promise.all([
+      db.query.deals.findFirst({
+        where: and(eq(deals.id, id), eq(deals.orgId, org.id)),
+      }),
+      db
+        .select({
+          id: checklistCategories.id,
+          phase: checklistCategories.phase,
+          name: checklistCategories.name,
+          sortOrder: checklistCategories.sortOrder,
+        })
+        .from(checklistCategories)
+        .where(eq(checklistCategories.dealId, id))
+        .orderBy(checklistCategories.phase, checklistCategories.sortOrder),
+      db
+        .select({
+          id: checklistItems.id,
+          categoryId: checklistItems.categoryId,
+          name: checklistItems.name,
+          optional: checklistItems.optional,
+          completed: checklistItems.completed,
+          sortOrder: checklistItems.sortOrder,
+        })
+        .from(checklistItems)
+        .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
+        .where(eq(checklistCategories.dealId, id))
+        .orderBy(checklistItems.sortOrder),
+      db
+        .select({ n: count() })
+        .from(contacts)
+        .innerJoin(dealBuyers, eq(dealBuyers.builderId, contacts.builderId))
+        .where(eq(dealBuyers.dealId, id))
+        .then((r) => r[0]),
+      db
+        .select({
+          total: count(),
+          approved: sql<number>`count(*) filter (where ${qaItems.approved} = true)::int`,
+        })
+        .from(qaItems)
+        .where(eq(qaItems.dealId, id))
+        .then((r) => r[0]),
+      db
+        .select({
+          open: sql<number>`count(*) filter (where ${issues.status} = 'open')::int`,
+        })
+        .from(issues)
+        .where(eq(issues.dealId, id))
+        .then((r) => r[0]),
+      db
+        .select({ n: count() })
+        .from(consultants)
+        .where(eq(consultants.dealId, id))
+        .then((r) => r[0]),
+    ]);
+
   if (!deal) notFound();
 
-  const categories = await db
-    .select({
-      id: checklistCategories.id,
-      phase: checklistCategories.phase,
-      name: checklistCategories.name,
-      sortOrder: checklistCategories.sortOrder,
-    })
-    .from(checklistCategories)
-    .where(eq(checklistCategories.dealId, id))
-    .orderBy(checklistCategories.phase, checklistCategories.sortOrder);
-
-  const items = await db
-    .select({
-      id: checklistItems.id,
-      categoryId: checklistItems.categoryId,
-      name: checklistItems.name,
-      optional: checklistItems.optional,
-      completed: checklistItems.completed,
-      sortOrder: checklistItems.sortOrder,
-    })
-    .from(checklistItems)
-    .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
-    .where(eq(checklistCategories.dealId, id))
-    .orderBy(checklistItems.sortOrder);
-
-  const [contactsCount] = await db
-    .select({ n: count() })
-    .from(contacts)
-    .innerJoin(dealBuyers, eq(dealBuyers.builderId, contacts.builderId))
-    .where(eq(dealBuyers.dealId, id));
-
-  const [qaTotal] = await db
-    .select({
-      total: count(),
-      approved: sql<number>`count(*) filter (where ${qaItems.approved} = true)::int`,
-    })
-    .from(qaItems)
-    .where(eq(qaItems.dealId, id));
-
-  const [issuesOpen] = await db
-    .select({
-      open: sql<number>`count(*) filter (where ${issues.status} = 'open')::int`,
-    })
-    .from(issues)
-    .where(eq(issues.dealId, id));
-
-  const [consultantsFilled] = await db
-    .select({ n: count() })
-    .from(consultants)
-    .where(eq(consultants.dealId, id));
+  const contactsCount = contactsCountRow;
+  const qaTotal = qaTotalRow;
+  const issuesOpen = issuesOpenRow;
+  const consultantsFilled = consultantsFilledRow;
 
   const totalItems = items.length;
   const doneItems = items.filter((i) => i.completed).length;
