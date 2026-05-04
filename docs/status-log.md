@@ -4,6 +4,42 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-04 — Production polish + auto-checklist on deal create
+
+Post-deploy fix-up session. Three threads stacked tightly together: deploy speed, ops UX, and a real bug (new deals shipped with empty checklists).
+
+### Done — Deploy speed (snappier deal navigation)
+- `vercel.json` locks function region to `pdx1` (Portland) — same datacenter region as Neon's `us-west-2`. Drops cross-region query RTT from ~70ms to ~5ms. Single biggest perceived-speed win
+- Deal page's 7 sequential DB queries (deal, categories, items, contacts/qa/issues/consultants counts) batched into one `Promise.all`. Total latency = max(query) instead of sum(query)
+- `getCurrentUser` + `getCurrentOrg` wrapped in React's `cache()` so the page + sidebar + any other resolver in the same request share one Better Auth session lookup and one DB read
+- Verified post-deploy: cold hit ~1.1s (function spin + Neon wake), warm hit ~290ms
+
+### Done — Feedback report ergonomics
+- `src/scripts/feedback-report.ts` no longer imports `@/db` (which transitively required every prod env var via `@/lib/env`). Constructs its own thin Drizzle client from `process.env.DATABASE_URL` directly
+- One-liner against any Postgres now works: `DATABASE_URL=postgres://... npm run feedback:report`. No more juggling stub auth/Resend env vars to look at prod feedback
+
+### Done — Auto-populate checklist on deal create
+- **Real bug:** `createDeal` only inserted the deal row — no checklist categories or items. Newly created deals showed an empty Checklist tab even though seeded deals had the full 4-phase tree
+- Extracted the canonical 4-phase / 11-category / ~37-item template from `seed.ts` into a new `src/db/checklist-template.ts` module. Source of truth — both seed and createDeal import from there so the two can never drift again
+- `seedChecklistForDeal(client, { orgId, dealId })` exposes the insert work as a function. createDeal calls it after the deal insert; the seed loops over both demo deals and calls it
+- Note in code: Neon HTTP driver doesn't support transactions, so deal-then-checklist isn't atomic. If checklist insert fails, the orphan deal needs manual cleanup. Acceptable trade-off for a fully-static template; revisit if it ever fails in practice
+
+### Decisions
+- **Deploy to `pdx1` co-located with Neon** instead of staying on `iad1` and reaching across the country. The Vercel/Neon round-trip is the dominant page-load cost on a server-rendered app like this — no clever caching beats just sitting next to the DB
+- **`cache()` over manual deduplication.** React's request-scoped cache is exactly the right tool — automatic, no leak risk across requests, transparent to callers. Better than passing `org`/`user` as props down the tree
+- **Single template module over duplicating the spec in seed + create.** The two were 100 lines of inline data each. One source, two callers, zero drift risk
+- **Decoupled feedback-report from `@/lib/env`** rather than adding a "report-only" relaxed env schema. The script genuinely needs only DATABASE_URL — making it explicit is better than carrying validation noise. Same approach should apply to any future ops scripts (db:studio, future migration helpers)
+
+### Notes for future Sean
+- **Don't re-seed production Neon casually.** Truncating organizations cascades to feedback_items, killing any test feedback users have left. Truncating auth tables invalidates every live session, bouncing users to /sign-in. During this session I re-seeded a couple times to validate refactors — should have used targeted SELECT queries instead. Treat seed as "fresh-bootstrap only" once the DB has any user-generated data
+- Vercel's CLI quirk where `vercel env add NAME preview` insists on a git-branch arg even when the docs say omit-for-all — still unresolved. Set BETTER_AUTH_SECRET on preview via the dashboard if/when first PR creates a preview deploy
+- Neon free tier auto-suspends after 5 min idle. First click after a coffee break will always have a 1–1.5s hitch. Only fix is upgrading to Launch ($19/mo); not worth it for a Phase 1 demo
+
+### Blockers
+- None active. Production deploy is live, snappy, and creates correct checklists. Phase 2 still gated on Lakebridge's vendor accounts (Vercel team transfer, R2, Resend)
+
+---
+
 ## 2026-05-01 (evening) — First Vercel deploy attempt + Neon integration + migration drift cleanup
 
 Got Sean-owned Vercel project up, integrated Neon via the Vercel marketplace, hit a real schema-drift bug in the process, and cleaned it up. Production deploy unblocked.

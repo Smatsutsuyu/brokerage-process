@@ -4,6 +4,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 
 import { auth } from "@/lib/auth/auth";
 
+import { seedChecklistForDeal } from "./checklist-template";
 import { db, schema } from "./index";
 
 const DEV_PASSWORD = "lakebridge-dev-password";
@@ -179,134 +180,10 @@ async function main() {
   ]);
 
   console.log("Seeding checklist (all four phases per CLAUDE.md, hierarchical)...");
-  // Items are CLAUDE.md verbatim. Phase 1 uses the category groupings the
-  // discovery section sketches (Valuation, Third Party Marketing Reports,
-  // Marketing Documents, plus Listing & Buyer Setup and Underwriting & OM
-  // for items not covered by Chris's sketched categories). Phases 2-4 use a
-  // single "Items" bucket since CLAUDE.md doesn't break them down further;
-  // categories can be added per Chris's preference later without schema work.
-  const phaseSpec: Array<{
-    phase: "phase_1" | "phase_2" | "phase_3" | "phase_4";
-    categories: Array<{ name: string; items: Array<string | { name: string; optional?: boolean }> }>;
-  }> = [
-    {
-      phase: "phase_1",
-      categories: [
-        {
-          name: "Listing & Buyer Setup",
-          items: ["Listing Agreement", "Initial List of Potential Buyers"],
-        },
-        {
-          name: "Third Party Marketing Reports",
-          items: [
-            "HOA Budget",
-            "Cost to Complete",
-            "CFD Analysis",
-            { name: "Market Study", optional: true },
-          ],
-        },
-        {
-          name: "Valuation",
-          items: ["Premium Analysis", "Valuation"],
-        },
-        {
-          name: "Marketing Documents",
-          items: [
-            "Entitlement Schedule",
-            { name: "Development Schedule", optional: true },
-            "Entitlement Summary",
-          ],
-        },
-        {
-          name: "Underwriting & OM",
-          items: [
-            "Custom Underwriting File for Deal",
-            "Offering Memorandum",
-            "Marketing Report (Green/Yellow/Red buyer categorization)",
-            "Determine PSA Attorney (drafting preference)",
-          ],
-        },
-      ],
-    },
-    {
-      phase: "phase_2",
-      categories: [
-        {
-          name: "Items",
-          items: [
-            "Send out OM / Blast (personalized by buyer tier)",
-            "Request In-Person Meeting with Top (Green) Buyers",
-            "Coordinate a Q&A File",
-            "Send out Q&A File",
-            { name: "Share Market Study", optional: true },
-            "Email Notification of Offers Due (X days before)",
-            "Day-of Reminder",
-            "Automated follow-up to Green & Yellow buyers whose offers haven't come in",
-          ],
-        },
-      ],
-    },
-    {
-      phase: "phase_3",
-      categories: [
-        {
-          name: "Items",
-          items: [
-            "Schedule Meeting with Ownership",
-            "Create Initial Summary (send out as received)",
-            "Review Underwriting Sheets for clarification",
-            "Run LOI through AI → SOO Matrix",
-            "Run UW Sheets through AI → Revenue Charts & UW Summary",
-            "PDF everything together",
-            "Create Recommendation memo (Pro/Con of each offer)",
-          ],
-        },
-      ],
-    },
-    {
-      phase: "phase_4",
-      categories: [
-        {
-          name: "Items",
-          items: [
-            "Share All Due Diligence",
-            "Kick Off PSA",
-            "Kickoff Call",
-            "Bi-Weekly Meeting Schedule for DD",
-            "Determine CTC Date",
-            "Issues Tracking Sheet (living document)",
-            "Consultant Roster",
-          ],
-        },
-      ],
-    },
-  ];
-
+  // Pulled from the shared template module so seed and createDeal can never
+  // drift. Edits to the canonical list happen in `checklist-template.ts`.
   for (const deal of [riverside, lakeview]) {
-    let phaseIdx = 0;
-    for (const spec of phaseSpec) {
-      for (const [catIdx, cat] of spec.categories.entries()) {
-        const [category] = await db
-          .insert(schema.checklistCategories)
-          .values({
-            orgId: org.id,
-            dealId: deal.id,
-            phase: spec.phase,
-            name: cat.name,
-            sortOrder: phaseIdx * 100 + catIdx,
-          })
-          .returning();
-
-        const itemRows = cat.items.map((it, idx) => {
-          const base = { orgId: org.id, categoryId: category.id, sortOrder: idx };
-          return typeof it === "string"
-            ? { ...base, name: it }
-            : { ...base, name: it.name, optional: it.optional ?? false };
-        });
-        await db.insert(schema.checklistItems).values(itemRows);
-      }
-      phaseIdx++;
-    }
+    await seedChecklistForDeal(db, { orgId: org.id, dealId: deal.id });
 
     // Mark a few Phase 1 items complete on Riverside so progress isn't 0%.
     if (deal.id === riverside.id) {

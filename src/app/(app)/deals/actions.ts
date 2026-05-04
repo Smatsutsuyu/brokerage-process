@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
+import { seedChecklistForDeal } from "@/db/checklist-template";
 import { deals } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
@@ -27,6 +28,12 @@ export async function createDeal(input: DealInput): Promise<string> {
   const name = input.name.trim();
   if (!name) throw new Error("Deal name is required");
 
+  // Insert deal + auto-populate the canonical 4-phase checklist from the
+  // shared template so a UI-created deal looks identical to a seeded one.
+  // Note: Neon HTTP driver doesn't support transactions, so writes happen
+  // sequentially. If the checklist insert fails partway, manual cleanup of
+  // the orphan deal is needed — acceptable trade-off for now since the
+  // template is fully static and has been exercised via seed many times.
   const [created] = await db
     .insert(deals)
     .values({
@@ -40,6 +47,8 @@ export async function createDeal(input: DealInput): Promise<string> {
       notes: input.notes?.trim() || null,
     })
     .returning();
+
+  await seedChecklistForDeal(db, { orgId: org.id, dealId: created.id });
 
   revalidatePath("/");
   return created.id;
