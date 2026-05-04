@@ -4,6 +4,42 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-01 (evening) — First Vercel deploy attempt + Neon integration + migration drift cleanup
+
+Got Sean-owned Vercel project up, integrated Neon via the Vercel marketplace, hit a real schema-drift bug in the process, and cleaned it up. Production deploy unblocked.
+
+### Done — Vercel project + Neon integration
+- Vercel CLI installed; project linked (`smatsutsuyus-projects/brokerage-process`). `.vercel/` auto-gitignored
+- Added Neon via Vercel's marketplace integration (Sean's account for now — handoff-clean because Lakebridge's Vercel team will own the Neon project once the Vercel team transfers)
+- Discovered Vercel marks integration-set env vars as **Sensitive** — values are encrypted server-side and cannot be retrieved via the CLI or UI even by the project owner. `vercel env pull` returns empty strings for these. The only way to get the actual `DATABASE_URL` is via the Neon dashboard
+- All four required env vars set on production: `DATABASE_URL` (from integration), `BETTER_AUTH_SECRET` (random 32-byte base64), `BETTER_AUTH_URL` (`https://brokerage-process-smatsutsuyus-projects.vercel.app`), `RESEND_API_KEY` (placeholder — no Phase 1 code calls Resend, will be replaced in Phase 2)
+
+### Done — Migration drift cleanup
+**The bug:** `src/db/schema/auth.ts` (Better Auth tables) was added during the 2026-05-01 morning Clerk-to-Better-Auth swap, plus the `users` table was reshaped during the Option-A consolidation (dropped clerk_user_id/email/firstName/lastName, added authUserId/disabledAt). All those changes were synced to local DB via `db:push` — neither got captured in a migration file. Result: the two checked-in migrations (`0000_modern_dorian_gray`, `0001_dizzy_wind_dancer`) describe an obsolete schema that doesn't include auth tables and still has the old user columns. Running `npm run db:migrate` against fresh Neon produced a working but stale schema; seed then crashed with "relation auth_session does not exist."
+
+**The fix:**
+- Deleted both old migration files + their meta snapshots; reset `_journal.json` to empty entries
+- Ran `npm run db:generate` against the current schema → produced a single clean `0000_flawless_masked_marvel.sql` capturing every table including the auth ones
+- Dropped `public` + `drizzle` schemas on Neon, ran `npm run db:migrate` against the empty DB → applied cleanly, populated `drizzle.__drizzle_migrations` tracking table (verified: 1 row, hash matches the new file)
+- Re-seeded sample data — 1 org, 2 users (Sean + Chris), 2 deals, full hierarchical checklist, sample Q&A/issues/consultants
+
+### Decisions
+- **Neon via Vercel integration over direct Neon account.** The integration auto-creates a Neon project tied to the Vercel team, injects DATABASE_URL into all envs automatically, and gives every preview deploy its own DB branch. Single billing relationship through Vercel. Handoff intent preserved because the Neon project belongs to whichever Vercel team owns the project — when Lakebridge takes over the Vercel team, Neon goes with it
+- **Reset migrations to a single 0000 instead of writing a 0002 fixup.** The two old migrations described a schema that never made it past local — no production deploy had ever run them, so collapsing the history was strictly cleaner than carrying obsolete intermediate states. Migrations from this point forward are the source of truth; no more `db:push` against environments that will be migrated
+- **Placeholder RESEND_API_KEY** so env validation passes during build. No Phase 1 code calls Resend; first real key happens when Lakebridge provisions the Resend account in Phase 2
+- **BETTER_AUTH_URL points at Vercel's auto-domain for now.** Will switch to `https://brokerage.lakebridgecap.com` once the subdomain is wired up in DNS — Better Auth keys session cookies and OAuth callbacks off this value, so it has to match the actual hostname users hit
+
+### Notes for future Sean
+- **`db:push` is now off-limits for any environment that runs `db:migrate`** (i.e. production, and any preview deploy created via Vercel). Local Docker DB still fine to push to during exploration, but generate a migration before merging schema changes
+- **Vercel's "Sensitive" env var feature is one-way.** If you ever need to read a Sensitive var's value (e.g. to debug a connection issue from outside Vercel's runtime), the only path is through the source service (Neon dashboard for DATABASE_URL, etc.) — there's no decrypt
+- **Preview env BETTER_AUTH_SECRET still missing.** CLI quirk where `vercel env add ... preview` insists on a git-branch arg even when the docs say omit-for-all-branches. Set via dashboard or revisit when first PR creates a preview deploy
+- **`RESEND_API_KEY=re_placeholder_phase1` is currently committed in env validation but not actually used at runtime.** When Phase 2 wires up email, double-check no code path silently fails open against the placeholder
+
+### Blockers
+- None active. Production deploy ready to retry. Phase 2 still gated on Lakebridge's vendor accounts (Vercel team transfer, R2, Resend)
+
+---
+
 ## 2026-05-01 (afternoon) — Contacts prototypes, planned-action placeholders, layout polish
 
 End-of-Phase-1 polish session. Two threads of work: (1) explore the Contacts UX with four parallel design proposals so Chris can pick a direction at next call, (2) flesh out the rest of the deal page with placeholder buttons for every Phase 2 feature so Chris can sign off on the design before any of it is built.

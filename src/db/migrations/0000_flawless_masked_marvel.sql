@@ -3,9 +3,10 @@ CREATE TYPE "public"."buyer_tier" AS ENUM('green', 'yellow', 'red', 'not_selecte
 CREATE TYPE "public"."checklist_phase" AS ENUM('phase_1', 'phase_2', 'phase_3', 'phase_4');--> statement-breakpoint
 CREATE TYPE "public"."consultant_role" AS ENUM('landscape_architect', 'civil_engineer', 'soils_engineer', 'cost_to_complete', 'hoa', 'dry_utility', 'phase_1_environmental', 'land_use', 'biologist', 'architect', 'psa_attorney');--> statement-breakpoint
 CREATE TYPE "public"."consultant_side" AS ENUM('buyer', 'seller');--> statement-breakpoint
-CREATE TYPE "public"."deal_priority" AS ENUM('low', 'medium', 'high');--> statement-breakpoint
-CREATE TYPE "public"."deal_status" AS ENUM('phase_1', 'phase_2', 'phase_3', 'phase_4', 'closed', 'cancelled');--> statement-breakpoint
+CREATE TYPE "public"."deal_priority" AS ENUM('normal', 'high');--> statement-breakpoint
 CREATE TYPE "public"."document_status" AS ENUM('draft', 'final');--> statement-breakpoint
+CREATE TYPE "public"."feedback_severity" AS ENUM('nit', 'suggestion', 'bug', 'blocker');--> statement-breakpoint
+CREATE TYPE "public"."feedback_status" AS ENUM('new', 'reviewed', 'actioned', 'wontfix');--> statement-breakpoint
 CREATE TYPE "public"."issue_priority" AS ENUM('low', 'medium', 'high', 'urgent');--> statement-breakpoint
 CREATE TYPE "public"."issue_status" AS ENUM('open', 'in_progress', 'resolved');--> statement-breakpoint
 CREATE TYPE "public"."user_role" AS ENUM('owner', 'broker', 'analyst', 'viewer');--> statement-breakpoint
@@ -20,6 +21,54 @@ CREATE TABLE "audit_log" (
 	"after" jsonb,
 	"metadata" jsonb,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "auth_account" (
+	"id" text PRIMARY KEY NOT NULL,
+	"account_id" text NOT NULL,
+	"provider_id" text NOT NULL,
+	"user_id" text NOT NULL,
+	"access_token" text,
+	"refresh_token" text,
+	"id_token" text,
+	"access_token_expires_at" timestamp with time zone,
+	"refresh_token_expires_at" timestamp with time zone,
+	"scope" text,
+	"password" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "auth_session" (
+	"id" text PRIMARY KEY NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	"token" text NOT NULL,
+	"ip_address" text,
+	"user_agent" text,
+	"user_id" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "auth_session_token_unique" UNIQUE("token")
+);
+--> statement-breakpoint
+CREATE TABLE "auth_user" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"email" text NOT NULL,
+	"email_verified" boolean DEFAULT false NOT NULL,
+	"image" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "auth_user_email_unique" UNIQUE("email")
+);
+--> statement-breakpoint
+CREATE TABLE "auth_verification" (
+	"id" text PRIMARY KEY NOT NULL,
+	"identifier" text NOT NULL,
+	"value" text NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now(),
+	"updated_at" timestamp with time zone DEFAULT now()
 );
 --> statement-breakpoint
 CREATE TABLE "builders" (
@@ -118,8 +167,7 @@ CREATE TABLE "deals" (
 	"city" text,
 	"state" text,
 	"type" text,
-	"status" "deal_status" DEFAULT 'phase_1' NOT NULL,
-	"priority" "deal_priority" DEFAULT 'medium' NOT NULL,
+	"priority" "deal_priority" DEFAULT 'normal' NOT NULL,
 	"notes" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -143,6 +191,22 @@ CREATE TABLE "documents" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "feedback_items" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL,
+	"user_id" uuid,
+	"user_email" text,
+	"section" text NOT NULL,
+	"page_path" text NOT NULL,
+	"commit_sha" text,
+	"severity" "feedback_severity" DEFAULT 'suggestion' NOT NULL,
+	"comment" text NOT NULL,
+	"status" "feedback_status" DEFAULT 'new' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"reviewed_at" timestamp with time zone,
+	"actioned_at" timestamp with time zone
+);
+--> statement-breakpoint
 CREATE TABLE "organizations" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"clerk_org_id" text NOT NULL,
@@ -157,14 +221,12 @@ CREATE TABLE "organizations" (
 CREATE TABLE "users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
-	"clerk_user_id" text NOT NULL,
-	"email" text NOT NULL,
-	"first_name" text,
-	"last_name" text,
+	"auth_user_id" text,
 	"role" "user_role" DEFAULT 'viewer' NOT NULL,
+	"disabled_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "users_clerk_user_id_unique" UNIQUE("clerk_user_id")
+	CONSTRAINT "users_auth_user_id_unique" UNIQUE("auth_user_id")
 );
 --> statement-breakpoint
 CREATE TABLE "qa_items" (
@@ -197,6 +259,8 @@ CREATE TABLE "issues" (
 --> statement-breakpoint
 ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "auth_account" ADD CONSTRAINT "auth_account_user_id_auth_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."auth_user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "auth_session" ADD CONSTRAINT "auth_session_user_id_auth_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."auth_user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "builders" ADD CONSTRAINT "builders_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "contacts" ADD CONSTRAINT "contacts_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "contacts" ADD CONSTRAINT "contacts_builder_id_builders_id_fk" FOREIGN KEY ("builder_id") REFERENCES "public"."builders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -217,6 +281,8 @@ ALTER TABLE "deals" ADD CONSTRAINT "deals_org_id_organizations_id_fk" FOREIGN KE
 ALTER TABLE "documents" ADD CONSTRAINT "documents_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "documents" ADD CONSTRAINT "documents_deal_id_deals_id_fk" FOREIGN KEY ("deal_id") REFERENCES "public"."deals"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "documents" ADD CONSTRAINT "documents_uploaded_by_users_id_fk" FOREIGN KEY ("uploaded_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "feedback_items" ADD CONSTRAINT "feedback_items_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "feedback_items" ADD CONSTRAINT "feedback_items_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "users" ADD CONSTRAINT "users_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "qa_items" ADD CONSTRAINT "qa_items_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "qa_items" ADD CONSTRAINT "qa_items_deal_id_deals_id_fk" FOREIGN KEY ("deal_id") REFERENCES "public"."deals"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
