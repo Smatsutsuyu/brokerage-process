@@ -1,0 +1,1 @@
+ALTER TABLE "feedback_items" ADD COLUMN "response" text;

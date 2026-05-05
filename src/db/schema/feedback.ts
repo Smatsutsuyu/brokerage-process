@@ -19,6 +19,10 @@ export const feedbackItems = pgTable("feedback_items", {
   commitSha: text("commit_sha"),
   severity: feedbackSeverityEnum("severity").notNull().default("suggestion"),
   comment: text("comment").notNull(),
+  // Dev-side reply / working notes for this item. Surfaced in the
+  // /admin/feedback page so the owner can keep responses inline with the
+  // original report. Plain text — no markdown parsing.
+  response: text("response"),
   status: feedbackStatusEnum("status").notNull().default("new"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
