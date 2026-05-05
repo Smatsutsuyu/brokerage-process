@@ -4,6 +4,26 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-05 (late) — Vendor swap: Cloudflare R2 → Vercel Blob
+
+Quick re-audit of third-party tooling now that we know the deploy target is Vercel. R2 was chosen pre-Vercel-decision; Vercel Blob is the obvious native swap.
+
+### Done
+- CLAUDE.md updated: file storage row in the architecture table (R2 → Vercel Blob with reasoning), Phase 1 setup deliverables, Phase 2 doc-upload bullet, Dropbox-integration implementation note, end-of-Phase-1 vendor-accounts line, vendor ownership table consolidated (now lists Vercel + Resend + Anthropic; "Removed from earlier plans" sub-list documents R2/Clerk/Sentry/standalone-Neon swap-outs)
+
+### Decisions
+- **Vercel Blob over Cloudflare R2.** Code wasn't written yet — zero-cost swap. Native to the platform: same dashboard, same billing, signed-URL browser uploads, public CDN URLs. ~$0.17/mo storage at our peak (~7.5 GB; 50 deals × 50 docs × 3 MB avg). Operational simplicity worth more than the rounding-error cost difference vs R2's "free egress" pitch
+- **Vendor inventory now: Vercel + Resend + (Anthropic deferred).** Down from the original plan of Vercel + Neon + Cloudflare + Clerk + Resend + Sentry. Lakebridge handoff is a 1–2 vendor situation depending on whether Anthropic gets activated for AI work later
+
+### Notes for future Sean
+- No code change needed — `@vercel/blob` SDK gets imported when Phase 2 doc storage starts. Same usage shape (signed URL → upload → blob URL) as any S3-compatible client would have been
+- If we ever do hit storage volumes where R2's free-egress matters (>>100 GB or heavy public download patterns), reconsider. Won't happen at brokerage workflow scale
+
+### Blockers
+- None active
+
+---
+
 ## 2026-05-05 (afternoon/evening) — Builders directory, deal-side contact flows, UX polish, lenient import
 
 Multi-thread session continuing from the morning's standalone Contacts directory. Builders gets the same first-class treatment, the deal-side Contacts tab gets a smarter "Add Existing" flow, and a long string of small UX polishes across the app.

@@ -12,7 +12,7 @@ This file is the authoritative project context for Claude Code working on the La
 
 **Reviewing client feedback during the build**: Chris uses an in-app feedback widget (floating button + per-section 💬 icons) to leave notes while exercising the platform. Notes flow into the `feedback_items` Postgres table. Read them with `npm run feedback:report` (defaults to "new" items grouped by section, with build commit SHA so you can correlate against deployed code). Disabled via `NEXT_PUBLIC_FEEDBACK_ENABLED=false` for production launch. See `docs/local-development.md` for full mechanics including how to mark items reviewed/actioned.
 
-**Current phase:** Phase 1 (Foundation) — **functionally complete as of 2026-05-01**, awaiting Lakebridge vendor accounts (Vercel, Neon, R2, Resend) for production deploy and Phase 2 kickoff. Phase 1 deliverables: hosted multi-user version of the prototype with Better Auth, hierarchical checklist, Buyer/Contact CRUD with tier tagging, Q&A workflow, Issues tracker, Consultant roster, profile + members admin pages, in-app feedback widget. Plus four parallel Contacts UX prototypes for client review and Phase 2 placeholder buttons throughout the deal page (Sonner toasts naming each future feature) so Chris can sign off on the design before Phase 2 begins.
+**Current phase:** Phase 1 (Foundation) — **functionally complete as of 2026-05-01**, awaiting Lakebridge vendor accounts (Vercel, Neon, Resend) for production deploy and Phase 2 kickoff. Phase 1 deliverables: hosted multi-user version of the prototype with Better Auth, hierarchical checklist, Buyer/Contact CRUD with tier tagging, Q&A workflow, Issues tracker, Consultant roster, profile + members admin pages, in-app feedback widget. Plus four parallel Contacts UX prototypes for client review and Phase 2 placeholder buttons throughout the deal page (Sonner toasts naming each future feature) so Chris can sign off on the design before Phase 2 begins.
 
 **Headline scope decisions (locked, do not revisit without explicit instruction):**
 
@@ -161,7 +161,7 @@ The platform's internal UI can use either Lakebridge or Land Advisors branding (
 | Application    | Next.js 16 (App Router, Turbopack) + React 19 + TypeScript (strict) + Tailwind v4 + shadcn/ui | Scaffolded 2026-04-30 with Next 16 (current latest, newer than this doc originally specified). shadcn `base-nova` preset uses BaseUI under the hood, not Radix. Single codebase, single deploy, API routes colocated with UI. |
 | Hosting        | Vercel Pro                                                          | $20/month, required (Hobby tier prohibits commercial use)                        |
 | Database       | Neon Postgres                                                       | Free tier (0.5 GB) sufficient for years; Launch tier ($19) when needed           |
-| File Storage   | Cloudflare R2                                                       | Free tier (10 GB), no egress fees, S3-compatible                                 |
+| File Storage   | **Vercel Blob**                                                     | Switched from Cloudflare R2 2026-05-05. Native to Vercel — same dashboard, same billing, signed-URL browser uploads, public CDN URLs out of the box. ~$0.17/mo storage at Lakebridge volume (~7.5 GB peak). One fewer vendor account at handoff. |
 | Auth           | **Better Auth** (self-hosted)                                       | Switched from Clerk 2026-05-01. Runs on our Postgres via Drizzle adapter; no vendor account, full UI control. Member management via in-app `/admin/members` page (owner-gated). |
 | AI             | Anthropic API direct                                                | Claude Sonnet 4.6 for substantive generation, Haiku 4.5 for emails/short outputs |
 | Email          | Resend                                                              | Free tier (3K/month, 100/day) sufficient                                         |
@@ -241,14 +241,14 @@ Approximately seven weeks across three phases. Compressed from the original eigh
 - Database schema and migrations (Drizzle ORM)
 - Database structure for organizations, users, deals, builders, contacts, hierarchical checklist items, Q&A items, issues, consultants, document metadata
 - UI built from prototype, faithful to its layout, with hierarchical checklist structure (per Excel) rather than flat
-- Sentry, R2 setup
+- Vercel Blob setup
 - Deploy to Vercel preview environment for client testing in second half of phase
 
 ### Phase 2: Document and Email Generation (2 weeks)
 
 Templated outputs only. No LLM calls. Mid-phase preview deploy after PDFs are working; end-of-phase deploy after email send works.
 
-- Document upload to R2, organized by deal and document type
+- Document upload to Vercel Blob, organized by deal and document type
 - Document viewer (PDF inline, Excel preview, image preview)
 - Document versioning (automatic — every save creates a version)
 - React-PDF infrastructure for branded outputs (Land Advisors branding throughout)
@@ -287,15 +287,17 @@ The platform is designed from day one for Lakebridge to operate without ongoing 
 
 **All accounts are created in Lakebridge's name from the start.** Sean does not create accounts in his name and transfer them later. This avoids messy ownership transitions at handoff.
 
-| Vendor     | Billed For          | Why Direct Access Matters                                    |
-| ---------- | ------------------- | ------------------------------------------------------------ |
-| Vercel     | Hosting             | Deploys, domain config, env variable management              |
-| Neon       | Database            | Backups, point-in-time restore                               |
-| Cloudflare | R2 storage          | Document storage; may also host DNS                          |
-| Clerk      | Auth                | User management, MFA, session revocation                     |
-| Resend     | Email               | Sender domain verification, deliverability                   |
-| Sentry     | Monitoring          | Error alerts, issue triage                                   |
-| Anthropic  | AI usage (deferred) | Not needed for this build. Set up when AI engagement begins. |
+| Vendor    | Billed For                  | Why Direct Access Matters                                                                                                |
+| --------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Vercel    | Hosting + DB + File storage | Deploys, domain config, env variable management. Bundles Neon (DB) and Vercel Blob (file storage) via marketplace.       |
+| Resend    | Email                       | Sender domain verification, deliverability                                                                               |
+| Anthropic | AI usage (deferred)         | Not needed for this build. Set up when AI engagement begins.                                                             |
+
+**Removed from earlier plans:**
+- **Cloudflare R2** — replaced with Vercel Blob (2026-05-05). Native to Vercel, ~$0.17/mo at our scale, one fewer vendor account.
+- **Clerk** — replaced with Better Auth (self-hosted on our DB, 2026-05-01).
+- **Sentry** — removed in favor of Vercel function logs (2026-05-01).
+- **Neon (direct account)** — provisioned via the Vercel ↔ Neon marketplace integration; Lakebridge accesses via Vercel team membership rather than a standalone Neon account. Direct sign-in to neon.tech still works for advanced ops.
 
 ### What Lakebridge Can Do Without a Developer
 
@@ -498,7 +500,7 @@ When starting work:
 7. **Vendor accounts in Lakebridge's name.** Do not create accounts in Sean's name. Chris is working through the Account Setup Checklist. Note: Anthropic account is NOT needed for this build.
 8. **Land Advisors branding on all generated client documents AND the platform UI.** Logo, address (100 Spectrum Center Drive Suite 1400, Irvine CA 92618), footer. Single brand throughout.
 9. **Don't reproduce the prototype's localStorage approach.** All state goes to Postgres. No browser-local persistence beyond ephemeral UI state.
-10. **Dropbox integration via links, not replacement.** Documents stored in R2 are platform documents. Existing Dropbox folders get linked to checklist items, not replaced. Manual link entry per Chris.
+10. **Dropbox integration via links, not replacement.** Documents stored in Vercel Blob are platform documents. Existing Dropbox folders get linked to checklist items, not replaced. Manual link entry per Chris.
 11. **Buyer tier states: Green, Yellow, Red, Not Selected on Deal.** Four states, not three. Per-deal, not persistent across deals (tiers attach to a per-deal `deal_buyer` join table, so the same builder can have different tiers across deals).
 12. **Document statuses: Draft, Final.** Two states only.
 13. **Document versioning: automatic, every save creates a version.**
@@ -623,7 +625,7 @@ By end of week 1: logged-in user, org context active, empty deal pages, all infr
 - Four Contacts UX prototypes → **Done** (parallel tabs for client review)
 - Phase 2 placeholder buttons throughout → **Done** (Sonner-toast surface area for design sign-off before any Phase 2 code)
 
-End of Phase 1: hosted multi-user version of the prototype, ready for Chris's testing. **Awaiting Vercel/Neon/R2/Resend vendor accounts to deploy.**
+End of Phase 1: hosted multi-user version of the prototype, ready for Chris's testing. **Vercel + Neon already live; Resend account needed before Phase 2 email work.**
 
 ## Working with This Document
 
