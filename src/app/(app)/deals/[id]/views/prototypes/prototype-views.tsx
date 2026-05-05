@@ -9,21 +9,49 @@ import { OptionDCompact } from "./option-d-compact";
 // sibling tabs to the production Contacts view so we can A/B them in the UI.
 
 export async function PrototypeAView({ dealId }: { dealId: string }) {
-  const { groups, leadOptions } = await loadBuyers(dealId);
-  return <OptionACards dealId={dealId} groups={groups} leadOptions={leadOptions} />;
+  const { groups, leadOptions, orgContacts } = await loadBuyers(dealId);
+  return (
+    <OptionACards
+      dealId={dealId}
+      groups={groups}
+      leadOptions={leadOptions}
+      orgContacts={orgContacts}
+    />
+  );
 }
 
 export async function PrototypeBView({ dealId }: { dealId: string }) {
-  const { groups, leadOptions } = await loadBuyers(dealId);
-  return <OptionBPane dealId={dealId} groups={groups} leadOptions={leadOptions} />;
+  const { groups, leadOptions, orgContacts } = await loadBuyers(dealId);
+  return (
+    <OptionBPane
+      dealId={dealId}
+      groups={groups}
+      leadOptions={leadOptions}
+      orgContacts={orgContacts}
+    />
+  );
 }
 
 export async function PrototypeCView({ dealId }: { dealId: string }) {
-  const { groups, leadOptions } = await loadBuyers(dealId);
-  return <OptionCGrouped dealId={dealId} groups={groups} leadOptions={leadOptions} />;
+  const { groups, leadOptions, orgContacts } = await loadBuyers(dealId);
+  return (
+    <OptionCGrouped
+      dealId={dealId}
+      groups={groups}
+      leadOptions={leadOptions}
+      orgContacts={orgContacts}
+    />
+  );
 }
 
 export async function PrototypeDView({ dealId }: { dealId: string }) {
-  const { groups, leadOptions } = await loadBuyers(dealId);
-  return <OptionDCompact dealId={dealId} groups={groups} leadOptions={leadOptions} />;
+  const { groups, leadOptions, orgContacts } = await loadBuyers(dealId);
+  return (
+    <OptionDCompact
+      dealId={dealId}
+      groups={groups}
+      leadOptions={leadOptions}
+      orgContacts={orgContacts}
+    />
+  );
 }

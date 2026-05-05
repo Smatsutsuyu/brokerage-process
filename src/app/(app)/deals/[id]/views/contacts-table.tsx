@@ -5,7 +5,8 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  Download,
+  Check,
+  ChevronDown,
   Mail,
   Pencil,
   Phone,
@@ -15,11 +16,17 @@ import {
 import { useConfirm } from "@/components/confirm/confirm-provider";
 import { PlannedAction } from "@/components/planned-action";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { formatPhone } from "@/lib/phone";
 import { cn } from "@/lib/utils";
 
 import { deleteContact } from "../actions";
 
-import { AddBuilderModal } from "./add-builder-modal";
 import {
   AddContactModal,
   type BuilderOption,
@@ -27,6 +34,10 @@ import {
 } from "./add-contact-modal";
 import { BuyerCheckbox } from "./buyer-checkbox";
 import { LeadPicker, type LeadOption } from "./lead-picker";
+import {
+  PickExistingContactModal,
+  type ExistingContactOption,
+} from "./pick-existing-contact-modal";
 import { TierBadge } from "./tier-badge";
 
 type Tier = "green" | "yellow" | "red" | "not_selected";
@@ -58,6 +69,9 @@ type ContactsTableProps = {
   dealId: string;
   rows: BuyerRow[];
   leadOptions: LeadOption[];
+  // Org-wide contacts directory feeds the "Add Existing Contact" picker.
+  // Optional so the prototype views (which don't load this) keep working.
+  orgContacts?: ExistingContactOption[];
 };
 
 const FILTER_META: Record<
@@ -158,12 +172,12 @@ function comparatorFor(column: SortColumn): (a: BuyerRow, b: BuyerRow) => number
   }
 }
 
-export function ContactsTable({ dealId, rows, leadOptions }: ContactsTableProps) {
+export function ContactsTable({ dealId, rows, leadOptions, orgContacts }: ContactsTableProps) {
   const [filter, setFilter] = useState<FilterValue>("all");
   const [sortBy, setSortBy] = useState<SortColumn>("builder");
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
   const [addContactOpen, setAddContactOpen] = useState(false);
-  const [addBuilderOpen, setAddBuilderOpen] = useState(false);
+  const [pickExistingOpen, setPickExistingOpen] = useState(false);
   const [editing, setEditing] = useState<EditingContact | null>(null);
   const [, startDelete] = useTransition();
   const confirm = useConfirm();
@@ -230,27 +244,49 @@ export function ContactsTable({ dealId, rows, leadOptions }: ContactsTableProps)
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        {FILTERS.map((value) => {
-          const isActive = value === filter;
-          const meta = FILTER_META[value];
-          return (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setFilter(value)}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors",
-                isActive
-                  ? meta.chip
-                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-400",
-              )}
-            >
-              {meta.dot && <span className={cn("h-2 w-2 rounded-full", meta.dot)} />}
-              {meta.label}
-              <span className="text-[10px] tabular-nums opacity-70">({tierCounts[value]})</span>
-            </button>
-          );
-        })}
+        {/* Single dropdown for the tier filter — saves the horizontal space
+            the row of chips used to occupy. The trigger reflects the current
+            filter (color dot + label + count) so the active state is still
+            visible at a glance. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors",
+              FILTER_META[filter].chip,
+            )}
+          >
+            {FILTER_META[filter].dot && (
+              <span className={cn("h-2 w-2 rounded-full", FILTER_META[filter].dot)} />
+            )}
+            {FILTER_META[filter].label}
+            <span className="text-[10px] tabular-nums opacity-70">({tierCounts[filter]})</span>
+            <ChevronDown className="h-3 w-3 opacity-60" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52">
+            {FILTERS.map((value) => {
+              const meta = FILTER_META[value];
+              const isCurrent = value === filter;
+              return (
+                <DropdownMenuItem
+                  key={value}
+                  onClick={() => setFilter(value)}
+                  className="flex items-center gap-2 text-[13px]"
+                >
+                  {meta.dot ? (
+                    <span className={cn("h-2 w-2 rounded-full", meta.dot)} />
+                  ) : (
+                    <span className="h-2 w-2" />
+                  )}
+                  <span className="flex-1">{meta.label}</span>
+                  <span className="text-[11px] tabular-nums text-gray-500">
+                    {tierCounts[value]}
+                  </span>
+                  {isCurrent && <Check className="h-3.5 w-3.5 text-gray-400" />}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <div className="ml-auto flex flex-wrap gap-2">
           <PlannedAction
@@ -267,25 +303,20 @@ export function ContactsTable({ dealId, rows, leadOptions }: ContactsTableProps)
             description="Drafts a templated follow-up email to Green/Yellow buyers who have OM Sent but no offer received yet."
             phase="phase_2"
           />
-          <PlannedAction
-            label="Import from Excel"
-            icon={Download}
-            feature="Excel buyer import"
-            description="Upload a marketing list (.xlsx) and map columns to builders + contacts in one step. Skips duplicates, suggests tier from prior deals."
-            phase="phase_2"
-          />
-          <Button size="sm" variant="outline" onClick={() => setAddBuilderOpen(true)}>
-            + Add Builder
-          </Button>
+          {orgContacts && orgContacts.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setPickExistingOpen(true)}
+              title="Pick an existing org contact and assign them to a builder on this deal"
+            >
+              + Existing Contact
+            </Button>
+          )}
           <Button
             size="sm"
             onClick={() => setAddContactOpen(true)}
-            disabled={builderOptions.length === 0}
-            title={
-              builderOptions.length === 0
-                ? "Add a builder to the deal first"
-                : "Add a contact at an existing builder"
-            }
+            title="Add a contact (and a new builder if needed)"
           >
             + Add Contact
           </Button>
@@ -307,11 +338,15 @@ export function ContactsTable({ dealId, rows, leadOptions }: ContactsTableProps)
         builders={builderOptions}
         editing={editing ?? undefined}
       />
-      <AddBuilderModal
-        open={addBuilderOpen}
-        onOpenChange={setAddBuilderOpen}
-        dealId={dealId}
-      />
+      {orgContacts && (
+        <PickExistingContactModal
+          open={pickExistingOpen}
+          onOpenChange={setPickExistingOpen}
+          dealId={dealId}
+          dealBuilders={builderOptions}
+          contacts={orgContacts}
+        />
+      )}
 
       <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
         <table className="w-full border-collapse text-[13px]">
@@ -404,11 +439,11 @@ export function ContactsTable({ dealId, rows, leadOptions }: ContactsTableProps)
                         <span className="text-gray-300">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-gray-600">
+                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">
                       {row.contactPhone ? (
-                        <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex items-center gap-1 tabular-nums">
                           <Phone className="h-3 w-3" />
-                          {row.contactPhone}
+                          {formatPhone(row.contactPhone)}
                         </span>
                       ) : (
                         <span className="text-gray-300">—</span>

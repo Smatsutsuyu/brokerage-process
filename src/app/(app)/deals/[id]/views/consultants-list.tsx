@@ -5,6 +5,7 @@ import { Loader2, Mail, Pencil, Phone, Plus, StickyNote, Trash2 } from "lucide-r
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
 import { PlannedAction } from "@/components/planned-action";
+import { formatPhone } from "@/lib/phone";
 import { cn } from "@/lib/utils";
 
 import { deleteConsultant, type ConsultantRole, type ConsultantSide } from "../actions";
@@ -242,9 +243,9 @@ function ConsultantEntry({ item, isDeleting, onEdit, onDelete }: ConsultantEntry
                 </a>
               )}
               {item.contactPhone && (
-                <span className="inline-flex items-center gap-1 select-text">
+                <span className="inline-flex items-center gap-1 whitespace-nowrap tabular-nums select-text">
                   <Phone className="h-3 w-3" />
-                  {item.contactPhone}
+                  {formatPhone(item.contactPhone)}
                 </span>
               )}
             </div>

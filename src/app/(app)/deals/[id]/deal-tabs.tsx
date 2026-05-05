@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FlaskConical } from "lucide-react";
 
 import { FeedbackZone } from "@/components/feedback/feedback-zone";
@@ -16,6 +17,22 @@ type TabKey =
   | "proto-b"
   | "proto-c"
   | "proto-d";
+
+const TAB_KEYS: ReadonlySet<TabKey> = new Set([
+  "checklist",
+  "contacts",
+  "qa",
+  "issues",
+  "consultants",
+  "proto-a",
+  "proto-b",
+  "proto-c",
+  "proto-d",
+]);
+
+function isTabKey(s: string | null | undefined): s is TabKey {
+  return s !== null && s !== undefined && TAB_KEYS.has(s as TabKey);
+}
 
 type DealTabsProps = {
   counts: {
@@ -41,7 +58,25 @@ const TABS: Array<{ key: TabKey; label: string; group?: "main" | "proto" }> = [
 ];
 
 export function DealTabs({ counts, children }: DealTabsProps) {
-  const [active, setActive] = useState<TabKey>("checklist");
+  // URL is the single source of truth for the active tab. ?tab= = deep-link
+  // friendly (Contacts directory links straight to /deals/[id]?tab=contacts);
+  // tab clicks call router.replace so changes don't pollute browser history.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const param = searchParams.get("tab");
+  const active: TabKey = isTabKey(param) ? param : "checklist";
+
+  function setActive(next: TabKey) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "checklist") {
+      params.delete("tab");
+    } else {
+      params.set("tab", next);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
 
   function badgeFor(key: TabKey): string | null {
     switch (key) {

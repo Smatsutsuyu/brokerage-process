@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { formatPhone } from "@/lib/phone";
 
 export async function toggleChecklistItem(input: {
   itemId: string;
@@ -105,7 +106,14 @@ export async function setBuyerLead(input: {
 
 export type AddContactInput = {
   dealId: string;
-  builderId: string;
+  // Either builderId (existing builder, must already be on this deal) or
+  // newBuilderName (will be created + added to the deal). Exactly one of
+  // the two must be provided.
+  builderId?: string;
+  newBuilderName?: string;
+  // Only relevant when newBuilderName is set. Defaults to "private" if
+  // omitted — most "I just learned about this builder" cases are private.
+  newBuilderClassification?: "private" | "public";
   firstName: string;
   lastName: string;
   title?: string;
@@ -122,30 +130,62 @@ export async function addContact(input: AddContactInput) {
   const lastName = input.lastName.trim();
   if (!firstName || !lastName) throw new Error("First and last name are required");
 
-  // Confirm the builder belongs to this org and is a buyer on this deal —
-  // prevents adding a contact for a builder that isn't actually on this deal.
-  const [link] = await db
-    .select({ id: dealBuyers.id })
-    .from(dealBuyers)
-    .innerJoin(builders, eq(dealBuyers.builderId, builders.id))
-    .where(
-      and(
-        eq(dealBuyers.dealId, input.dealId),
-        eq(dealBuyers.builderId, input.builderId),
-        eq(builders.orgId, org.id),
-      ),
-    )
-    .limit(1);
-  if (!link) throw new Error("Builder is not a buyer on this deal");
+  if (!input.builderId && !input.newBuilderName?.trim()) {
+    throw new Error("Builder is required");
+  }
+  if (input.builderId && input.newBuilderName?.trim()) {
+    throw new Error("Provide either builderId or newBuilderName, not both");
+  }
+
+  let builderId = input.builderId;
+
+  // Caller wants a brand-new builder created + attached to this deal in one
+  // shot. Defaults: classification = private (most common case for the kind
+  // of unknown-to-the-org builder you'd hand-add via the contact form), tier
+  // = not_selected (Chris explicitly tiers them later in the workflow).
+  if (input.newBuilderName?.trim()) {
+    const name = input.newBuilderName.trim();
+    const [builder] = await db
+      .insert(builders)
+      .values({
+        orgId: org.id,
+        name,
+        classification: input.newBuilderClassification ?? "private",
+      })
+      .returning();
+    await db.insert(dealBuyers).values({
+      orgId: org.id,
+      dealId: input.dealId,
+      builderId: builder.id,
+      tier: "not_selected",
+    });
+    builderId = builder.id;
+  } else {
+    // Existing builder must belong to this org AND be on this deal — both
+    // checks needed to prevent forging a cross-tenant or wrong-deal id.
+    const [link] = await db
+      .select({ id: dealBuyers.id })
+      .from(dealBuyers)
+      .innerJoin(builders, eq(dealBuyers.builderId, builders.id))
+      .where(
+        and(
+          eq(dealBuyers.dealId, input.dealId),
+          eq(dealBuyers.builderId, input.builderId!),
+          eq(builders.orgId, org.id),
+        ),
+      )
+      .limit(1);
+    if (!link) throw new Error("Builder is not a buyer on this deal");
+  }
 
   await db.insert(contacts).values({
     orgId: org.id,
-    builderId: input.builderId,
+    builderId: builderId!,
     firstName,
     lastName,
     title: input.title?.trim() || null,
     email: input.email?.trim() || null,
-    phone: input.phone?.trim() || null,
+    phone: formatPhone(input.phone),
     notes: input.notes?.trim() || null,
   });
 
@@ -176,7 +216,7 @@ export async function updateContact(input: {
       lastName,
       title: input.title?.trim() || null,
       email: input.email?.trim() || null,
-      phone: input.phone?.trim() || null,
+      phone: formatPhone(input.phone),
       notes: input.notes?.trim() || null,
     })
     .where(and(eq(contacts.id, input.contactId), eq(contacts.orgId, org.id)));
@@ -420,7 +460,7 @@ export async function addConsultant(input: {
     firmName,
     contactName: input.contactName?.trim() || null,
     contactEmail: input.contactEmail?.trim() || null,
-    contactPhone: input.contactPhone?.trim() || null,
+    contactPhone: formatPhone(input.contactPhone),
     notes: input.notes?.trim() || null,
   });
 
@@ -452,7 +492,7 @@ export async function updateConsultant(input: {
       firmName,
       contactName: input.contactName?.trim() || null,
       contactEmail: input.contactEmail?.trim() || null,
-      contactPhone: input.contactPhone?.trim() || null,
+      contactPhone: formatPhone(input.contactPhone),
       notes: input.notes?.trim() || null,
     })
     .where(and(eq(consultants.id, input.consultantId), eq(consultants.orgId, org.id)));
@@ -512,6 +552,52 @@ export async function addBuilderToDeal(input: {
 
   revalidatePath(`/deals/${input.dealId}`);
   return result;
+}
+
+// Attaches an existing org builder to a deal. Idempotent — if the builder
+// is already on the deal, returns the existing dealBuyer id without
+// inserting a duplicate. Used by the "Add Existing Contact" flow when the
+// picked contact's builder isn't yet on the deal — we just bring the
+// builder along automatically rather than asking the user to pick.
+export async function attachBuilderToDeal(input: {
+  dealId: string;
+  builderId: string;
+}): Promise<{ dealBuyerId: string }> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  // Confirm builder belongs to this org.
+  const [b] = await db
+    .select({ id: builders.id })
+    .from(builders)
+    .where(and(eq(builders.id, input.builderId), eq(builders.orgId, org.id)))
+    .limit(1);
+  if (!b) throw new Error("Builder not found");
+
+  // Already on the deal? Return the existing row.
+  const [existing] = await db
+    .select({ id: dealBuyers.id })
+    .from(dealBuyers)
+    .where(
+      and(eq(dealBuyers.dealId, input.dealId), eq(dealBuyers.builderId, input.builderId)),
+    )
+    .limit(1);
+  if (existing) {
+    return { dealBuyerId: existing.id };
+  }
+
+  const [created] = await db
+    .insert(dealBuyers)
+    .values({
+      orgId: org.id,
+      dealId: input.dealId,
+      builderId: input.builderId,
+      tier: "not_selected",
+    })
+    .returning();
+
+  revalidatePath(`/deals/${input.dealId}`);
+  return { dealBuyerId: created.id };
 }
 
 // Verifies that an item belongs to the active deal — useful for any action

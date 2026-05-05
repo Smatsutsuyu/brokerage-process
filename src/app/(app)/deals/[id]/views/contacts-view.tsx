@@ -6,6 +6,7 @@ import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
 import { ContactsTable, type BuyerRow } from "./contacts-table";
 import type { LeadOption } from "./lead-picker";
+import type { ExistingContactOption } from "./pick-existing-contact-modal";
 
 type ContactsViewProps = {
   dealId: string;
@@ -90,5 +91,45 @@ export async function ContactsView({ dealId }: ContactsViewProps) {
     name: u.name || u.email,
   }));
 
-  return <ContactsTable dealId={dealId} rows={buyerRows} leadOptions={leadOptions} />;
+  // Org-wide contacts directory feeds the "Add Existing Contact" picker.
+  // Joining the optional builder so the picker can show "Bob — Lennar" or
+  // "Bob — standalone" without an extra round-trip.
+  const orgContactRows = org
+    ? await db
+        .select({
+          id: contacts.id,
+          firstName: contacts.firstName,
+          lastName: contacts.lastName,
+          title: contacts.title,
+          email: contacts.email,
+          geography: contacts.geography,
+          builderId: contacts.builderId,
+          builderName: builders.name,
+        })
+        .from(contacts)
+        .leftJoin(builders, eq(contacts.builderId, builders.id))
+        .where(eq(contacts.orgId, org.id))
+        .orderBy(asc(contacts.lastName), asc(contacts.firstName))
+    : [];
+
+  const orgContacts: ExistingContactOption[] = orgContactRows.map((r) => ({
+    id: r.id,
+    firstName: r.firstName,
+    lastName: r.lastName,
+    fullName: `${r.firstName} ${r.lastName}`.trim(),
+    title: r.title,
+    email: r.email,
+    geography: r.geography,
+    builderId: r.builderId,
+    builderName: r.builderName,
+  }));
+
+  return (
+    <ContactsTable
+      dealId={dealId}
+      rows={buyerRows}
+      leadOptions={leadOptions}
+      orgContacts={orgContacts}
+    />
+  );
 }

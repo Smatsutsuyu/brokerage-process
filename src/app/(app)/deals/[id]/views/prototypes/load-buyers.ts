@@ -5,6 +5,7 @@ import { authUser, builders, contacts, dealBuyers, users } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
 import type { LeadOption } from "../lead-picker";
+import type { ExistingContactOption } from "../pick-existing-contact-modal";
 
 export type Tier = "green" | "yellow" | "red" | "not_selected";
 export type Classification = "private" | "public";
@@ -37,6 +38,9 @@ export type BuyerGroup = {
 export type BuyerData = {
   groups: BuyerGroup[];
   leadOptions: LeadOption[];
+  // Org-wide contacts directory for the "+ Existing Contact" picker. Loaded
+  // once here so each prototype view doesn't re-query.
+  orgContacts: ExistingContactOption[];
 };
 
 // Shared loader so each prototype view doesn't re-implement the JOIN.
@@ -123,5 +127,37 @@ export async function loadBuyers(dealId: string): Promise<BuyerData> {
     name: u.name || u.email,
   }));
 
-  return { groups: Array.from(map.values()), leadOptions };
+  // Pull org-wide contacts (joined to optional builder name) for the picker.
+  // Same shape as the production view's contacts-view loader.
+  const orgContactRows = org
+    ? await db
+        .select({
+          id: contacts.id,
+          firstName: contacts.firstName,
+          lastName: contacts.lastName,
+          title: contacts.title,
+          email: contacts.email,
+          geography: contacts.geography,
+          builderId: contacts.builderId,
+          builderName: builders.name,
+        })
+        .from(contacts)
+        .leftJoin(builders, eq(contacts.builderId, builders.id))
+        .where(eq(contacts.orgId, org.id))
+        .orderBy(asc(contacts.lastName), asc(contacts.firstName))
+    : [];
+
+  const orgContacts: ExistingContactOption[] = orgContactRows.map((r) => ({
+    id: r.id,
+    firstName: r.firstName,
+    lastName: r.lastName,
+    fullName: `${r.firstName} ${r.lastName}`.trim(),
+    title: r.title,
+    email: r.email,
+    geography: r.geography,
+    builderId: r.builderId,
+    builderName: r.builderName,
+  }));
+
+  return { groups: Array.from(map.values()), leadOptions, orgContacts };
 }

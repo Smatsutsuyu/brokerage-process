@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 import { addContact, updateContact } from "../actions";
 
@@ -51,6 +52,11 @@ type AddContactModalProps = {
   editing?: EditingContact;
 };
 
+// Sentinel value for the "Create new builder" select option. Picking it
+// reveals an inline name input and routes the submit through a path that
+// creates the builder + adds it to the deal before inserting the contact.
+const NEW_BUILDER = "__new__";
+
 export function AddContactModal({
   open,
   onOpenChange,
@@ -61,9 +67,13 @@ export function AddContactModal({
 }: AddContactModalProps) {
   const isEdit = Boolean(editing);
 
-  const [builderId, setBuilderId] = useState<string>(
-    editing?.builderId ?? defaultBuilderId ?? builders[0]?.id ?? "",
+  const [builderChoice, setBuilderChoice] = useState<string>(
+    editing?.builderId ?? defaultBuilderId ?? builders[0]?.id ?? NEW_BUILDER,
   );
+  const [newBuilderName, setNewBuilderName] = useState("");
+  const [newBuilderClassification, setNewBuilderClassification] = useState<
+    "private" | "public"
+  >("private");
   const [firstName, setFirstName] = useState(editing?.firstName ?? "");
   const [lastName, setLastName] = useState(editing?.lastName ?? "");
   const [title, setTitle] = useState(editing?.title ?? "");
@@ -88,11 +98,17 @@ export function AddContactModal({
           setEmail("");
           setPhone("");
           setNotes("");
+          setNewBuilderName("");
+          setNewBuilderClassification("private");
         }
       }, 150);
       return () => clearTimeout(t);
     }
-    setBuilderId(editing?.builderId ?? defaultBuilderId ?? builders[0]?.id ?? "");
+    setBuilderChoice(
+      editing?.builderId ?? defaultBuilderId ?? builders[0]?.id ?? NEW_BUILDER,
+    );
+    setNewBuilderName("");
+    setNewBuilderClassification("private");
     setFirstName(editing?.firstName ?? "");
     setLastName(editing?.lastName ?? "");
     setTitle(editing?.title ?? "");
@@ -106,8 +122,13 @@ export function AddContactModal({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!builderId) {
+    const isNewBuilder = builderChoice === NEW_BUILDER;
+    if (!isNewBuilder && !builderChoice) {
       setError("Pick a builder.");
+      return;
+    }
+    if (isNewBuilder && !newBuilderName.trim()) {
+      setError("Enter a name for the new builder.");
       return;
     }
     if (!firstName.trim() || !lastName.trim()) {
@@ -130,7 +151,10 @@ export function AddContactModal({
         } else {
           await addContact({
             dealId,
-            builderId,
+            // One of the two is set per the validation above.
+            builderId: isNewBuilder ? undefined : builderChoice,
+            newBuilderName: isNewBuilder ? newBuilderName : undefined,
+            newBuilderClassification: isNewBuilder ? newBuilderClassification : undefined,
             firstName,
             lastName,
             title,
@@ -146,6 +170,11 @@ export function AddContactModal({
     });
   }
 
+  const selectedBuilderLabel = (() => {
+    if (builderChoice === NEW_BUILDER) return "+ Create new builder";
+    return builders.find((b) => b.id === builderChoice)?.name ?? "Pick a builder";
+  })();
+
   return (
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
       <DialogContent className="sm:max-w-lg">
@@ -154,7 +183,7 @@ export function AddContactModal({
           <DialogDescription>
             {isEdit
               ? "Update this contact's details. To move them to a different builder, delete and re-add."
-              : "Add a person at a builder that's already on this deal."}
+              : "Add a person at a builder. Pick an existing builder or create a new one and add it to the deal in one step."}
           </DialogDescription>
         </DialogHeader>
 
@@ -162,16 +191,15 @@ export function AddContactModal({
           <div className="grid gap-2">
             <Label htmlFor="add-contact-builder">Builder</Label>
             <Select
-              value={builderId}
-              onValueChange={(v) => setBuilderId(v ?? "")}
+              value={builderChoice}
+              onValueChange={(v) => v && setBuilderChoice(v)}
               disabled={isEdit}
             >
-              <SelectTrigger id="add-contact-builder">
-                <SelectValue placeholder="Pick a builder">
-                  {builders.find((b) => b.id === builderId)?.name ?? "Pick a builder"}
-                </SelectValue>
+              <SelectTrigger id="add-contact-builder" className="w-full">
+                <SelectValue placeholder="Pick a builder">{selectedBuilderLabel}</SelectValue>
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={NEW_BUILDER}>+ Create new builder</SelectItem>
                 {builders.map((b) => (
                   <SelectItem key={b.id} value={b.id}>
                     {b.name}
@@ -179,6 +207,41 @@ export function AddContactModal({
                 ))}
               </SelectContent>
             </Select>
+            {builderChoice === NEW_BUILDER && (
+              <div className="mt-1 space-y-2 rounded-lg border border-blue-200 bg-blue-50/30 p-3">
+                <Input
+                  value={newBuilderName}
+                  onChange={(e) => setNewBuilderName(e.target.value)}
+                  placeholder="New builder name (e.g. Lennar)"
+                  className="bg-white"
+                />
+                <div>
+                  <div className="mb-1.5 text-[11px] font-medium text-gray-700">
+                    Classification
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["private", "public"] as const).map((value) => {
+                      const isActive = value === newBuilderClassification;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setNewBuilderClassification(value)}
+                          className={cn(
+                            "rounded-md border px-2 py-1.5 text-xs font-medium transition-colors",
+                            isActive
+                              ? "border-brand-blue bg-brand-blue text-white"
+                              : "border-gray-200 bg-white text-gray-600 hover:border-gray-400",
+                          )}
+                        >
+                          {value === "private" ? "Private" : "Public"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
