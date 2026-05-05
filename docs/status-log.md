@@ -4,6 +4,126 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-05 (afternoon/evening) — Builders directory, deal-side contact flows, UX polish, lenient import
+
+Multi-thread session continuing from the morning's standalone Contacts directory. Builders gets the same first-class treatment, the deal-side Contacts tab gets a smarter "Add Existing" flow, and a long string of small UX polishes across the app.
+
+### Done — Standalone Builders directory (`/builders`)
+- New top-level route, sidebar nav link "Builders" (sits with Contacts above the owner-only Admin section)
+- Server-rendered list table: Name · Classification chip (private/public) · Contacts count · Deals count
+- Filter: All / Private / Public (now a dropdown — see UX polish below)
+- Search by name / contact-name / deal-name
+- Add + edit modal with classification toggle (private/public segmented control) and notes
+- Delete is **blocked** when builder is on any deal — confirmation modal lists those deals so the user knows what to clean up first
+- Expandable rows show two side-by-side panels: contacts at this builder + deals it's on (deal chips link to `/deals/[id]?tab=contacts`)
+- Delete cascades to `set null` on contact.builder_id (configured in earlier schema change), so contacts at a deleted builder orphan rather than disappear
+
+### Done — Deal Contacts tab: combine Add Builder into Add Contact
+- Dropped the `+ Add Builder` toolbar button — the AddContactModal now handles inline builder creation through a `+ Create new builder` option in the Builder dropdown. Inline panel reveals a name input + Private/Public segmented toggle when picked
+- `addContact` server action now accepts either `builderId` (existing-on-deal) OR `newBuilderName` + `newBuilderClassification`. New-builder path bootstraps the builder + deal_buyer link before inserting the contact
+- Deleted dead `add-builder-modal.tsx` (the toolbar's standalone "+ Add Builder" modal) and `prototypes/add-buyer-modal.tsx` (the prototype combined builder/contact creation flow that's now superseded by AddContactModal)
+- All four prototypes now match the production tab: `+ Add Contact` instead of `+ Add Buyer`, all using the same AddContactModal so feature parity is automatic
+
+### Done — Deal Contacts tab: smart "Add Existing Contact"
+- New `PickExistingContactModal` for adding org-wide contacts to a deal. Two distinct paths inside one modal:
+  - **Contact already has a builder** → confirmation summary ("Add Bob to this deal via Lennar (Lennar will be added to the deal too)"). One click. No prompt for assignment.
+  - **Standalone contact** → picker (existing deal-builders OR `+ Create new builder` with classification toggle)
+- New idempotent `attachBuilderToDeal({ dealId, builderId })` server action — inserts a deal_buyer if the builder isn't already on the deal, no-ops otherwise. Used by the contact-with-builder path to silently bring the contact's company onto the deal
+- Available from the production view AND all four prototypes via shared `loadBuyers()` (now also returns `orgContacts: ExistingContactOption[]`)
+
+### Done — UX polish (production + prototypes + directories)
+- **Filter chips → single dropdown** on all 6 surfaces: production deal Contacts, 4 prototypes, /contacts, /builders. Trigger reflects the active filter (color dot + label + count + chevron); dropdown shows all options with checkmark on current. Saves ~400px of horizontal real estate, no more wrap collisions
+- **Column sorting** added to /contacts (Name · Builder · Title · Email · Phone · Geography) and /builders (Name · Classification · Contacts · Deals). Defaults to Name asc; nulls always sort last; click toggles asc → desc → asc; reuses the same SortHeader pattern from the existing deal Contacts table
+- **Builder color chips** in /contacts table — each builder gets a stable pastel color from a 12-color palette (deterministic via UUID hash), so related contacts are visually grouped at a glance. New `src/lib/builder-color.ts` with `builderChipClass(builderId)` for reuse elsewhere later if needed
+- **"standalone" label → em dash** in the contact's Builder column (less label noise; same meaning)
+- **Building2 icon `flex-shrink-0`** so the icon stays a consistent size when builder names are long (was getting squished by flexbox)
+- **Phone normalization** sweep — new `src/lib/phone.ts` with `formatPhone()` (10-digit US → `(XXX) XXX-XXXX`, 11-digit-leading-1 same, anything else returned as-is). Applied at all write sites (`/contacts/actions`, `/deals/[id]/actions` for both contacts and consultants) and all display sites (production view, 4 prototypes, /contacts, consultants list). All phone display cells get `whitespace-nowrap tabular-nums` so numbers never wrap and align cleanly
+- **Deal tabs honor `?tab=` query param** — URL is single source of truth, tab clicks call `router.replace` (no history pollution), deep-links from /contacts and /builders directory expand panels land on the right deal tab (Contacts) automatically
+- **Removed Excel import placeholder** from the deal Contacts tab — the real importer lives on /contacts now; surfacing the placeholder there too was misleading
+- **Deal `revalidatePath` tag** — single helper `revalidateContactSurfaces()` invalidates both `/contacts` and `/deals/[id]` (page) so changes from any direction are immediately reflected
+
+### Done — Lenient Excel importer
+- **`Name` column** accepted as alternative to separate `First Name`/`Last Name`. Splits on the LAST whitespace boundary: "Mary Jane Smith" → first="Mary Jane", last="Smith"; "Madonna" → first="Madonna", last="". If a file has both `Name` AND `First Name`/`Last Name`, the split-out columns win
+- **`Classification` column** accepted (aliases: `Type`, `Builder Type`, `Company Type`). Values: `public` / `private` / `pub` / `priv` / `publicly traded` / `privately held` (case-insensitive). Only honored when creating a NEW builder — for rows whose builder already exists, classification is read but ignored (no silent mutation of existing builders). Unrecognized values silently fall back to default ("private"); preview shows what classification will be applied next to "+ create XYZ" so typos are visible
+- `findOrCreateBuilder` now accepts an optional classification arg (defaults to "private"); piped through from the importer
+- `docs/sample-contacts.xlsx` regenerated with 14 rows exercising every code path: standard rows, Name-only rows, classification valid/short/typo, builder match/create, email-dedupe, validation errors
+
+### Decisions
+- **Single dropdown over chip row** for filters across the board, even where there are only 3 filter values. Consistency wins; the chip row was a bigger horizontal-space hog than its visual weight justified, and the dropdown trigger styled as the active chip preserves the at-a-glance current state
+- **Builder color chips deterministic via UUID hash** rather than per-builder stored color. Two reasons: (1) no schema work, (2) colors stay consistent forever as long as the UUID does. 12-color palette gives enough distinction without collisions at Lakebridge's scale (<200 builders)
+- **PickExistingContactModal: no prompt for builder-having contacts** — Chris's call. The mental model is "I want this person on the deal," not "I want this person at THIS specific builder on the deal." If they're already at Lennar, just bring Lennar onto the deal too. One-click instead of prompt-then-confirm
+- **Block builder deletion when on any deal** (option A from the design discussion). Cascade-delete or orphan would silently destroy buyer history. Force the user to remove from each deal first; the confirmation modal lists those deals so the cleanup is obvious
+- **Combine `+ Add Builder` button into `+ Add Contact`** — reduces toolbar density without losing functionality. The standalone "Add Builder" was a schema-leak (most users want to add a person, builder is incidental)
+- **Lenient classification import** (silent fallback for typos) over hard validation. The preview screen surfaces what will actually happen, which is enough; blocking on a typo would force the user to fix the file and re-upload, friction with no upside
+- **`Name` parsing splits on LAST whitespace** — handles middle names better than first-whitespace ("Mary Jane Smith" stays correctly bucketed). Single-word names go to first-name, last-name empty. Comma-first format ("Smith, John") is NOT supported — uncommon in real-world contact lists, easy to add later if Chris asks
+
+### Notes for future Sean
+- **Migrations now run automatically on Vercel deploy** via the new `vercel-build` script (`drizzle-kit migrate && next build`). Production deploys hit prod Neon; preview deploys hit their own branch DBs (Vercel-Neon integration auto-provisions these). Failed migration → failed build → no deploy lands. No more manual `npm run db:migrate` step
+- **First deploy of this batch will apply two migrations to prod:** `0001_loving_archangel.sql` (nullable contacts.builder_id + FK → set null) and `0002_unusual_tempest.sql` (add contacts.geography). Both non-destructive — existing rows keep their builder_id and get NULL for geography
+- **Prototype views still loaded with org contacts** even though they're throwaway — adding the `+ Existing Contact` button required it. If we drop prototypes later, also drop `orgContacts` from `loadBuyers()`
+- **Deal-tab `?tab=` URL state has implications for the prototype tab strip** — switching to a prototype tab now sets `?tab=proto-a` etc. in the URL. That's fine, but worth knowing if anyone deep-links to a deal expecting Checklist
+- **Builder color palette has no contrast guarantees** beyond the chosen Tailwind tints (100 bg / 800 text). All 12 should be readable but if Chris reports any pair as too similar, swap that color in `src/lib/builder-color.ts`
+- **Classification import has 4 alias columns** (`Classification`, `Type`, `Builder Type`, `Company Type`). If Chris's marketing list uses something else, easy to add to `HEADER_KEYS` in import-modal.tsx
+
+### Blockers
+- None active. Ready to deploy. Migrations run separately as noted above
+
+---
+
+## 2026-05-05 — Standalone Contacts directory + Excel import
+
+Mid-sized refactor in response to Chris flagging that contacts should live independently of any specific builder or deal. Took a planning pass first, then built end-to-end against the local Docker environment so Sean could exercise it as it came together.
+
+### Done — Schema
+- `contacts.builder_id` is now nullable (was `notNull`). FK changed from `ON DELETE cascade` to `ON DELETE set null` so deleting a builder orphans rather than destroys its contacts
+- New `contacts.geography` text column (nullable) for the geographic-market field Chris asked to capture in the Excel import
+- Two clean migrations: `0001_loving_archangel.sql` (nullable builder_id + FK swap) and `0002_unusual_tempest.sql` (add geography). Migration history stays linear from the existing `0000_flawless_masked_marvel.sql` baseline
+
+### Done — Standalone Contacts page (`/contacts`)
+- New top-level route, sidebar nav link "Contacts" (visible to all roles, sits above the owner-only Admin section)
+- Server-rendered list table: Name · Builder (or "standalone") · Title · Email · Phone · Geography · # of deals their builder is on
+- Filter chips: All / With builder / Standalone
+- Search box across name / email / builder / title / geography (client-side filter on the loaded list — fine at Lakebridge's expected scale of <500 org contacts)
+- Add Contact modal: full form with optional builder picker (existing dropdown + "+ Create new builder" option that calls `findOrCreateBuilder`)
+- Edit + delete inline (hover-revealed action buttons; matches existing Contacts tab patterns)
+- Server actions: `createContact`, `updateContact`, `deleteContact`, `findOrCreateBuilder`, `importContacts`. Single `revalidateContactSurfaces()` helper invalidates both `/contacts` and the dynamic `/deals/[id]` route so the deal Contacts tab stays fresh
+
+### Done — Excel import
+- Installed `xlsx` (sheetjs); parses .xlsx, .xls, and .csv via `XLSX.read` + `sheet_to_json`
+- Two-step modal: upload → preview → commit
+- Header matching is fuzzy (case-insensitive, strip non-alphanumeric): "First Name", "first_name", "FirstName" all map to the same canonical column. Aliases supported: `Builder Name` ≈ Builder ≈ Company ≈ Company Name; `Geography` ≈ Geo ≈ Market; etc.
+- Preview screen shows every row with: row number, parsed name, builder resolution (matched / will-create / none), email, title, geography. Per-row validation errors (missing first name, invalid email format) surfaced inline and excluded from the import count
+- Builder name match is case-insensitive against existing org builders. Unmatched names get auto-created (default classification: private). Same name across multiple rows = one new builder created (intra-batch cache)
+- Email-based dedupe: existing contact with the same email gets updated rather than duplicated; no email = always insert
+- Commit returns `{ contactsCreated, contactsUpdated, buildersCreated, skipped }`; success screen reports each count
+
+### Done — Deal-side "Add Existing Contact"
+- New `PickExistingContactModal` on the production deal Contacts view. Sits next to "+ Add Builder" and "+ Add Contact" as a third action button labeled "+ Existing Contact"
+- Search across name / email / builder / title; candidates are filtered to contacts NOT already at one of the deal's builders (those already show up in the table — surfacing them again is confusing)
+- After picking, requires choosing a builder on the deal as the assignment target. Reuses the standalone `updateContact` action — picking moves the contact's builder_id, which then surfaces them in the deal Contacts tab via the existing JOIN
+- Warning shown when picking a contact already at a different builder, since this moves them rather than creating a duplicate
+- The four prototype Contacts views were intentionally NOT updated — they're throwaway alternatives Chris is reviewing for layout, not features. Adding the new flow to all 5 places would balloon the diff for no design value
+
+### Decisions
+- **Nullable builder_id over a separate contact-builder join table.** Chris's stated need is "contacts can exist without a builder, then get a builder later." A 1:N (builder has many contacts, contact has zero or one builder) model fits that exactly. A many-to-many `contact_builders` join table would handle "Bob worked at Lennar 2020-2023, KB 2023-now" but that's a different feature (employment history) Chris hasn't asked for
+- **`ON DELETE set null` on the FK.** Deleting a builder shouldn't destroy the people we know about. Orphaned contacts can be re-assigned to a new builder later or stay as standalone records
+- **Auto-create unmatched builders during import** with classification = private as the default. Alternative was to skip those rows and require pre-creating builders manually, but Chris's import workflow assumes the marketing list IS the source of truth — forcing a manual builder-creation pre-step would defeat the point of bulk import. The preview screen surfaces what will be created so it's still visible
+- **Email-based dedupe over name+builder.** Email is the strongest unique signal in real-world contact lists; same name at the same builder could be junior vs senior people, but the same email is almost always the same person
+- **Excel parsing client-side, commit server-side.** Parsing in the browser (via xlsx) keeps the file off our servers and gives instant feedback; only the validated row payload goes to the server action for the commit. Cleaner separation, smaller server payload
+- **Reuse `updateContact` for the deal-side pick-existing flow** rather than introducing a new `assignContactToBuilder` action. Setting `builderId` on update is exactly what we want; a dedicated assign action would just be a partial wrapper
+- **Skipped reseeding the prod Neon DB** for this batch (per recent feedback). Local Docker DB validates the migrations + flows; prod gets the schema migrations on the next deploy via `db:migrate`, and existing prod contact data carries over with no transformation needed (dropping `notNull` is non-destructive)
+
+### Notes for future Sean
+- New `xlsx` dep is well-known but pulls in a CVE per `npm install` warning. It's only used in the browser for parsing; not invoked server-side. If we ever want to parse server-side too (e.g. for an email-attachment ingest), revisit whether to swap for `read-excel-file` or similar
+- The deal-side pick-existing modal currently calls `updateContact` from `/contacts/actions`. Cross-route action import works fine but is a slight architecture smell — if `/contacts/actions` ever picks up auth-gating or extra side effects, the deal page inherits them. Worth refactoring to a shared `lib/contact-actions.ts` if it grows
+- Standalone contacts have `builder_id = NULL`. The deal Contacts tab's JOIN currently does `dealBuyers.builderId = builders.id` then `LEFT JOIN contacts on contacts.builderId = builders.id` — standalone contacts never appear because they have no builder. That's the intended behavior, but worth remembering when debugging "why isn't contact X showing up on this deal?"
+- Migration `0002_unusual_tempest.sql` adds `geography` as a fresh column with no backfill — existing contacts will have `NULL` until edited or re-imported. Fine for now; if Chris wants a "geography known" indicator on the org contacts list, that's a future tweak
+
+### Blockers
+- None active. Refactor functionally complete and locally validated. Will deploy on next push to main; existing prod data carries over cleanly (no destructive schema changes)
+
+---
+
 ## 2026-05-04 — Production polish + auto-checklist on deal create
 
 Post-deploy fix-up session. Three threads stacked tightly together: deploy speed, ops UX, and a real bug (new deals shipped with empty checklists).
