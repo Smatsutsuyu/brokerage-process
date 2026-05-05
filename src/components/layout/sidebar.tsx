@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Contact, Users } from "lucide-react";
+import { Building2, Contact, Users } from "lucide-react";
 
 import { db } from "@/db";
 import { deals, checklistItems, checklistCategories } from "@/db/schema";
@@ -134,10 +134,13 @@ export async function Sidebar({ activeDealId }: SidebarProps) {
         )}
       </nav>
 
-      {/* Org-wide Contacts directory — visible to everyone (any role can
-          use contacts to populate deals). Sits above the Admin section so it
-          reads as a primary feature, not an admin-only utility. */}
+      {/* Org-wide directories — Contacts and Builders. Visible to everyone
+          (any role can use them to populate deals). Sit above the Admin
+          section so they read as primary features, not admin-only utilities. */}
       <div className="border-t border-gray-200 p-2">
+        <SidebarNavLink href="/builders" icon={<Building2 className="h-3.5 w-3.5" />}>
+          Builders
+        </SidebarNavLink>
         <SidebarNavLink href="/contacts" icon={<Contact className="h-3.5 w-3.5" />}>
           Contacts
         </SidebarNavLink>
