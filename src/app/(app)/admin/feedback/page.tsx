@@ -1,0 +1,75 @@
+import { redirect } from "next/navigation";
+import { desc, eq } from "drizzle-orm";
+
+import { db } from "@/db";
+import { feedbackItems } from "@/db/schema";
+import { Sidebar } from "@/components/layout/sidebar";
+import { getCurrentOrg } from "@/lib/auth/get-current-org";
+import { getCurrentUser } from "@/lib/auth/get-current-user";
+
+import { FeedbackList, type FeedbackRow } from "./feedback-list";
+
+export const dynamic = "force-dynamic";
+
+export const metadata = {
+  title: "Feedback — Lakebridge Capital",
+};
+
+export default async function FeedbackAdminPage() {
+  const me = await getCurrentUser();
+  if (!me) redirect("/sign-in");
+  if (me.role !== "owner") redirect("/");
+
+  const org = await getCurrentOrg();
+  if (!org) redirect("/sign-in");
+
+  const rows = await db
+    .select({
+      id: feedbackItems.id,
+      section: feedbackItems.section,
+      pagePath: feedbackItems.pagePath,
+      commitSha: feedbackItems.commitSha,
+      severity: feedbackItems.severity,
+      status: feedbackItems.status,
+      comment: feedbackItems.comment,
+      response: feedbackItems.response,
+      userEmail: feedbackItems.userEmail,
+      createdAt: feedbackItems.createdAt,
+      reviewedAt: feedbackItems.reviewedAt,
+      actionedAt: feedbackItems.actionedAt,
+    })
+    .from(feedbackItems)
+    .where(eq(feedbackItems.orgId, org.id))
+    .orderBy(desc(feedbackItems.createdAt));
+
+  const items: FeedbackRow[] = rows.map((r) => ({
+    id: r.id,
+    section: r.section,
+    pagePath: r.pagePath,
+    commitSha: r.commitSha,
+    severity: r.severity,
+    status: r.status,
+    comment: r.comment,
+    response: r.response,
+    userEmail: r.userEmail,
+    createdAt: r.createdAt.toISOString(),
+    reviewedAt: r.reviewedAt?.toISOString() ?? null,
+    actionedAt: r.actionedAt?.toISOString() ?? null,
+  }));
+
+  return (
+    <>
+      <Sidebar />
+      <main className="bg-brand-bg flex-1 overflow-y-auto px-8 py-8 [scrollbar-gutter:stable]">
+        <header className="mb-6">
+          <h1 className="text-[26px] leading-tight font-bold text-gray-900">Feedback</h1>
+          <p className="text-[13px] text-gray-400">
+            In-app feedback submissions. Update status as you triage, and add responses or working
+            notes inline. Owner-only.
+          </p>
+        </header>
+        <FeedbackList items={items} />
+      </main>
+    </>
+  );
+}

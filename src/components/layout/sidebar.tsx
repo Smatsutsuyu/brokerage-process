@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, Contact, Users } from "lucide-react";
+import { Building2, Contact, MessageSquare, Users } from "lucide-react";
 
 import { db } from "@/db";
 import { deals, checklistItems, checklistCategories } from "@/db/schema";
@@ -153,6 +153,12 @@ export async function Sidebar({ activeDealId }: SidebarProps) {
           </div>
           <SidebarNavLink href="/admin/members" icon={<Users className="h-3.5 w-3.5" />}>
             Members
+          </SidebarNavLink>
+          <SidebarNavLink
+            href="/admin/feedback"
+            icon={<MessageSquare className="h-3.5 w-3.5" />}
+          >
+            Feedback
           </SidebarNavLink>
         </div>
       )}
