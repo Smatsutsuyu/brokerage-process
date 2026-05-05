@@ -232,15 +232,6 @@ export function ContactsTable({ dealId, rows, leadOptions, orgContacts }: Contac
     }
   }
 
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
-        <h2 className="mb-1 text-base font-semibold text-gray-700">No buyers on this deal yet</h2>
-        <p className="text-sm text-gray-500">Add a builder and contact to start tracking interest.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -396,8 +387,10 @@ export function ContactsTable({ dealId, rows, leadOptions, orgContacts }: Contac
           <tbody>
             {visibleRows.length === 0 ? (
               <tr>
-                <td colSpan={13} className="px-4 py-8 text-center text-sm text-gray-400">
-                  No contacts at this level.
+                <td colSpan={13} className="px-4 py-12 text-center text-sm text-gray-400">
+                  {rows.length === 0
+                    ? "No buyers on this deal yet. Use + Add Contact above to get started."
+                    : "No contacts match this filter."}
                 </td>
               </tr>
             ) : (
