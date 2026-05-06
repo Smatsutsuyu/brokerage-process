@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -9,6 +9,7 @@ import {
   contacts,
   dealBuyers,
   deals,
+  documents,
   issues,
   qaItems,
 } from "@/db/schema";
@@ -41,8 +42,16 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   // All queries are independent — fire them in parallel so total latency is
   // ~1 RTT instead of 7. The deal existence check happens after the batch so
   // we don't need a serial dependency just to short-circuit on notFound.
-  const [deal, categories, items, contactsCountRow, qaTotalRow, issuesOpenRow, consultantsFilledRow] =
-    await Promise.all([
+  const [
+    deal,
+    categories,
+    items,
+    contactsCountRow,
+    qaTotalRow,
+    issuesOpenRow,
+    consultantsFilledRow,
+    documentRows,
+  ] = await Promise.all([
       db.query.deals.findFirst({
         where: and(eq(deals.id, id), eq(deals.orgId, org.id)),
       }),
@@ -95,6 +104,23 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
         .from(consultants)
         .where(eq(consultants.dealId, id))
         .then((r) => r[0]),
+      // All checklist-attached docs for this deal. Sorted by version desc so
+      // the JS-side dedupe below trivially keeps the latest per item without
+      // needing DISTINCT ON. Only ~37 items max, so over-fetching is fine.
+      db
+        .select({
+          id: documents.id,
+          checklistItemId: documents.checklistItemId,
+          name: documents.name,
+          version: documents.version,
+          mimeType: documents.mimeType,
+          uploadedAt: documents.uploadedAt,
+        })
+        .from(documents)
+        .where(
+          and(eq(documents.dealId, id), isNotNull(documents.checklistItemId)),
+        )
+        .orderBy(desc(documents.version)),
     ]);
 
   if (!deal) notFound();
@@ -107,6 +133,26 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   const totalItems = items.length;
   const doneItems = items.filter((i) => i.completed).length;
   const pct = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
+
+  // Latest doc per checklist item. documentRows is already sorted version
+  // desc, so the first entry seen for each itemId is the most recent. Plain
+  // record (not a Map) so the data crosses the RSC → client-component
+  // boundary cleanly.
+  const documentByItemId: Record<
+    string,
+    { id: string; name: string; version: number; mimeType: string | null; uploadedAt: string }
+  > = {};
+  for (const d of documentRows) {
+    if (!d.checklistItemId) continue;
+    if (documentByItemId[d.checklistItemId]) continue;
+    documentByItemId[d.checklistItemId] = {
+      id: d.id,
+      name: d.name,
+      version: d.version,
+      mimeType: d.mimeType,
+      uploadedAt: d.uploadedAt.toISOString(),
+    };
+  }
 
   const counts = {
     checklist: { done: doneItems, total: totalItems },
@@ -150,7 +196,12 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
           {{
             checklist: (
               <FeedbackZone section="deal-checklist">
-                <ChecklistView dealId={id} categories={categories} items={items} />
+                <ChecklistView
+                  dealId={id}
+                  categories={categories}
+                  items={items}
+                  documentByItemId={documentByItemId}
+                />
               </FeedbackZone>
             ),
             contacts: (

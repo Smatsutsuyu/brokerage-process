@@ -8,13 +8,13 @@ import {
   FileText,
   Link as LinkIcon,
   Mail,
-  Upload,
 } from "lucide-react";
 
 import { PlannedAction } from "@/components/planned-action";
 import { cn } from "@/lib/utils";
 
 import { ChecklistCheckbox } from "./checklist-checkbox";
+import { ChecklistDocument, type AttachedDocument } from "./checklist-document";
 import { getPlannedActionsForItem, type ItemActionKind } from "./planned-item-actions";
 
 const KIND_ICON: Record<ItemActionKind, typeof FileText> = {
@@ -44,6 +44,7 @@ type PhaseSectionProps = {
   categories: Category[];
   // Plain record (not Map) so it serializes cleanly across the RSC boundary.
   itemsByCategory: Record<string, Item[]>;
+  documentByItemId: Record<string, AttachedDocument>;
 };
 
 export function PhaseSection({
@@ -52,6 +53,7 @@ export function PhaseSection({
   headerBg,
   categories,
   itemsByCategory,
+  documentByItemId,
 }: PhaseSectionProps) {
   const allItems = categories.flatMap((c) => itemsByCategory[c.id] ?? []);
   const done = allItems.filter((i) => i.completed).length;
@@ -133,12 +135,12 @@ export function PhaseSection({
                           </span>
                         )}
 
-                        {/* Planned actions stay visible at all times — kept
-                            light/muted so they don't compete with the item
-                            name, but no floaty hover-reveal that makes other
-                            rows feel half-rendered. Item-specific actions
-                            (Generate / Send) render first, then the universal
-                            Upload + Link Dropbox affordances. */}
+                        {/* Real upload + link affordances stay visible at
+                            all times. Upload handles direct browser → Vercel
+                            Blob and shows the attached file when present.
+                            Link is still a Phase-2 placeholder. Item-specific
+                            actions (Generate / Send) remain placeholders for
+                            templated outputs that come later. */}
                         <div className="flex items-center gap-0.5">
                           {itemActions.map((a) => (
                             <PlannedAction
@@ -151,13 +153,11 @@ export function PhaseSection({
                               icon={KIND_ICON[a.kind]}
                             />
                           ))}
-                          <PlannedAction
-                            compact
-                            feature="Upload document"
-                            description="Uploads a file to Cloudflare R2 storage and attaches it to this checklist item. Supports versioning — every save creates a new version."
-                            phase="phase_2"
-                            label="Upload"
-                            icon={Upload}
+                          <ChecklistDocument
+                            dealId={dealId}
+                            checklistItemId={item.id}
+                            document={documentByItemId[item.id] ?? null}
+                            itemName={item.name}
                           />
                           <PlannedAction
                             compact

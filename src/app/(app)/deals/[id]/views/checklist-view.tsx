@@ -1,3 +1,4 @@
+import type { AttachedDocument } from "./checklist-document";
 import { PhaseSection } from "./phase-section";
 
 type Phase = "phase_1" | "phase_2" | "phase_3" | "phase_4";
@@ -22,6 +23,9 @@ type ChecklistViewProps = {
   dealId: string;
   categories: Category[];
   items: Item[];
+  // Latest document attached to each checklist item, keyed by item id.
+  // Items with no document are simply absent from the record.
+  documentByItemId: Record<string, AttachedDocument>;
 };
 
 const PHASE_META: Record<Phase, { label: string; bg: string }> = {
@@ -33,7 +37,12 @@ const PHASE_META: Record<Phase, { label: string; bg: string }> = {
 
 const PHASES: Phase[] = ["phase_1", "phase_2", "phase_3", "phase_4"];
 
-export function ChecklistView({ dealId, categories, items }: ChecklistViewProps) {
+export function ChecklistView({
+  dealId,
+  categories,
+  items,
+  documentByItemId,
+}: ChecklistViewProps) {
   if (categories.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
@@ -71,6 +80,7 @@ export function ChecklistView({ dealId, categories, items }: ChecklistViewProps)
             headerBg={meta.bg}
             categories={phaseCats.map((c) => ({ id: c.id, name: c.name }))}
             itemsByCategory={itemsByCategory}
+            documentByItemId={documentByItemId}
           />
         );
       })}
