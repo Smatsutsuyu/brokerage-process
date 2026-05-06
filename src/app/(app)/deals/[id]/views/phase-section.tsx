@@ -6,7 +6,6 @@ import {
   ChevronDown,
   FileSpreadsheet,
   FileText,
-  Link as LinkIcon,
   Mail,
 } from "lucide-react";
 
@@ -15,6 +14,7 @@ import { cn } from "@/lib/utils";
 
 import { ChecklistCheckbox } from "./checklist-checkbox";
 import { ChecklistDocument, type AttachedDocument } from "./checklist-document";
+import { ChecklistLink } from "./checklist-link";
 import { getPlannedActionsForItem, type ItemActionKind } from "./planned-item-actions";
 
 const KIND_ICON: Record<ItemActionKind, typeof FileText> = {
@@ -35,6 +35,8 @@ type Item = {
   name: string;
   optional: boolean;
   completed: boolean;
+  externalLinkUrl: string | null;
+  externalLinkLabel: string | null;
 };
 
 type PhaseSectionProps = {
@@ -159,13 +161,17 @@ export function PhaseSection({
                             document={documentByItemId[item.id] ?? null}
                             itemName={item.name}
                           />
-                          <PlannedAction
-                            compact
-                            feature="Link Dropbox folder"
-                            description="Pastes a Dropbox folder URL to associate with this checklist item — no file replication, just a direct link."
-                            phase="phase_2"
-                            label="Link"
-                            icon={LinkIcon}
+                          <ChecklistLink
+                            dealId={dealId}
+                            itemId={item.id}
+                            link={
+                              item.externalLinkUrl
+                                ? {
+                                    url: item.externalLinkUrl,
+                                    label: item.externalLinkLabel,
+                                  }
+                                : null
+                            }
                           />
                         </div>
                       </div>

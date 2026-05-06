@@ -73,6 +73,8 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
           optional: checklistItems.optional,
           completed: checklistItems.completed,
           sortOrder: checklistItems.sortOrder,
+          externalLinkUrl: checklistItems.externalLinkUrl,
+          externalLinkLabel: checklistItems.externalLinkLabel,
         })
         .from(checklistItems)
         .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))

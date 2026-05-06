@@ -40,6 +40,60 @@ export async function toggleChecklistItem(input: {
   revalidatePath(`/deals/${input.dealId}`);
 }
 
+// Attach an external link (Dropbox folder, SharePoint, Google Drive, any
+// URL) to a checklist item. Stored on the item itself (not as a document
+// row) since the platform never sees the file — it's just a pointer for
+// users. Optional label so a long share URL can display as something
+// readable like "HOA Budget folder."
+export async function setChecklistItemLink(input: {
+  itemId: string;
+  dealId: string;
+  url: string;
+  label?: string;
+}) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  const url = input.url.trim();
+  if (!url) throw new Error("URL is required");
+  // Light validation — accept anything that parses as a URL with a scheme.
+  // We don't restrict to specific hosts; users may legitimately link to
+  // SharePoint, Drive, internal file shares, etc.
+  try {
+    const parsed = new URL(url);
+    if (!parsed.protocol.startsWith("http")) {
+      throw new Error("URL must start with http(s)://");
+    }
+  } catch {
+    throw new Error("Not a valid URL");
+  }
+
+  await db
+    .update(checklistItems)
+    .set({
+      externalLinkUrl: url,
+      externalLinkLabel: input.label?.trim() || null,
+    })
+    .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)));
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
+export async function clearChecklistItemLink(input: {
+  itemId: string;
+  dealId: string;
+}) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  await db
+    .update(checklistItems)
+    .set({ externalLinkUrl: null, externalLinkLabel: null })
+    .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)));
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
 export async function updateBuyerTier(input: {
   dealBuyerId: string;
   dealId: string;

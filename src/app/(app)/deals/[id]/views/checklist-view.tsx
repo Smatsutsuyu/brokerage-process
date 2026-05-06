@@ -17,6 +17,8 @@ type Item = {
   optional: boolean;
   completed: boolean;
   sortOrder: number;
+  externalLinkUrl: string | null;
+  externalLinkLabel: string | null;
 };
 
 type ChecklistViewProps = {
