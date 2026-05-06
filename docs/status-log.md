@@ -4,6 +4,43 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-06 — Phase 2 kickoff: per-checklist document upload (Vercel Blob, private)
+
+First Phase 2 deliverable lands. Document upload + view + delete is wired into every checklist item, backed by Vercel Blob's private store.
+
+### Done — Schema
+- New migration `0004_third_loners.sql`: `documents.checklist_item_id` (uuid, nullable, FK to checklist_items, ON DELETE set null) so we can attach a doc to the item it satisfies. `documents.status` default flipped from "draft" to "final" (Phase 1 didn't surface draft/final UX; defaulting to final keeps the column meaningful for later without forcing every uploader to think about it). `r2_key` column kept under that name — it's the storage column for the blob URL/path; renaming would be cosmetic churn
+
+### Done — Upload + view + delete pipeline
+- New `src/lib/documents.ts` server-only helpers: `authorizeDealAccess` (verify deal + item belong to caller's org), `nextVersionFor` (auto-version per (deal, item) pair), `recordUploadedDocument` (writes the row after head() verifies the blob exists in OUR store), `deleteDocumentBlob` (best-effort blob delete + row delete + revalidate)
+- New `src/app/api/upload/blob/route.ts`: thin wrapper around `@vercel/blob/client`'s `handleUpload` that issues signed client tokens scoped to a specific deal/item. No `onUploadCompleted` callback — see decision below
+- New `src/app/(app)/deals/[id]/document-actions.ts`: `recordUpload` (called from the client after upload() returns; verifies blob exists via head() before writing the row, prevents a malicious caller from registering an arbitrary URL as a "document") and `deleteDocument`
+- New `src/app/api/documents/[id]/route.ts`: GET endpoint that authz-checks the doc belongs to the caller's org, then streams the blob through via `get()` with `access: "private"`. Sets correct Content-Type from the recorded MIME and `Content-Disposition: inline` so PDFs render in-tab
+- New `src/app/(app)/deals/[id]/views/checklist-document.tsx`: client component that handles the upload state machine. Empty → file picker + Upload button; uploading → progress %; attached → filename chip (links to `/api/documents/[id]`) + replace + delete buttons. Uses `@vercel/blob/client`'s `upload()` for direct browser-to-Vercel-Blob with progress events
+- Wired into `phase-section.tsx` to replace the "Upload" PlannedAction placeholder on every checklist item. Latest doc per item is loaded in `page.tsx` (single query, group by item id keeping latest version) and passed through `ChecklistView` → `PhaseSection` → `ChecklistDocument`
+
+### Decisions
+- **Private store + stream-through-server downloads** instead of public-with-unguessable-URLs. Sensitive deal docs (OMs, buyer lists, pricing analyses) shouldn't be retrievable just by knowing a URL. Trade-off: every download flows through our Next.js function, costs some compute + bandwidth. At Lakebridge volume (small files, low download frequency) the cost is negligible and we get full audit-trail control
+- **Client-driven upload completion** instead of `handleUpload`'s `onUploadCompleted` webhook. The webhook is invoked by Vercel's servers as a POST back to our app, which doesn't work in local dev (Vercel can't reach localhost). Switching to client-side completion (client calls `recordUpload` server action with the pathname after `upload()` returns) works in dev AND prod with one code path. Security comes from server verifying the pathname via `head()` before writing the row — `head()` resolves against OUR store using `BLOB_READ_WRITE_TOKEN`, so a bogus pathname or one in someone else's store throws and the row never lands
+- **Inline upload UI per checklist row** (not a modal). Per design discussion: row is the natural unit, modal would be overkill for "upload one file." When attached, the row shows a compact filename chip + replace/delete icons
+- **Default status = final, no UI to set draft/final.** Schema retains the column; surfacing it later is a small change. Phase 1 didn't surface this and Chris hasn't asked
+- **Versioning at data layer only, no version-history UI.** Each upload bumps `version` and prior blobs stay in storage. UI shows only the latest. If "wait what was in the previous one" comes up, easy to add a small history affordance
+- **No file size cap beyond Vercel Blob's defaults.** Direct browser upload bypasses Next.js's 4.5 MB body limit, so OMs in the 10–20 MB range work without timeout issues. Vercel Blob's per-file cap is 5 GB which we'll never approach
+- **Allowed content types whitelist** (PDF, Word, Excel, common images, CSV, plain text) at the token-issuance step. Vercel Blob enforces this server-side; tightens vs accepting `*/*`
+- **Content-Type header set from `doc.mimeType` recorded at upload time**, not from `get()` response (which doesn't include contentType — only contentDisposition, which is a different thing entirely; bug fixed during initial testing)
+
+### Notes for future Sean
+- **Important debugging note:** if uploads fail with a CORS/400 error on `vercel.com/api/blob/`, the most common causes are (1) `BLOB_READ_WRITE_TOKEN` not loaded into the running process (restart dev server after appending), (2) `access` mismatch — store is private, code asks for public (or vice versa) — Vercel returns "Cannot use public access on a private store" from the SDK, (3) `onUploadCompleted` provided when there's no public callback URL (warning in server logs taints the issued token; remove the callback or set `VERCEL_BLOB_CALLBACK_URL`)
+- **`r2_key` column name preserved.** It stores the Vercel Blob URL despite the historical name. Future cosmetic rename would touch a lot of files and add no value
+- **Excel/image inline preview deferred.** Browsers render PDFs natively but won't preview .xlsx/.docx without a third-party viewer. If Chris asks, we can add a Microsoft Office Online viewer iframe (free, no API key) or fall back to "Download to view" for non-PDF files
+- **Version-history UI deferred.** Old blobs remain in storage on replace; cleanup script could prune to keep only last N versions per item if storage costs ever matter (they won't at this scale)
+- **Dropbox link integration not yet built.** Per Chris's discovery answers, items can also point at existing Dropbox folders via a manual link. Next sub-task in Phase 2 — separate work from upload
+
+### Blockers
+- None active
+
+---
+
 ## 2026-05-05 (late) — Vendor swap: Cloudflare R2 → Vercel Blob
 
 Quick re-audit of third-party tooling now that we know the deploy target is Vercel. R2 was chosen pre-Vercel-decision; Vercel Blob is the obvious native swap.

@@ -248,9 +248,9 @@ Approximately seven weeks across three phases. Compressed from the original eigh
 
 Templated outputs only. No LLM calls. Mid-phase preview deploy after PDFs are working; end-of-phase deploy after email send works.
 
-- Document upload to Vercel Blob, organized by deal and document type
-- Document viewer (PDF inline, Excel preview, image preview)
-- Document versioning (automatic — every save creates a version)
+- Document upload to Vercel Blob, organized by deal and document type → **Done 2026-05-06** (per-checklist-item upload, private store, PDF inline viewer via streaming, replace + delete with auto-versioning at the data layer)
+- Document viewer (PDF inline, Excel preview, image preview) → **PDF inline done; Excel/image preview deferred**
+- Document versioning (automatic — every save creates a version) → **Done at data layer** (each upload bumps version per (deal, item) pair, old versions retained in blob); version-history UI to surface old versions deferred
 - React-PDF infrastructure for branded outputs (Land Advisors branding throughout)
 - Templates implemented:
   - Q&A File (Land Advisors-branded PDF, structured from approved Q&A items)
