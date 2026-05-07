@@ -4,6 +4,26 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-07 — Pending: M365 DNS access for Resend domain verification
+
+**TODO when Phase 2 email work starts.** Need DNS-record edit access on `lakebridgecap.com` (M365-managed; nameservers are `ns1-4.bdm.microsoftonline.com`) to set up Resend sender-domain verification.
+
+**Why this is a pending item:** Tried two access paths, both blocked.
+
+1. Chris invited my personal Microsoft account as a guest in his M365 tenant. Microsoft admin center categorically rejects personal MS accounts at sign-in regardless of guest status — error "You can't sign in here with a personal account. Use your work or school account instead." Documented Microsoft limitation; should have flagged up front.
+
+2. Plan B: sign up for free Microsoft 365 Developer Program account → get a real `*.onmicrosoft.com` work account → have Chris re-invite that. Chris is the business owner and a non-technical client who already accommodated one access request that didn't work; a "let's hop on a call so you can run the edits" reframe would push work back onto him after he asked me to handle it.
+
+**Plan:** when DNS edits are actually needed (Phase 2 Resend setup, eventual `brokerage.lakebridgecap.com` subdomain cutover):
+- Stand up the Microsoft 365 Developer Program account ahead of time (https://developer.microsoft.com/microsoft-365/dev-program — free, ~10 min, gives `you@<your-tenant>.onmicrosoft.com`)
+- Verify it signs into admin.microsoft.com cleanly in own dev tenant before bothering Chris
+- Send Chris one clean message: "Hit a Microsoft quirk with personal accounts; new work-account address is X — could you re-send the invite to that and re-assign Domain Name Administrator?"
+- Don't re-litigate the failed first invite
+
+**Backstop if dev-account path also fails (~5% chance per Entra cross-tenant settings or guest-admin restrictions):** ask Chris to provision a real `sean@lakebridgecap.com` user. Costs ~$6/mo for a Business Basic license, creates handoff offboarding step. Reserve as last resort.
+
+---
+
 ## 2026-05-06 — Phase 2 kickoff: per-checklist document upload (Vercel Blob, private)
 
 First Phase 2 deliverable lands. Document upload + view + delete is wired into every checklist item, backed by Vercel Blob's private store.
