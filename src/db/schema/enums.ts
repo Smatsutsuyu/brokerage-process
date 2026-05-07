@@ -55,9 +55,13 @@ export const feedbackSeverityEnum = pgEnum("feedback_severity", [
   "blocker",
 ]);
 
+// Workflow: new → reviewed → actioned → complete. "actioned" means the
+// dev shipped a change; "complete" means the reporter (Chris) verified
+// and signed off. "wontfix" is the off-ramp for declined items.
 export const feedbackStatusEnum = pgEnum("feedback_status", [
   "new",
   "reviewed",
   "actioned",
+  "complete",
   "wontfix",
 ]);

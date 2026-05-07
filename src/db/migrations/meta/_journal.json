@@ -50,6 +50,13 @@
       "when": 1778142726156,
       "tag": "0006_awesome_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1778146178938,
+      "tag": "0007_tough_blizzard",
+      "breakpoints": true
     }
   ]
 }

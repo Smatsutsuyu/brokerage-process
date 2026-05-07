@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 
 import { deleteFeedback, setFeedbackResponse, setFeedbackStatus } from "./actions";
 
-type FeedbackStatus = "new" | "reviewed" | "actioned" | "wontfix";
+type FeedbackStatus = "new" | "reviewed" | "actioned" | "complete" | "wontfix";
 type FeedbackSeverity = "nit" | "suggestion" | "bug" | "blocker";
 
 export type FeedbackRow = {
@@ -51,10 +51,11 @@ type StatusFilter = FeedbackStatus | "all" | "open";
 
 const STATUS_FILTER_LABEL: Record<StatusFilter, string> = {
   all: "All",
-  open: "Open (new + reviewed)",
+  open: "Open (new + reviewed + actioned)",
   new: "New",
   reviewed: "Reviewed",
   actioned: "Actioned",
+  complete: "Complete",
   wontfix: "Won't fix",
 };
 
@@ -64,7 +65,8 @@ const STATUS_META: Record<
 > = {
   new: { label: "New", chip: "bg-amber-100 text-amber-800", dot: "bg-amber-500" },
   reviewed: { label: "Reviewed", chip: "bg-blue-100 text-blue-800", dot: "bg-blue-500" },
-  actioned: { label: "Actioned", chip: "bg-green-100 text-green-800", dot: "bg-green-500" },
+  actioned: { label: "Actioned", chip: "bg-indigo-100 text-indigo-800", dot: "bg-indigo-500" },
+  complete: { label: "Complete", chip: "bg-green-100 text-green-800", dot: "bg-green-500" },
   wontfix: { label: "Won't fix", chip: "bg-gray-100 text-gray-700", dot: "bg-gray-400" },
 };
 
@@ -78,8 +80,14 @@ const SEVERITY_META: Record<
   nit: { label: "Nit", chip: "bg-gray-100 text-gray-700", rank: 3 },
 };
 
-const STATUS_ORDER: FeedbackStatus[] = ["new", "reviewed", "actioned", "wontfix"];
+const STATUS_ORDER: FeedbackStatus[] = ["new", "reviewed", "actioned", "complete", "wontfix"];
 const FILTER_ORDER: StatusFilter[] = ["all", "open", ...STATUS_ORDER];
+
+// "Open" = anything not in a terminal state. Actioned items aren't terminal:
+// they're awaiting Chris's sign-off (→ complete) or pushback (→ reviewed).
+function isOpen(status: FeedbackStatus): boolean {
+  return status === "new" || status === "reviewed" || status === "actioned";
+}
 
 type SortColumn = "created" | "severity" | "section" | "status";
 type SortDirection = "asc" | "desc";
@@ -136,17 +144,18 @@ export function FeedbackList({ items }: FeedbackListProps) {
       new: 0,
       reviewed: 0,
       actioned: 0,
+      complete: 0,
       wontfix: 0,
     };
     for (const it of items) c[it.status]++;
-    c.open = c.new + c.reviewed;
+    c.open = c.new + c.reviewed + c.actioned;
     return c;
   }, [items]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     const filtered = items.filter((it) => {
-      if (filter === "open" && it.status !== "new" && it.status !== "reviewed") return false;
+      if (filter === "open" && !isOpen(it.status)) return false;
       if (filter !== "all" && filter !== "open" && it.status !== filter) return false;
       if (!q) return true;
       return (

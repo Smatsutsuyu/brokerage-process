@@ -8,7 +8,7 @@ import { feedbackItems } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 
-export type FeedbackStatus = "new" | "reviewed" | "actioned" | "wontfix";
+export type FeedbackStatus = "new" | "reviewed" | "actioned" | "complete" | "wontfix";
 
 async function assertOwner() {
   const me = await getCurrentUser();
@@ -26,9 +26,15 @@ export async function setFeedbackStatus(input: {
   const { org } = await assertOwner();
 
   // Set timestamps idempotently. reviewedAt fires on the first transition
-  // out of "new"; actionedAt on transition into "actioned". Going BACK to
-  // "new" clears both — useful if the owner wants to re-open an item.
+  // out of "new"; actionedAt fires on the transition into "actioned" and is
+  // preserved through "complete" (since complete implies it was actioned
+  // first). Going BACK to "new" clears both — useful if the owner wants to
+  // re-open an item.
   const now = new Date();
+  const existing = await db.query.feedbackItems.findFirst({
+    where: and(eq(feedbackItems.id, input.feedbackId), eq(feedbackItems.orgId, org.id)),
+    columns: { reviewedAt: true, actionedAt: true },
+  });
   const update: {
     status: FeedbackStatus;
     reviewedAt?: Date | null;
@@ -38,10 +44,19 @@ export async function setFeedbackStatus(input: {
   if (input.status === "new") {
     update.reviewedAt = null;
     update.actionedAt = null;
+  } else if (input.status === "actioned") {
+    update.reviewedAt = existing?.reviewedAt ?? now;
+    update.actionedAt = existing?.actionedAt ?? now;
+  } else if (input.status === "complete") {
+    // Complete implies the work shipped (actioned) AND the reporter signed
+    // off. Preserve any existing timestamps; stamp now as a fallback if the
+    // owner jumped straight to complete without a prior actioned state.
+    update.reviewedAt = existing?.reviewedAt ?? now;
+    update.actionedAt = existing?.actionedAt ?? now;
   } else {
-    // Any other status implies it's been reviewed.
-    update.reviewedAt = now;
-    update.actionedAt = input.status === "actioned" ? now : null;
+    // reviewed | wontfix → reviewed but no work shipped.
+    update.reviewedAt = existing?.reviewedAt ?? now;
+    update.actionedAt = null;
   }
 
   await db

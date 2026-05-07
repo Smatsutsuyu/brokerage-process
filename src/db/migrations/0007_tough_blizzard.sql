@@ -1,0 +1,1 @@
+ALTER TYPE "public"."feedback_status" ADD VALUE 'complete' BEFORE 'wontfix';
