@@ -75,6 +75,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
           sortOrder: checklistItems.sortOrder,
           externalLinkUrl: checklistItems.externalLinkUrl,
           externalLinkLabel: checklistItems.externalLinkLabel,
+          notes: checklistItems.notes,
         })
         .from(checklistItems)
         .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
@@ -203,6 +204,11 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                   categories={categories}
                   items={items}
                   documentByItemId={documentByItemId}
+                  psaAttorney={{
+                    name: deal.psaAttorneyName,
+                    firm: deal.psaAttorneyFirm,
+                    drafting: deal.psaDrafting,
+                  }}
                 />
               </FeedbackZone>
             ),

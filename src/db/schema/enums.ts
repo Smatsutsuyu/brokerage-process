@@ -10,6 +10,11 @@ export const userRoleEnum = pgEnum("user_role", ["owner", "broker", "analyst", "
 // tier ("low"/"deferred"), Chris will tell us — keeping the surface tight.
 export const dealPriorityEnum = pgEnum("deal_priority", ["normal", "high"]);
 
+// Drafting preference for the PSA Attorney decision recorded on each deal.
+// Per Chris's feedback (2026-05-05): which side's attorney drafts the PSA,
+// or "na" when undecided / outside-counsel arrangement.
+export const psaDraftingEnum = pgEnum("psa_drafting", ["buyer", "seller", "na"]);
+
 export const builderClassificationEnum = pgEnum("builder_classification", ["private", "public"]);
 
 export const buyerTierEnum = pgEnum("buyer_tier", ["green", "yellow", "red", "not_selected"]);

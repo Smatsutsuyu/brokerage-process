@@ -27,6 +27,13 @@ type ChecklistDocumentProps = {
   // Display name for the checklist item — used to derive a sensible blob
   // pathname so docs are at least roughly browsable in Vercel Blob's UI.
   itemName: string;
+  // Where the parent wants this rendered:
+  // - "trigger" → the Upload button in the main row's action area. Renders
+  //   nothing when a doc already exists (the document is shown in the
+  //   sub-row instead).
+  // - "display" → the doc chip + replace/delete in the row's expanded
+  //   sub-row beneath. Renders nothing when no doc exists.
+  slot: "trigger" | "display";
 };
 
 export function ChecklistDocument({
@@ -34,6 +41,7 @@ export function ChecklistDocument({
   checklistItemId,
   document,
   itemName,
+  slot,
 }: ChecklistDocumentProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -118,66 +126,73 @@ export function ChecklistDocument({
     />
   );
 
-  if (isUploading) {
+  // Trigger slot: only renders the upload button when no doc exists yet.
+  // When the doc IS attached, the trigger slot is empty (the doc lives in
+  // the display slot below the row). Upload-in-progress also surfaces here
+  // since it starts from the trigger.
+  if (slot === "trigger") {
+    if (document && !isUploading) return null;
+    if (isUploading) {
+      return (
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-600">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Uploading{progress !== null ? ` ${progress}%` : "…"}
+        </span>
+      );
+    }
     return (
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-600">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        Uploading{progress !== null ? ` ${progress}%` : "…"}
-      </span>
-    );
-  }
-
-  if (document) {
-    return (
-      <span className="inline-flex items-center gap-0.5">
-        <a
-          href={`/api/documents/${document.id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={`${document.name} (v${document.version})`}
-          className="hover:bg-brand-blue/10 hover:text-brand-blue inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-700 transition-colors"
-        >
-          <FileText className="h-3 w-3" />
-          <span className="max-w-[160px] truncate">{document.name}</span>
-          <ExternalLink className="h-2.5 w-2.5 opacity-60" />
-        </a>
+      <span className="inline-flex items-center gap-1">
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          title="Replace with a new version"
-          className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-amber-50 hover:text-amber-700"
+          className={cn(
+            "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-amber-50 hover:text-amber-700",
+          )}
         >
           <Upload className="h-3 w-3" />
-        </button>
-        <button
-          type="button"
-          onClick={handleDelete}
-          title="Delete document"
-          className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600"
-        >
-          <Trash2 className="h-3 w-3" />
+          Upload
         </button>
         {fileInput}
-        {error && <span className="ml-1 text-[10px] text-red-600">{error}</span>}
+        {error && <span className="text-[10px] text-red-600">{error}</span>}
       </span>
     );
   }
 
-  // No document yet — compact upload button.
+  // Display slot: only renders when a doc exists. Lives in the sub-row
+  // beneath the main item; gets its own breathing room so replace/delete
+  // can stay visible at all times without crowding the main row.
+  if (!document) return null;
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex items-center gap-0.5">
+      <a
+        href={`/api/documents/${document.id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={`${document.name} (v${document.version})`}
+        className="hover:bg-brand-blue/10 hover:text-brand-blue inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-700 transition-colors"
+      >
+        <FileText className="h-3 w-3" />
+        <span className="max-w-[240px] truncate">{document.name}</span>
+        <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+      </a>
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className={cn(
-          "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-amber-50 hover:text-amber-700",
-        )}
+        title="Replace with a new version"
+        className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-amber-50 hover:text-amber-700"
       >
         <Upload className="h-3 w-3" />
-        Upload
+      </button>
+      <button
+        type="button"
+        onClick={handleDelete}
+        title="Delete document"
+        className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600"
+      >
+        <Trash2 className="h-3 w-3" />
       </button>
       {fileInput}
-      {error && <span className="text-[10px] text-red-600">{error}</span>}
+      {error && <span className="ml-1 text-[10px] text-red-600">{error}</span>}
     </span>
   );
 }

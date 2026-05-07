@@ -11,6 +11,7 @@ import {
   consultants,
   contacts,
   dealBuyers,
+  deals,
   issues,
   qaItems,
 } from "@/db/schema";
@@ -90,6 +91,53 @@ export async function clearChecklistItemLink(input: {
     .update(checklistItems)
     .set({ externalLinkUrl: null, externalLinkLabel: null })
     .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)));
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
+// Free-form working notes per checklist item. Empty string clears the
+// notes field — keeps the API simple (one action handles both save + clear)
+// vs needing a separate clear action.
+export async function setChecklistItemNotes(input: {
+  itemId: string;
+  dealId: string;
+  notes: string;
+}) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  const trimmed = input.notes.trim();
+  await db
+    .update(checklistItems)
+    .set({ notes: trimmed || null })
+    .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)));
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
+// PSA Attorney decision recorded on the deal itself (not a consultant
+// row). Surfaced inline on the "Determine PSA Attorney" checklist row.
+// All three fields nullable individually so a partial decision (firm
+// known, name TBD, drafting undecided) is representable.
+export type PsaDrafting = "buyer" | "seller" | "na";
+
+export async function setPsaAttorney(input: {
+  dealId: string;
+  name: string | null;
+  firm: string | null;
+  drafting: PsaDrafting | null;
+}) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  await db
+    .update(deals)
+    .set({
+      psaAttorneyName: input.name?.trim() || null,
+      psaAttorneyFirm: input.firm?.trim() || null,
+      psaDrafting: input.drafting,
+    })
+    .where(and(eq(deals.id, input.dealId), eq(deals.orgId, org.id)));
 
   revalidatePath(`/deals/${input.dealId}`);
 }

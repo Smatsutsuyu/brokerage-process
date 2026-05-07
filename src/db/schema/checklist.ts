@@ -48,6 +48,10 @@ export const checklistItems = pgTable("checklist_items", {
   completedBy: uuid("completed_by").references(() => users.id, { onDelete: "set null" }),
   externalLinkUrl: text("external_link_url"),
   externalLinkLabel: text("external_link_label"),
+  // User-entered working notes for this item. Separate from `description`
+  // (which is the canonical item description from the seed) so the user's
+  // notes are clearly authored content vs. boilerplate.
+  notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

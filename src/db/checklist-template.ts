@@ -69,6 +69,7 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
       {
         name: "Items",
         items: [
+          "Confidentiality Agreement",
           "Send out OM / Blast (personalized by buyer tier)",
           "Request In-Person Meeting with Top (Green) Buyers",
           "Coordinate a Q&A File",

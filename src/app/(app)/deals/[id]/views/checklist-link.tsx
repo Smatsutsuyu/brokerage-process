@@ -27,6 +27,13 @@ type ChecklistLinkProps = {
   dealId: string;
   itemId: string;
   link: ChecklistLinkData | null;
+  // Where the parent wants this rendered:
+  // - "trigger" → the Link button in the main row's action area. Renders
+  //   nothing when a link already exists (the link is shown in the
+  //   sub-row instead).
+  // - "display" → the link chip + edit/clear in the row's expanded
+  //   sub-row beneath. Renders nothing when no link exists.
+  slot: "trigger" | "display";
 };
 
 // Compact display label for an attached link. Prefers the user-supplied
@@ -43,7 +50,7 @@ function displayLabel(link: ChecklistLinkData): string {
   }
 }
 
-export function ChecklistLink({ dealId, itemId, link }: ChecklistLinkProps) {
+export function ChecklistLink({ dealId, itemId, link, slot }: ChecklistLinkProps) {
   const [editing, setEditing] = useState(false);
   const [, startClear] = useTransition();
   const confirm = useConfirm();
@@ -62,63 +69,70 @@ export function ChecklistLink({ dealId, itemId, link }: ChecklistLinkProps) {
     });
   }
 
-  if (link) {
+  // Trigger slot: only renders the "Link" button when no link is set yet.
+  // When a link IS attached, the trigger slot is empty (the link chip
+  // lives in the display slot below the row).
+  if (slot === "trigger") {
+    if (link) return null;
     return (
-      <span className="inline-flex items-center gap-0.5">
-        <a
-          href={link.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={link.url}
-          className="hover:bg-brand-blue/10 hover:text-brand-blue inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-700 transition-colors"
-        >
-          <LinkIcon className="h-3 w-3" />
-          <span className="max-w-[160px] truncate">{displayLabel(link)}</span>
-          <ExternalLink className="h-2.5 w-2.5 opacity-60" />
-        </a>
+      <span className="inline-flex items-center gap-1">
         <button
           type="button"
           onClick={() => setEditing(true)}
-          title="Edit link"
-          className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-amber-50 hover:text-amber-700"
+          className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-amber-50 hover:text-amber-700"
         >
-          <Pencil className="h-3 w-3" />
-        </button>
-        <button
-          type="button"
-          onClick={handleClear}
-          title="Remove link"
-          className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600"
-        >
-          <Trash2 className="h-3 w-3" />
+          <LinkIcon className="h-3 w-3" />
+          Link
         </button>
         <ChecklistLinkModal
           open={editing}
           onOpenChange={setEditing}
           dealId={dealId}
           itemId={itemId}
-          existing={link}
+          existing={null}
         />
       </span>
     );
   }
 
+  // Display slot: only renders when a link exists. Lives in the sub-row;
+  // edit/clear stay visible at all times.
+  if (!link) return null;
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex items-center gap-0.5">
+      <a
+        href={link.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={link.url}
+        className="hover:bg-brand-blue/10 hover:text-brand-blue inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-700 transition-colors"
+      >
+        <LinkIcon className="h-3 w-3" />
+        <span className="max-w-[240px] truncate">{displayLabel(link)}</span>
+        <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+      </a>
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-amber-50 hover:text-amber-700"
+        title="Edit link"
+        className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-amber-50 hover:text-amber-700"
       >
-        <LinkIcon className="h-3 w-3" />
-        Link
+        <Pencil className="h-3 w-3" />
+      </button>
+      <button
+        type="button"
+        onClick={handleClear}
+        title="Remove link"
+        className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600"
+      >
+        <Trash2 className="h-3 w-3" />
       </button>
       <ChecklistLinkModal
         open={editing}
         onOpenChange={setEditing}
         dealId={dealId}
         itemId={itemId}
-        existing={null}
+        existing={link}
       />
     </span>
   );

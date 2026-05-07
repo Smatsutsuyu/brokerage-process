@@ -107,6 +107,20 @@ const EXACT: Record<string, PlannedItemAction[]> = {
   ],
 
   // --- Phase 2 items (marketing process) ---
+  // Per Chris's feedback (2026-05-07): the CA flow is upload + email-out
+  // with a custom template. Upload is wired (universal affordance on
+  // every row); email-out is deferred Phase 2 work. Surfaces as the
+  // standard placeholder until the Resend pipeline lands.
+  "confidentiality agreement": [
+    {
+      kind: "send-email",
+      label: "Email to marketing list",
+      feature: "Confidentiality Agreement distribution",
+      description:
+        "Sends the uploaded CA to all buyers on this deal using a templated email — default body: \"We'd like to share some information on a proposed [X unit] [Type] deal in [City]. We'd like to keep information confidential and are sharing the proposed confidentiality agreement. Please review and let us know if this form works and we will send it out for signatures.\" Editable per send.",
+      phase: "phase_2",
+    },
+  ],
   "send out om / blast": [
     {
       kind: "send-email",
