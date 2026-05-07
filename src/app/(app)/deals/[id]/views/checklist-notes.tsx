@@ -10,20 +10,42 @@ import { cn } from "@/lib/utils";
 
 import { setChecklistItemNotes } from "../actions";
 
-// Trigger button shown in the main row's action area. Only renders when
-// no notes exist yet — once a note is saved, it's shown inline below the
-// row (via <ChecklistNotesPanel>) and that panel owns its own Edit
-// affordance.
-export function ChecklistNotesAddButton({ onAdd }: { onAdd: () => void }) {
+// Single icon trigger always rendered in the main row's action area. A
+// small dot decorates the icon when a note exists so the team can spot
+// items with notes without expanding anything. Clicking toggles the
+// inline panel open/closed; the parent owns that open state since the
+// panel renders outside this button's DOM.
+export function ChecklistNotesToggle({
+  hasNotes,
+  open,
+  onToggle,
+}: {
+  hasNotes: boolean;
+  open: boolean;
+  onToggle: () => void;
+}) {
   return (
     <button
       type="button"
-      onClick={onAdd}
-      title="Add notes"
-      className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-amber-50 hover:text-amber-700"
+      onClick={onToggle}
+      title={hasNotes ? (open ? "Hide note" : "Show note") : "Add note"}
+      aria-pressed={open}
+      className={cn(
+        "relative inline-flex h-7 w-7 items-center justify-center rounded transition-colors",
+        open
+          ? "bg-amber-100 text-amber-700"
+          : hasNotes
+            ? "text-amber-700 hover:bg-amber-50"
+            : "text-gray-400 hover:bg-amber-50 hover:text-amber-700",
+      )}
     >
-      <NotebookPen className="h-3 w-3" />
-      Note
+      <NotebookPen className="h-3.5 w-3.5" />
+      {hasNotes && (
+        <span
+          aria-hidden
+          className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white"
+        />
+      )}
     </button>
   );
 }
@@ -35,9 +57,14 @@ type ChecklistNotesPanelProps = {
   // Whether the panel is in edit mode (textarea visible). View mode renders
   // the saved notes as plain text with Edit/Clear affordances. Owned by the
   // parent so the row can decide when to flip into editing (e.g. from the
-  // "Add note" button click).
+  // toggle button click on an item with no existing note).
   editing: boolean;
   onEditingChange: (next: boolean) => void;
+  // Called when the panel decides it should be dismissed entirely (e.g.
+  // user canceled an empty draft, or cleared the only existing note).
+  // The parent uses this to drop the item from its `notesOpen` set so the
+  // panel actually unmounts instead of lingering as an empty stub.
+  onClose: () => void;
 };
 
 // Renders the per-item notes block beneath the row. Two modes:
@@ -53,6 +80,7 @@ export function ChecklistNotesPanel({
   notes,
   editing,
   onEditingChange,
+  onClose,
 }: ChecklistNotesPanelProps) {
   const [draft, setDraft] = useState(notes ?? "");
   const [isPending, startTransition] = useTransition();
@@ -86,6 +114,10 @@ export function ChecklistNotesPanel({
   function handleCancel() {
     setDraft(notes ?? "");
     onEditingChange(false);
+    // Cancelling out of an empty draft (no prior note) means the panel
+    // has nothing left to display — collapse it rather than render an
+    // empty sub-row.
+    if (!notes) onClose();
   }
 
   async function handleClear() {
@@ -99,6 +131,10 @@ export function ChecklistNotesPanel({
     if (!ok) return;
     startClear(async () => {
       await setChecklistItemNotes({ itemId, dealId, notes: "" });
+      // Note is gone; the panel would render null on the next pass. Tell
+      // the parent to close so the toggle button reflects the new state
+      // immediately and the row collapses cleanly.
+      onClose();
     });
   }
 

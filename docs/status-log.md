@@ -4,6 +4,38 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-07 (afternoon) — Excel-import hardening + checklist notes hidden by default
+
+Two unrelated polish items in the same session.
+
+### Done — Excel importer accepts messier files
+- Hardened `src/app/(app)/contacts/import-modal.tsx` so the `Buyers.xlsx` shape Chris sent imports cleanly. Five changes:
+  - Header aliases added: `mobile`/`mobilephone`/`cell`/`cellphone`/`workphone` → Phone; `contact` → Name. Fixes Norwalk's "Mobile Phone" column being silently dropped and Lyons's "CONTACT" column not matching anything
+  - Header-row autodetection: switched to a 2D-array read and scan the first 10 rows for the one with the most known header keys. Lets us skip a stray title row (Lyons has a `#VALUE!` merged-cell title on row 1 with the real headers on row 2)
+  - Sheet picker: when the workbook has more than one sheet, pill buttons appear in the preview to switch sheets. Re-runs parse + auto-detect each time
+  - Forward-fill toggle: when a Builder Name column is detected and >=2 rows have empty Builder under a non-empty prior row, the parser suggests forward-fill (default on, user can override). Group-style files where one builder name spans N contacts now work
+  - Empty-row filter tightened: drop rows with no name and no email so blank Lyons separator rows don't surface as "Missing first name" errors after forward-fill carries the builder name into them
+- Verified end-to-end against `Buyers.xlsx`: Lyons → 14/14 valid (header at row 2, forward-fill auto-applied, separator rows dropped); Norwalk → 79/79 valid (forward-fill correctly NOT suggested, "Mobile Phone" alias picks up phones)
+
+### Done — Checklist notes hidden by default (Chris feedback)
+- Chris's 5/7 feedback: "Can you make the notes hidden instead of showing almost as sub bullets?" The 5/7 morning commit (`fbd8baf`) had notes always visible inline beneath the row when content existed
+- Replaced `ChecklistNotesAddButton` (only-when-empty text+icon button) with `ChecklistNotesToggle` (always-rendered icon button with a small amber dot when content exists)
+- Two-state model in `phase-section.tsx`: `notesOpen` (panel expanded) + `notesEditing` (textarea visible). Click on empty item → opens AND auto-enters edit mode. Click on item with content → opens in view mode. Click again → collapses + clears edit state
+- `ChecklistNotesPanel` gains an `onClose` prop. Cancel from an empty draft and Clear of an existing note both call `onClose` so the panel collapses cleanly instead of lingering as an empty stub
+
+### Decisions
+- **Always-rendered icon, not "Add" text + chip-on-content.** The icon being permanently in the row gives a stable visual rhythm and lets a glance pick up which items have notes (via the dot) without expanding anything. The earlier text affordance was only there for empty items, then disappeared once content existed — a less consistent shape
+- **Separate `notesOpen` and `notesEditing` over one combined state.** The state machine is conceptually 3-state (closed / open-view / open-edit). Keeping editing as a subset of open keeps the panel's existing edit/view internals untouched and makes the transitions easy to reason about
+
+### Notes for future Sean
+- Excel importer still ignores the per-deal-tag column pattern (Norwalk's `X` column marking which contacts are buyers on that deal). If we want that, the natural shape is: detect un-mapped columns when the import is launched from a deal page, and offer to mark `X`-flagged rows as buyers on that deal
+- Reference memory `reference_vercel_env_cli.md` is now load-bearing for ops scripts. When pulling prod feedback, paste DATABASE_URL inline — never via `vercel env pull` (sensitive vars come back empty + .env.local would override anyway). Burned a couple turns relearning this; re-read memory next time
+
+### Blockers
+- None active
+
+---
+
 ## 2026-05-07 — Pending: M365 DNS access for Resend domain verification
 
 **TODO when Phase 2 email work starts.** Need DNS-record edit access on `lakebridgecap.com` (M365-managed; nameservers are `ns1-4.bdm.microsoftonline.com`) to set up Resend sender-domain verification.

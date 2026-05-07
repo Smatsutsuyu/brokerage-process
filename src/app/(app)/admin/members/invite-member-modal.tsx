@@ -159,10 +159,10 @@ export function InviteMemberModal({ open, onOpenChange }: InviteMemberModalProps
             <div className="grid gap-2">
               <Label htmlFor="invite-role">Role</Label>
               <Select value={role} onValueChange={(v) => v && setRole(v as Role)}>
-                <SelectTrigger id="invite-role">
+                <SelectTrigger id="invite-role" className="w-full">
                   <SelectValue>{ROLE_LABEL[role]}</SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent alignItemWithTrigger={false} className="w-auto">
                   <SelectItem value="owner">Owner — full access incl. member management</SelectItem>
                   <SelectItem value="broker">Broker — manage deals, contacts, documents</SelectItem>
                   <SelectItem value="analyst">Analyst — view + edit underwriting data</SelectItem>

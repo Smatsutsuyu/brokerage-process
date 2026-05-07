@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { ChecklistCheckbox } from "./checklist-checkbox";
 import { ChecklistDocument, type AttachedDocument } from "./checklist-document";
 import { ChecklistLink } from "./checklist-link";
-import { ChecklistNotesAddButton, ChecklistNotesPanel } from "./checklist-notes";
+import { ChecklistNotesPanel, ChecklistNotesToggle } from "./checklist-notes";
 import { getPlannedActionsForItem, type ItemActionKind } from "./planned-item-actions";
 import { PsaAttorneyInline, type PsaAttorneyState } from "./psa-attorney";
 
@@ -79,11 +79,15 @@ export function PhaseSection({
   // doesn't auto-collapse mid-session (that'd be jarring).
   const [collapsed, setCollapsed] = useState(allDone);
 
-  // Set of item ids whose notes are in EDIT mode (textarea visible). When
-  // a note exists but isn't being edited, it's shown inline by default —
-  // no toggle needed. Living at this level (vs. inside each row) keeps the
-  // child component oblivious to its own position in the layout.
+  // Notes are hidden by default (per Chris's feedback — the always-visible
+  // sub-row read like cluttered sub-bullets). Two state sets:
+  //   notesOpen    — items whose panel is currently expanded
+  //   notesEditing — items whose textarea is showing (subset of notesOpen)
+  // Living at this level (vs. inside each row) keeps the child components
+  // oblivious to their position in the layout.
+  const [notesOpen, setNotesOpen] = useState<Set<string>>(new Set());
   const [notesEditing, setNotesEditing] = useState<Set<string>>(new Set());
+
   function setItemNotesEditing(itemId: string, next: boolean) {
     setNotesEditing((prev) => {
       const copy = new Set(prev);
@@ -91,6 +95,27 @@ export function PhaseSection({
       else copy.delete(itemId);
       return copy;
     });
+  }
+
+  function closeNotesPanel(itemId: string) {
+    setNotesOpen((prev) => {
+      if (!prev.has(itemId)) return prev;
+      const copy = new Set(prev);
+      copy.delete(itemId);
+      return copy;
+    });
+    setItemNotesEditing(itemId, false);
+  }
+
+  function toggleNotesPanel(itemId: string, hasNotes: boolean) {
+    if (notesOpen.has(itemId)) {
+      closeNotesPanel(itemId);
+      return;
+    }
+    setNotesOpen((prev) => new Set(prev).add(itemId));
+    // Empty note → jump straight into edit mode so the click feels like
+    // "+ Add note" rather than landing on an empty view-mode pane.
+    if (!hasNotes) setItemNotesEditing(itemId, true);
   }
 
   return (
@@ -137,6 +162,7 @@ export function PhaseSection({
                   catItems.map((item) => {
                     const itemActions = getPlannedActionsForItem(item.name);
                     const isNotesEditing = notesEditing.has(item.id);
+                    const isNotesOpen = notesOpen.has(item.id);
                     const hasNotes = Boolean(item.notes && item.notes.trim());
                     const doc = documentByItemId[item.id] ?? null;
                     const link = item.externalLinkUrl
@@ -209,15 +235,17 @@ export function PhaseSection({
                             {isPsaAttorneyItem(item.name) && (
                               <PsaAttorneyInline dealId={dealId} state={psaAttorney} />
                             )}
-                            {/* "Add note" only renders when no note exists
-                                yet. Once a note is saved it's shown inline
-                                below the row, with its own edit/clear
-                                affordances. */}
-                            {!hasNotes && !isNotesEditing && (
-                              <ChecklistNotesAddButton
-                                onAdd={() => setItemNotesEditing(item.id, true)}
-                              />
-                            )}
+                            {/* Notes toggle is always rendered. Dot
+                                indicator on the icon flags items that
+                                already have a note; click expands the
+                                panel below the row. Hidden by default so
+                                multi-line notes don't crowd the
+                                checklist density. */}
+                            <ChecklistNotesToggle
+                              hasNotes={hasNotes}
+                              open={isNotesOpen}
+                              onToggle={() => toggleNotesPanel(item.id, hasNotes)}
+                            />
                           </div>
                         </div>
 
@@ -246,10 +274,12 @@ export function PhaseSection({
                           </div>
                         )}
 
-                        {/* Notes panel renders whenever a note exists OR
-                            we're actively editing one. The panel itself
-                            decides between view and edit modes. */}
-                        {(hasNotes || isNotesEditing) && (
+                        {/* Notes panel only renders when explicitly
+                            opened via the toggle button. The panel itself
+                            decides between view and edit modes; onClose
+                            collapses the panel when the user cancels an
+                            empty draft or clears the only existing note. */}
+                        {isNotesOpen && (
                           <ChecklistNotesPanel
                             dealId={dealId}
                             itemId={item.id}
@@ -258,6 +288,7 @@ export function PhaseSection({
                             onEditingChange={(next) =>
                               setItemNotesEditing(item.id, next)
                             }
+                            onClose={() => closeNotesPanel(item.id)}
                           />
                         )}
                       </div>
