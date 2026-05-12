@@ -28,6 +28,9 @@ export type ContactInput = {
   // standalone contact. To create a new builder during contact create, the
   // caller should call createBuilder first and pass the returned id here.
   builderId?: string | null;
+  // Marketing-blast opt-in. Optional — defaults to true at the schema
+  // level so older callers behave the same.
+  receivesCommunication?: boolean;
 };
 
 export async function createContact(input: ContactInput): Promise<string> {
@@ -61,6 +64,9 @@ export async function createContact(input: ContactInput): Promise<string> {
       phone: formatPhone(input.phone),
       geography: input.geography?.trim() || null,
       notes: input.notes?.trim() || null,
+      ...(input.receivesCommunication !== undefined
+        ? { receivesCommunication: input.receivesCommunication }
+        : {}),
     })
     .returning();
 
@@ -99,6 +105,9 @@ export async function updateContact(input: {
       phone: formatPhone(input.data.phone),
       geography: input.data.geography?.trim() || null,
       notes: input.data.notes?.trim() || null,
+      ...(input.data.receivesCommunication !== undefined
+        ? { receivesCommunication: input.data.receivesCommunication }
+        : {}),
     })
     .where(and(eq(contacts.id, input.contactId), eq(contacts.orgId, org.id)));
 

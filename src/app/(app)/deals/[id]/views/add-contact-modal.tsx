@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,10 @@ export type EditingContact = {
   email: string | null;
   phone: string | null;
   notes: string | null;
+  // Marketing-blast opt-in. Optional in the type for legacy callers
+  // (contacts-table + the prototype-b/c/d views that don't surface this
+  // field). When absent the modal defaults the checkbox to true.
+  receivesCommunication?: boolean;
 };
 
 type AddContactModalProps = {
@@ -83,6 +88,11 @@ export function AddContactModal({
   const [email, setEmail] = useState(editing?.email ?? "");
   const [phone, setPhone] = useState(editing?.phone ?? "");
   const [notes, setNotes] = useState(editing?.notes ?? "");
+  // Default new contacts to receive communication; preserve the saved value
+  // when editing.
+  const [receivesCommunication, setReceivesCommunication] = useState(
+    editing?.receivesCommunication ?? true,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -101,6 +111,7 @@ export function AddContactModal({
           setEmail("");
           setPhone("");
           setNotes("");
+          setReceivesCommunication(true);
           setNewBuilderName("");
           setNewBuilderClassification("private");
         }
@@ -118,6 +129,7 @@ export function AddContactModal({
     setEmail(editing?.email ?? "");
     setPhone(editing?.phone ?? "");
     setNotes(editing?.notes ?? "");
+    setReceivesCommunication(editing?.receivesCommunication ?? true);
     setError(null);
   }, [open, defaultBuilderId, builders, editing]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -150,6 +162,7 @@ export function AddContactModal({
             email,
             phone,
             notes,
+            receivesCommunication,
           });
         } else {
           await addContact({
@@ -164,6 +177,7 @@ export function AddContactModal({
             email,
             phone,
             notes,
+            receivesCommunication,
           });
         }
         onOpenChange(false);
@@ -323,6 +337,21 @@ export function AddContactModal({
               rows={3}
             />
           </div>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded border border-gray-200 px-3 py-2 hover:bg-gray-50">
+            <Checkbox
+              checked={receivesCommunication}
+              onCheckedChange={(state) => setReceivesCommunication(state === true)}
+              className="mt-0.5"
+            />
+            <div className="flex-1">
+              <div className="text-sm font-medium text-gray-800">Receives communication</div>
+              <div className="text-xs text-gray-500">
+                Include this contact in OM blasts and follow-up emails. Uncheck for
+                informational-only contacts or anyone who&rsquo;s opted out.
+              </div>
+            </div>
+          </label>
 
           {error && (
             <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>

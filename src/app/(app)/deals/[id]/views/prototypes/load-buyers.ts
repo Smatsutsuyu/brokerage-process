@@ -26,6 +26,7 @@ export type ContactRow = {
   email: string | null;
   phone: string | null;
   notes: string | null;
+  receivesCommunication: boolean;
 };
 
 // A "group" is one card in the Contacts UI. Either a builder's contacts
@@ -89,6 +90,7 @@ export async function loadBuyers(dealId: string): Promise<BuyerData> {
       contactEmail: contacts.email,
       contactPhone: contacts.phone,
       contactNotes: contacts.notes,
+      contactReceivesCommunication: contacts.receivesCommunication,
       builderId: builders.id,
       builderName: builders.name,
       classification: builders.classification,
@@ -133,6 +135,7 @@ export async function loadBuyers(dealId: string): Promise<BuyerData> {
       email: r.contactEmail,
       phone: r.contactPhone,
       notes: r.contactNotes,
+      receivesCommunication: r.contactReceivesCommunication,
     };
 
     if (r.builderId && r.dealBuyerId && r.builderName && r.classification && r.tier) {

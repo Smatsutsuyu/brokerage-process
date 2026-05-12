@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
+  authUser,
   builders,
   checklistCategories,
   checklistItems,
@@ -15,6 +16,7 @@ import {
   deals,
   issues,
   qaItems,
+  users,
 } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
@@ -242,6 +244,10 @@ export type AddContactInput = {
   email?: string;
   phone?: string;
   notes?: string;
+  // Marketing-blast opt-in. Optional — defaults to true at the schema
+  // level so callers that don't surface the field still create
+  // communicate-able contacts.
+  receivesCommunication?: boolean;
 };
 
 export async function addContact(input: AddContactInput) {
@@ -322,6 +328,10 @@ export async function addContact(input: AddContactInput) {
         email: input.email?.trim() || null,
         phone: formatPhone(input.phone),
         notes: input.notes?.trim() || null,
+        // Default to true via the schema; explicit when caller provides.
+        ...(input.receivesCommunication !== undefined
+          ? { receivesCommunication: input.receivesCommunication }
+          : {}),
       })
       .returning();
 
@@ -346,6 +356,10 @@ export async function updateContact(input: {
   email?: string;
   phone?: string;
   notes?: string;
+  // Optional — when undefined we leave the existing value alone (so callers
+  // that don't surface the field can ignore it). When provided, sets the
+  // marketing-blast opt-in flag.
+  receivesCommunication?: boolean;
 }) {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
@@ -354,16 +368,29 @@ export async function updateContact(input: {
   const lastName = input.lastName.trim();
   if (!firstName || !lastName) throw new Error("First and last name are required");
 
+  const update: {
+    firstName: string;
+    lastName: string;
+    title: string | null;
+    email: string | null;
+    phone: string | null;
+    notes: string | null;
+    receivesCommunication?: boolean;
+  } = {
+    firstName,
+    lastName,
+    title: input.title?.trim() || null,
+    email: input.email?.trim() || null,
+    phone: formatPhone(input.phone),
+    notes: input.notes?.trim() || null,
+  };
+  if (input.receivesCommunication !== undefined) {
+    update.receivesCommunication = input.receivesCommunication;
+  }
+
   await db
     .update(contacts)
-    .set({
-      firstName,
-      lastName,
-      title: input.title?.trim() || null,
-      email: input.email?.trim() || null,
-      phone: formatPhone(input.phone),
-      notes: input.notes?.trim() || null,
-    })
+    .set(update)
     .where(and(eq(contacts.id, input.contactId), eq(contacts.orgId, org.id)));
 
   revalidatePath(`/deals/${input.dealId}`);
@@ -950,6 +977,93 @@ export async function removeContactFromDeal(input: {
     );
 
   revalidatePath(`/deals/${input.dealId}`);
+}
+
+// Preview computation for the OM-blast modal. Returns the contacts that
+// WOULD be emailed given the chosen filters — no email is actually sent
+// (Phase 2 work, blocked on landadvisors.com DNS / Resend setup).
+//
+// Filters compose as AND:
+//   - tier IN tiers (multi-select; e.g. green + yellow)
+//   - dealBuyer.leadUserId === assigneeUserId (when set; null = anyone)
+//   - contact.receivesCommunication = true (always)
+//
+// The receives-communication check is non-negotiable: even if a contact
+// matches every other filter, opt-out wins. Keeps the data model honest:
+// no UI affordance can re-include an opted-out contact.
+export type BlastPreviewRow = {
+  contactId: string;
+  contactName: string;
+  contactEmail: string | null;
+  builderName: string;
+  builderId: string;
+  tier: "green" | "yellow" | "red" | "not_selected";
+  leadUserId: string | null;
+  leadName: string | null;
+};
+
+export async function previewBlastRecipients(input: {
+  dealId: string;
+  tiers: ("green" | "yellow" | "red" | "not_selected")[];
+  // null = no assignee filter (any builder, regardless of lead).
+  assigneeUserId: string | null;
+}): Promise<BlastPreviewRow[]> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  if (input.tiers.length === 0) return [];
+
+  // Pull every contact on the deal whose builder is on the deal AND
+  // matches the tier filter AND (when assigneeUserId is set) is led by
+  // that user. Skip contacts without an email since they can't receive
+  // a blast anyway. Skip opted-out contacts (receivesCommunication=false).
+  const rows = await db
+    .select({
+      contactId: contacts.id,
+      contactFirstName: contacts.firstName,
+      contactLastName: contacts.lastName,
+      contactEmail: contacts.email,
+      builderId: builders.id,
+      builderName: builders.name,
+      tier: dealBuyers.tier,
+      leadUserId: dealBuyers.leadUserId,
+      leadName: authUser.name,
+    })
+    .from(dealContacts)
+    .innerJoin(contacts, eq(contacts.id, dealContacts.contactId))
+    .innerJoin(builders, eq(builders.id, contacts.builderId))
+    .innerJoin(
+      dealBuyers,
+      and(
+        eq(dealBuyers.builderId, contacts.builderId),
+        eq(dealBuyers.dealId, input.dealId),
+      ),
+    )
+    .leftJoin(users, eq(users.id, dealBuyers.leadUserId))
+    .leftJoin(authUser, eq(authUser.id, users.authUserId))
+    .where(
+      and(
+        eq(dealContacts.dealId, input.dealId),
+        eq(dealContacts.orgId, org.id),
+        eq(contacts.receivesCommunication, true),
+        inArray(dealBuyers.tier, input.tiers),
+        input.assigneeUserId
+          ? eq(dealBuyers.leadUserId, input.assigneeUserId)
+          : undefined,
+      ),
+    )
+    .orderBy(asc(builders.name), asc(contacts.lastName), asc(contacts.firstName));
+
+  return rows.map((r) => ({
+    contactId: r.contactId,
+    contactName: `${r.contactFirstName} ${r.contactLastName}`.trim(),
+    contactEmail: r.contactEmail,
+    builderName: r.builderName,
+    builderId: r.builderId,
+    tier: r.tier,
+    leadUserId: r.leadUserId,
+    leadName: r.leadName,
+  }));
 }
 
 // Verifies that an item belongs to the active deal — useful for any action

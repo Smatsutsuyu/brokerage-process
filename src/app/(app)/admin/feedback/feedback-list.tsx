@@ -89,8 +89,19 @@ function isOpen(status: FeedbackStatus): boolean {
   return status === "new" || status === "reviewed" || status === "actioned";
 }
 
-type SortColumn = "created" | "severity" | "section" | "status";
+type SortColumn = "created" | "activity" | "severity" | "section" | "status";
 type SortDirection = "asc" | "desc";
+
+// Most recent activity on a feedback item: latest comment (created or edited),
+// falling back to the item's submission time when there are no replies yet.
+function lastActivityAt(item: FeedbackRow): string {
+  let max = item.createdAt;
+  for (const c of item.comments) {
+    if (c.createdAt > max) max = c.createdAt;
+    if (c.updatedAt > max) max = c.updatedAt;
+  }
+  return max;
+}
 
 function relTime(iso: string): string {
   const then = new Date(iso).getTime();
@@ -136,8 +147,8 @@ export function FeedbackList({ items, currentUserId }: FeedbackListProps) {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
     } else {
       setSortBy(column);
-      // Smart defaults: created desc (newest first), everything else asc.
-      setSortDir(column === "created" ? "desc" : "asc");
+      // Smart defaults: time-based columns desc (newest first), everything else asc.
+      setSortDir(column === "created" || column === "activity" ? "desc" : "asc");
     }
   }
 
@@ -174,6 +185,8 @@ export function FeedbackList({ items, currentUserId }: FeedbackListProps) {
       switch (sortBy) {
         case "created":
           return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "activity":
+          return new Date(lastActivityAt(a)).getTime() - new Date(lastActivityAt(b)).getTime();
         case "severity":
           return SEVERITY_META[a.severity].rank - SEVERITY_META[b.severity].rank;
         case "section":
@@ -263,6 +276,15 @@ export function FeedbackList({ items, currentUserId }: FeedbackListProps) {
                   className="text-right"
                 >
                   Submitted
+                </SortHeader>
+                <SortHeader
+                  column="activity"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="text-right"
+                >
+                  Last activity
                 </SortHeader>
               </tr>
             </thead>
@@ -396,11 +418,19 @@ function FeedbackRowView({ item, expanded, onToggle, currentUserId }: FeedbackRo
         <td className="px-4 py-2.5 text-right text-xs whitespace-nowrap text-gray-500">
           <span title={new Date(item.createdAt).toLocaleString()}>{relTime(item.createdAt)}</span>
         </td>
+        <td className="px-4 py-2.5 text-right text-xs whitespace-nowrap text-gray-500">
+          {(() => {
+            const activity = lastActivityAt(item);
+            return (
+              <span title={new Date(activity).toLocaleString()}>{relTime(activity)}</span>
+            );
+          })()}
+        </td>
       </tr>
 
       {expanded && (
         <tr className="border-b border-gray-100 bg-gray-50/50">
-          <td colSpan={6} className="px-4 py-4 pl-12">
+          <td colSpan={7} className="px-4 py-4 pl-12">
             <div className="space-y-4">
               {/* Metadata */}
               <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-gray-500">

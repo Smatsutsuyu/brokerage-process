@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { builderClassificationEnum } from "./enums";
 import { organizations } from "./organizations";
@@ -39,6 +39,12 @@ export const contacts = pgTable("contacts", {
   // also editable via the contact form.
   geography: text("geography"),
   notes: text("notes"),
+  // Per-contact opt-in for marketing email blasts. Default true (most
+  // imported contacts are buyer-side reps we want to talk to). Setting
+  // false excludes the contact from EVERY blast filter — even when their
+  // builder + tier match — so it acts as a hard do-not-contact at the
+  // individual level.
+  receivesCommunication: boolean("receives_communication").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

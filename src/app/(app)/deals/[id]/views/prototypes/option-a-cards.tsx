@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
+  BellOff,
   Check,
   ChevronDown,
   ChevronRight,
@@ -28,6 +29,7 @@ import { cn } from "@/lib/utils";
 
 import { removeContactFromDeal } from "../../actions";
 import { AddContactModal, type EditingContact } from "../add-contact-modal";
+import { BlastModal } from "../blast-modal";
 import { BuyerCheckbox } from "../buyer-checkbox";
 import { BuyerCommentsEditor } from "../buyer-comments-editor";
 import { LeadPicker, type LeadOption } from "../lead-picker";
@@ -132,6 +134,7 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
   }, [groups]);
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [pickExistingOpen, setPickExistingOpen] = useState(false);
+  const [blastOpen, setBlastOpen] = useState(false);
   const [addContactFor, setAddContactFor] = useState<{ id: string; name: string } | null>(null);
   const [editing, setEditing] = useState<EditingContact | null>(null);
   const [, startDelete] = useTransition();
@@ -261,13 +264,15 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
             <FileText className="h-3.5 w-3.5" />
             Marketing Report
           </Button>
-          <PlannedAction
-            label="Send OM blast"
-            icon={Mail}
-            feature="OM blast email"
-            description="Composes templated OM-distribution emails per buyer tier (Green / Yellow), opens a review screen, then sends via Resend."
-            phase="phase_2"
-          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setBlastOpen(true)}
+            title="Filter contacts by tier and assignment, preview the recipient list (sending lands in Phase 2)"
+          >
+            <Mail className="h-3.5 w-3.5" />
+            Send OM blast
+          </Button>
           <PlannedAction
             label="Send follow-up"
             icon={Mail}
@@ -305,6 +310,13 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
         dealBuilders={builderOptions}
         contacts={orgContacts}
         excludeContactIds={onDealContactIds}
+      />
+
+      <BlastModal
+        open={blastOpen}
+        onOpenChange={setBlastOpen}
+        dealId={dealId}
+        leadOptions={leadOptions}
       />
 
       <AddContactModal
@@ -467,8 +479,17 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
                           >
                             <div className="flex flex-1 items-center gap-2">
                               <div className="flex-1">
-                                <div className="text-[13px] font-medium text-gray-900">
+                                <div className="flex items-center gap-1.5 text-[13px] font-medium text-gray-900">
                                   {c.fullName}
+                                  {!c.receivesCommunication && (
+                                    <span
+                                      title="Will be excluded from email blasts"
+                                      className="inline-flex items-center gap-0.5 rounded bg-gray-200 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-gray-600 uppercase"
+                                    >
+                                      <BellOff className="h-2.5 w-2.5" />
+                                      no blast
+                                    </span>
+                                  )}
                                 </div>
                                 {c.title && (
                                   <div className="text-[11px] text-gray-500">{c.title}</div>
@@ -505,6 +526,7 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
                                     email: c.email,
                                     phone: c.phone,
                                     notes: c.notes,
+                                    receivesCommunication: c.receivesCommunication,
                                   })
                                 }
                                 className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-blue-50 hover:text-blue-600"
