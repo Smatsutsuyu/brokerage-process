@@ -1,11 +1,32 @@
+import { join } from "path";
+
 import {
   Document,
+  Font,
   Image,
   Page,
   StyleSheet,
   Text,
   View,
 } from "@react-pdf/renderer";
+
+// Open Sans matches the example PDF's typography (clean humanist sans-
+// serif). Bundled as TTF in src/lib/pdf/fonts/ rather than fetched from a
+// CDN at render time — deterministic across builds, no network call per
+// PDF, no risk of a Google Fonts URL change breaking generation.
+//
+// Register at module load. process.cwd() is the Vercel function root; in
+// dev it's the project root. Either way src/lib/pdf/fonts is reachable.
+Font.register({
+  family: "Open Sans",
+  fonts: [
+    { src: join(process.cwd(), "src/lib/pdf/fonts/OpenSans-Regular.ttf") },
+    {
+      src: join(process.cwd(), "src/lib/pdf/fonts/OpenSans-Bold.ttf"),
+      fontWeight: "bold",
+    },
+  ],
+});
 
 // React-PDF template for the per-deal Marketing Report. Mirrors the
 // Catana example Chris provided: hero banner up top, two-column
@@ -62,7 +83,7 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 60,
     paddingHorizontal: 0,
-    fontFamily: "Helvetica",
+    fontFamily: "Open Sans",
     fontSize: 10,
     color: COLORS.textPrimary,
   },
@@ -82,7 +103,8 @@ const styles = StyleSheet.create({
   bannerFallbackText: {
     color: "white",
     fontSize: 28,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "Open Sans",
+    fontWeight: "bold",
     letterSpacing: 2,
   },
   // Title block beneath the banner.
@@ -93,17 +115,19 @@ const styles = StyleSheet.create({
   },
   dealTitle: {
     fontSize: 22,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "Open Sans",
+    fontWeight: "bold",
     color: COLORS.ink,
     marginBottom: 2,
   },
   reportLabel: {
     fontSize: 11,
     color: COLORS.textSecondary,
-    fontFamily: "Helvetica",
+    fontFamily: "Open Sans",
     letterSpacing: 1,
   },
-  // Table.
+  // Table — split into header strip + row container so backgrounds + tier
+  // bars can run edge-to-edge without per-row vertical padding gaps.
   tableWrap: {
     paddingHorizontal: 40,
   },
@@ -117,7 +141,8 @@ const styles = StyleSheet.create({
   thBuilder: {
     width: "30%",
     fontSize: 9,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "Open Sans",
+    fontWeight: "bold",
     color: COLORS.ink,
     letterSpacing: 1,
     paddingLeft: 14, // Aligns with row content (after the tier-color bar).
@@ -125,28 +150,39 @@ const styles = StyleSheet.create({
   thComments: {
     flex: 1,
     fontSize: 9,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "Open Sans",
+    fontWeight: "bold",
     color: COLORS.ink,
     letterSpacing: 1,
   },
+  // Row container has NO vertical padding — that lives on rowContent — so
+  // the tier bar fills the full row height and stacks edge-to-edge with
+  // the next row's bar (matches the example PDF, which has continuous
+  // colored bars across consecutive rows).
   row: {
     flexDirection: "row",
     minHeight: 38,
-    paddingVertical: 8,
   },
   rowAlt: {
     backgroundColor: COLORS.rowAlt,
   },
-  // Left tier-color bar — narrow vertical accent.
   tierBar: {
     width: 4,
-    marginRight: 10,
+    // Spans the full row height by default (flexbox stretch).
+  },
+  // The actual text cells get the vertical padding the row used to.
+  rowContent: {
+    flexDirection: "row",
+    flex: 1,
+    paddingVertical: 8,
+    paddingLeft: 10, // Was the bar's marginRight in the previous layout.
   },
   cellBuilder: {
     width: "30%",
     paddingRight: 10,
     fontSize: 11,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "Open Sans",
+    fontWeight: "bold",
     color: COLORS.ink,
   },
   cellComments: {
@@ -170,7 +206,8 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   footerLogoBold: {
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "Open Sans",
+    fontWeight: "bold",
     color: COLORS.ink,
     fontSize: 11,
   },
@@ -238,9 +275,14 @@ export function MarketingReportDoc(props: MarketingReportProps) {
             const isAlt = i % 2 === 1;
             return (
               <View key={`${r.builderName}-${i}`} style={[styles.row, isAlt ? styles.rowAlt : {}]}>
+                {/* Bar fills full row height (no row padding above/below).
+                    Consecutive same-tier rows produce one continuous color
+                    band — matches the example PDF's grouping cue. */}
                 <View style={[styles.tierBar, { backgroundColor: TIER_BAR_COLOR[r.tier] }]} />
-                <Text style={styles.cellBuilder}>{r.builderName}</Text>
-                <Text style={styles.cellComments}>{r.comments || "—"}</Text>
+                <View style={styles.rowContent}>
+                  <Text style={styles.cellBuilder}>{r.builderName}</Text>
+                  <Text style={styles.cellComments}>{r.comments || "—"}</Text>
+                </View>
               </View>
             );
           })}
