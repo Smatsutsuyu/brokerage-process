@@ -2,9 +2,7 @@
 
 import { type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { FlaskConical } from "lucide-react";
 
-import { FeedbackZone } from "@/components/feedback/feedback-zone";
 import { cn } from "@/lib/utils";
 
 type TabKey =
@@ -100,20 +98,14 @@ export function DealTabs({ counts, children }: DealTabsProps) {
   }
 
   const mainTabs = TABS.filter((t) => t.group === "main");
-  const protoTabs = TABS.filter((t) => t.group === "proto");
 
-  // Prototype switcher is only relevant when looking at Contacts or one of
-  // the prototype views — hide it on Checklist / Q&A / Issues / Consultants.
-  const showProtoStrip = active === "contacts" || active.startsWith("proto-");
+  // Prototype switcher removed (2026-05-12) — Chris picked the cards layout
+  // as canonical. The proto-* tab keys still resolve via ?tab= so the views
+  // stay reachable for design review, but no UI affordance surfaces them.
 
   return (
     <>
-      <nav
-        className={cn(
-          "flex flex-wrap items-center gap-0 border-b-2 border-gray-200",
-          showProtoStrip ? "mb-2" : "mb-6",
-        )}
-      >
+      <nav className="mb-6 flex flex-wrap items-center gap-0 border-b-2 border-gray-200">
         {mainTabs.map((tab) => {
           const isActive = active === tab.key;
           const badge = badgeFor(tab.key);
@@ -144,39 +136,6 @@ export function DealTabs({ counts, children }: DealTabsProps) {
           );
         })}
       </nav>
-
-      {/* Prototype switcher — only visible when looking at Contacts or a
-          prototype view. Visually offset so it reads as throwaway exploration.
-          Wrapped in a FeedbackZone so Chris can leave notes specifically about
-          the prototypes (which one he prefers, what's missing, etc.). */}
-      {showProtoStrip && (
-        <FeedbackZone section="contacts-prototypes" className="mb-6">
-          <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-amber-300 bg-amber-50/50 px-3 py-2">
-            <FlaskConical className="h-3.5 w-3.5 text-amber-700" />
-            <span className="mr-2 text-[10px] font-bold tracking-wider text-amber-800 uppercase">
-              Contacts prototypes
-            </span>
-            {protoTabs.map((tab) => {
-              const isActive = active === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActive(tab.key)}
-                  className={cn(
-                    "rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors",
-                    isActive
-                      ? "bg-amber-700 text-white"
-                      : "text-amber-800 hover:bg-amber-100",
-                  )}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </FeedbackZone>
-      )}
 
       <div>{children[active]}</div>
     </>

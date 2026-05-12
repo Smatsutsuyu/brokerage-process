@@ -33,7 +33,10 @@ export type BuilderOption = {
 
 export type EditingContact = {
   contactId: string;
-  builderId: string;
+  // null when editing an Unaffiliated contact (no builder yet) — the modal
+  // surfaces the builder picker with "+ Create new" preselected so the user
+  // can optionally assign one without it being mandatory.
+  builderId: string | null;
   firstName: string;
   lastName: string;
   title: string | null;

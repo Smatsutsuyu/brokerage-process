@@ -1,7 +1,14 @@
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { authUser, builders, contacts, dealBuyers, users } from "@/db/schema";
+import {
+  authUser,
+  builders,
+  contacts,
+  dealBuyers,
+  dealContacts,
+  users,
+} from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
 import type { LeadOption } from "../lead-picker";
@@ -21,19 +28,38 @@ export type ContactRow = {
   notes: string | null;
 };
 
-export type BuyerGroup = {
-  dealBuyerId: string;
-  builderId: string;
-  builderName: string;
-  classification: Classification;
-  tier: Tier;
-  leadUserId: string | null;
-  leadName: string | null;
-  called: boolean;
-  omSent: boolean;
-  comments: string | null;
-  contacts: ContactRow[];
-};
+// A "group" is one card in the Contacts UI. Either a builder's contacts
+// (with the builder's tier/lead/etc. metadata) OR the synthetic
+// "Unaffiliated" group for contacts on the deal that have no builder.
+//
+// kind === "builder": dealBuyer-derived metadata is populated. dealBuyerId
+//   is non-null. Card shows tier, lead picker, called/OM-sent toggles.
+// kind === "unaffiliated": no builder metadata. dealBuyerId is null. Card
+//   just shows the contacts list — no tier/lead/etc. (would be meaningless
+//   without a builder to attach them to).
+export type BuyerGroup =
+  | {
+      kind: "builder";
+      // Stable key for the group — maps to the dealBuyer row.
+      dealBuyerId: string;
+      builderId: string;
+      builderName: string;
+      classification: Classification;
+      tier: Tier;
+      leadUserId: string | null;
+      leadName: string | null;
+      called: boolean;
+      omSent: boolean;
+      comments: string | null;
+      contacts: ContactRow[];
+    }
+  | {
+      kind: "unaffiliated";
+      // Stable key — fixed string since there's only ever one of these per
+      // deal. UI uses it to dedupe and as a React key.
+      dealBuyerId: "unaffiliated";
+      contacts: ContactRow[];
+    };
 
 export type BuyerData = {
   groups: BuyerGroup[];
@@ -43,21 +69,19 @@ export type BuyerData = {
   orgContacts: ExistingContactOption[];
 };
 
-// Shared loader so each prototype view doesn't re-implement the JOIN.
-// Returns one BuyerGroup per builder-on-deal with its contacts nested.
+// Loader for the deal's contact groups. Reads from deal_contacts (explicit
+// per-person assignment), joins through to the contact and (optionally)
+// their builder, and pulls per-builder metadata from deal_buyers when a
+// builder is present. A builder card only appears when at least one of its
+// contacts is on the deal — purely query-derived, not stored.
 export async function loadBuyers(dealId: string): Promise<BuyerData> {
   const org = await getCurrentOrg();
 
+  // One row per (deal_contact, contact, [builder], [dealBuyer]). Standalone
+  // contacts have null builder/dealBuyer columns. Builder ordering puts
+  // null (Unaffiliated) last via NULLS LAST.
   const rows = await db
     .select({
-      dealBuyerId: dealBuyers.id,
-      tier: dealBuyers.tier,
-      omSentAt: dealBuyers.omSentAt,
-      calledAt: dealBuyers.calledAt,
-      comments: dealBuyers.comments,
-      builderId: builders.id,
-      builderName: builders.name,
-      classification: builders.classification,
       contactId: contacts.id,
       contactFirstName: contacts.firstName,
       contactLastName: contacts.lastName,
@@ -65,49 +89,78 @@ export async function loadBuyers(dealId: string): Promise<BuyerData> {
       contactEmail: contacts.email,
       contactPhone: contacts.phone,
       contactNotes: contacts.notes,
+      builderId: builders.id,
+      builderName: builders.name,
+      classification: builders.classification,
+      dealBuyerId: dealBuyers.id,
+      tier: dealBuyers.tier,
+      omSentAt: dealBuyers.omSentAt,
+      calledAt: dealBuyers.calledAt,
+      comments: dealBuyers.comments,
       leadUserId: dealBuyers.leadUserId,
       leadName: authUser.name,
     })
-    .from(dealBuyers)
-    .innerJoin(builders, eq(dealBuyers.builderId, builders.id))
-    .leftJoin(contacts, eq(contacts.builderId, builders.id))
+    .from(dealContacts)
+    .innerJoin(contacts, eq(contacts.id, dealContacts.contactId))
+    .leftJoin(builders, eq(builders.id, contacts.builderId))
+    .leftJoin(
+      dealBuyers,
+      eq(dealBuyers.builderId, contacts.builderId),
+    )
     .leftJoin(users, eq(users.id, dealBuyers.leadUserId))
     .leftJoin(authUser, eq(authUser.id, users.authUserId))
-    .where(eq(dealBuyers.dealId, dealId))
-    .orderBy(builders.name, contacts.lastName);
+    .where(eq(dealContacts.dealId, dealId))
+    .orderBy(builders.name, contacts.lastName, contacts.firstName);
 
+  // Bucket rows into groups. Key is dealBuyerId for builder groups,
+  // "unaffiliated" for the standalone bucket.
   const map = new Map<string, BuyerGroup>();
+  let unaffiliated: Extract<BuyerGroup, { kind: "unaffiliated" }> | null = null;
+
   for (const r of rows) {
-    let g = map.get(r.dealBuyerId);
-    if (!g) {
-      g = {
-        dealBuyerId: r.dealBuyerId,
-        builderId: r.builderId,
-        builderName: r.builderName,
-        classification: r.classification,
-        tier: r.tier,
-        leadUserId: r.leadUserId,
-        leadName: r.leadName,
-        called: r.calledAt !== null,
-        omSent: r.omSentAt !== null,
-        comments: r.comments,
-        contacts: [],
-      };
-      map.set(r.dealBuyerId, g);
-    }
-    if (r.contactId) {
-      g.contacts.push({
-        id: r.contactId,
-        firstName: r.contactFirstName ?? "",
-        lastName: r.contactLastName ?? "",
-        fullName: `${r.contactFirstName ?? ""} ${r.contactLastName ?? ""}`.trim(),
-        title: r.contactTitle,
-        email: r.contactEmail,
-        phone: r.contactPhone,
-        notes: r.contactNotes,
-      });
+    const contact: ContactRow = {
+      id: r.contactId,
+      firstName: r.contactFirstName,
+      lastName: r.contactLastName,
+      fullName: `${r.contactFirstName} ${r.contactLastName}`.trim(),
+      title: r.contactTitle,
+      email: r.contactEmail,
+      phone: r.contactPhone,
+      notes: r.contactNotes,
+    };
+
+    if (r.builderId && r.dealBuyerId && r.builderName && r.classification && r.tier) {
+      let g = map.get(r.dealBuyerId);
+      if (!g) {
+        g = {
+          kind: "builder",
+          dealBuyerId: r.dealBuyerId,
+          builderId: r.builderId,
+          builderName: r.builderName,
+          classification: r.classification,
+          tier: r.tier,
+          leadUserId: r.leadUserId,
+          leadName: r.leadName,
+          called: r.calledAt !== null,
+          omSent: r.omSentAt !== null,
+          comments: r.comments,
+          contacts: [],
+        };
+        map.set(r.dealBuyerId, g);
+      }
+      // Type narrowing — at this point g is the builder variant.
+      if (g.kind === "builder") g.contacts.push(contact);
+    } else {
+      // Standalone — bucket into the synthetic Unaffiliated group.
+      if (!unaffiliated) {
+        unaffiliated = { kind: "unaffiliated", dealBuyerId: "unaffiliated", contacts: [] };
+      }
+      unaffiliated.contacts.push(contact);
     }
   }
+
+  const groups: BuyerGroup[] = Array.from(map.values());
+  if (unaffiliated) groups.push(unaffiliated);
 
   const orgUsers = org
     ? await db
@@ -127,8 +180,7 @@ export async function loadBuyers(dealId: string): Promise<BuyerData> {
     name: u.name || u.email,
   }));
 
-  // Pull org-wide contacts (joined to optional builder name) for the picker.
-  // Same shape as the production view's contacts-view loader.
+  // Org-wide contacts directory feeds the "Add Existing Contact" picker.
   const orgContactRows = org
     ? await db
         .select({
@@ -159,5 +211,5 @@ export async function loadBuyers(dealId: string): Promise<BuyerData> {
     builderName: r.builderName,
   }));
 
-  return { groups: Array.from(map.values()), leadOptions, orgContacts };
+  return { groups, leadOptions, orgContacts };
 }

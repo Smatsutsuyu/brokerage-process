@@ -25,7 +25,7 @@ import {
 import { formatPhone } from "@/lib/phone";
 import { cn } from "@/lib/utils";
 
-import { deleteContact } from "../../actions";
+import { removeContactFromDeal } from "../../actions";
 import { AddContactModal, type EditingContact } from "../add-contact-modal";
 import { BuyerCheckbox } from "../buyer-checkbox";
 import { LeadPicker, type LeadOption } from "../lead-picker";
@@ -106,17 +106,34 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
       red: 0,
       not_selected: 0,
     };
-    for (const g of groups) counts[g.tier]++;
+    for (const g of groups) {
+      // Unaffiliated has no tier — only count it under "all".
+      if (g.kind === "builder") counts[g.tier]++;
+    }
     return counts;
   }, [groups]);
 
   const visibleGroups = useMemo(() => {
     if (filter === "all") return groups;
-    return groups.filter((g) => g.tier === filter);
+    // Tier filter applies to builder groups only; the Unaffiliated card is
+    // hidden when a specific tier is selected since it has no tier.
+    return groups.filter((g) => g.kind === "builder" && g.tier === filter);
   }, [groups, filter]);
 
+  // Builder picker only sees builder groups — the Unaffiliated bucket isn't
+  // a target for "Add contact at [builder]".
   const builderOptions = useMemo(
-    () => groups.map((g) => ({ id: g.builderId, name: g.builderName })),
+    () =>
+      groups
+        .filter((g): g is Extract<BuyerGroup, { kind: "builder" }> => g.kind === "builder")
+        .map((g) => ({ id: g.builderId, name: g.builderName })),
+    [groups],
+  );
+
+  // Set of contact ids currently on the deal — feeds the
+  // PickExistingContactModal so it doesn't show people already added.
+  const onDealContactIds = useMemo(
+    () => new Set(groups.flatMap((g) => g.contacts.map((c) => c.id))),
     [groups],
   );
 
@@ -129,16 +146,20 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
     });
   }
 
-  async function handleDeleteContact(contactId: string, name: string) {
+  // "Remove from deal" — drops the deal_contacts row, leaves the contact
+  // intact in the org directory. The builder card disappears automatically
+  // when its last contact is removed (purely query-derived; per-builder
+  // dealBuyer metadata persists for re-add scenarios).
+  async function handleRemoveFromDeal(contactId: string, name: string) {
     const ok = await confirm({
-      title: "Delete contact?",
-      description: `${name} will be removed. The builder stays on the deal.`,
-      confirmLabel: "Delete",
+      title: "Remove from deal?",
+      description: `${name} will be removed from this deal. The contact stays in the org directory and can be added back anytime.`,
+      confirmLabel: "Remove",
       variant: "destructive",
     });
     if (!ok) return;
     startDelete(async () => {
-      await deleteContact({ dealId, contactId });
+      await removeContactFromDeal({ dealId, contactId });
     });
   }
 
@@ -205,12 +226,7 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
               size="sm"
               variant="outline"
               onClick={() => setPickExistingOpen(true)}
-              disabled={builderOptions.length === 0}
-              title={
-                builderOptions.length === 0
-                  ? "Add a builder to the deal first"
-                  : "Pick an existing org contact and assign them to a builder on this deal"
-              }
+              title="Pick one or more existing org contacts and add them to this deal"
             >
               + Existing Contact
             </Button>
@@ -234,6 +250,7 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
         dealId={dealId}
         dealBuilders={builderOptions}
         contacts={orgContacts}
+        excludeContactIds={onDealContactIds}
       />
 
       <AddContactModal
@@ -260,7 +277,7 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
         <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
           <p className="text-sm text-gray-500">
             {groups.length === 0
-              ? "No buyers on this deal yet."
+              ? "No contacts on this deal yet."
               : "No buyers in this tier."}
           </p>
         </div>
@@ -268,13 +285,16 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
         <div className="space-y-2">
           {visibleGroups.map((g) => {
             const isOpen = expanded.has(g.dealBuyerId);
-            const meta = FILTER_META[g.tier];
+            // Builder cards get the tier ribbon; Unaffiliated gets a neutral
+            // gray border to read as a sibling card without implying tier.
+            const ribbon =
+              g.kind === "builder" ? FILTER_META[g.tier].ribbon : "border-l-gray-300";
             return (
               <div
                 key={g.dealBuyerId}
                 className={cn(
                   "overflow-hidden rounded-xl border-l-[3px] bg-white shadow-sm transition-shadow",
-                  meta.ribbon,
+                  ribbon,
                 )}
               >
                 {/* Header row — always visible. Click to expand/collapse. */}
@@ -297,62 +317,79 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
                     onClick={() => toggleExpanded(g.dealBuyerId)}
                     className="flex flex-1 items-center gap-3 text-left"
                   >
-                    <span className="text-[15px] font-semibold text-gray-900">
-                      {g.builderName}
-                    </span>
-                    <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] tracking-wider text-gray-600 uppercase">
-                      {g.classification}
-                    </span>
+                    {g.kind === "builder" ? (
+                      <>
+                        <span className="text-[15px] font-semibold text-gray-900">
+                          {g.builderName}
+                        </span>
+                        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] tracking-wider text-gray-600 uppercase">
+                          {g.classification}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[15px] font-semibold text-gray-700 italic">
+                          Unaffiliated
+                        </span>
+                        <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] tracking-wider text-amber-700 uppercase">
+                          no builder
+                        </span>
+                      </>
+                    )}
                     <span className="text-xs text-gray-500">
-                      {g.contacts.length === 0
-                        ? "No contacts"
-                        : `${g.contacts.length} contact${g.contacts.length === 1 ? "" : "s"}`}
+                      {g.contacts.length} contact{g.contacts.length === 1 ? "" : "s"}
                     </span>
-                    {g.comments && (
+                    {g.kind === "builder" && g.comments && (
                       <span className="text-gray-400">
                         <MessageSquare className="h-3.5 w-3.5" />
                       </span>
                     )}
                   </button>
 
-                  <TierBadge dealBuyerId={g.dealBuyerId} dealId={dealId} tier={g.tier} />
-
-                  <div className="flex items-center gap-3 text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-gray-500">Lead:</span>
-                      <LeadPicker
-                        dealId={dealId}
-                        dealBuyerId={g.dealBuyerId}
-                        currentUserId={g.leadUserId}
-                        currentName={g.leadName}
-                        options={leadOptions}
-                      />
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <BuyerCheckbox
-                        dealBuyerId={g.dealBuyerId}
-                        dealId={dealId}
-                        field="called"
-                        checked={g.called}
-                      />
-                      <span className="text-gray-600">Called</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <BuyerCheckbox
-                        dealBuyerId={g.dealBuyerId}
-                        dealId={dealId}
-                        field="omSent"
-                        checked={g.omSent}
-                      />
-                      <span className="text-gray-600">OM</span>
-                    </div>
-                  </div>
+                  {/* Tier / Lead / Called / OM only apply to builder cards.
+                      Unaffiliated gets nothing here — it's just a contacts
+                      bucket without per-builder metadata. */}
+                  {g.kind === "builder" && (
+                    <>
+                      <TierBadge dealBuyerId={g.dealBuyerId} dealId={dealId} tier={g.tier} />
+                      <div className="flex items-center gap-3 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-gray-500">Lead:</span>
+                          <LeadPicker
+                            dealId={dealId}
+                            dealBuyerId={g.dealBuyerId}
+                            currentUserId={g.leadUserId}
+                            currentName={g.leadName}
+                            options={leadOptions}
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <BuyerCheckbox
+                            dealBuyerId={g.dealBuyerId}
+                            dealId={dealId}
+                            field="called"
+                            checked={g.called}
+                          />
+                          <span className="text-gray-600">Called</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <BuyerCheckbox
+                            dealBuyerId={g.dealBuyerId}
+                            dealId={dealId}
+                            field="omSent"
+                            checked={g.omSent}
+                          />
+                          <span className="text-gray-600">OM</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Expanded contacts panel. */}
                 {isOpen && (
                   <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-3">
-                    {g.comments && (
+                    {g.kind === "builder" && g.comments && (
                       <div className="mb-3 rounded border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-700">
                         <div className="mb-0.5 text-[10px] font-semibold tracking-wider text-gray-500 uppercase">
                           Notes
@@ -405,7 +442,7 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
                                 onClick={() =>
                                   setEditing({
                                     contactId: c.id,
-                                    builderId: g.builderId,
+                                    builderId: g.kind === "builder" ? g.builderId : null,
                                     firstName: c.firstName,
                                     lastName: c.lastName,
                                     title: c.title,
@@ -421,9 +458,9 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleDeleteContact(c.id, c.fullName)}
+                                onClick={() => handleRemoveFromDeal(c.id, c.fullName)}
                                 className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600"
-                                title="Delete"
+                                title="Remove from deal"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
@@ -433,16 +470,18 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
                       </div>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setAddContactFor({ id: g.builderId, name: g.builderName })
-                      }
-                      className="mt-2 inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-white hover:text-gray-800"
-                    >
-                      <Plus className="h-3 w-3" />
-                      Add contact at {g.builderName}
-                    </button>
+                    {g.kind === "builder" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAddContactFor({ id: g.builderId, name: g.builderName })
+                        }
+                        className="mt-2 inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-white hover:text-gray-800"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Add contact at {g.builderName}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

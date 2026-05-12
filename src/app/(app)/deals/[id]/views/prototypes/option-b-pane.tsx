@@ -78,7 +78,7 @@ const FILTERS: FilterValue[] = ["all", "green", "yellow", "red", "not_selected"]
 
 type OptionBPaneProps = {
   dealId: string;
-  groups: BuyerGroup[];
+  groups: Extract<BuyerGroup, { kind: "builder" }>[];
   leadOptions: LeadOption[];
   orgContacts: ExistingContactOption[];
 };

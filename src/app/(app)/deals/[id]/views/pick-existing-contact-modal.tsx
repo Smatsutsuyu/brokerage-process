@@ -50,13 +50,24 @@ type PickExistingContactModalProps = {
   // Builders currently on the deal — these are the assignment targets for
   // standalone contacts, alongside an inline "+ Create new builder" option.
   dealBuilders: DealBuilderOption[];
-  // All contacts in the org. The modal filters out anyone already at one of
-  // the deal's builders since they already show up in the table.
+  // All contacts in the org.
   contacts: ExistingContactOption[];
+  // Contact IDs already on this deal. The modal filters them out so users
+  // don't see "Bob is already here" duplicates. Under the new deal_contacts
+  // model, a contact's presence on a deal is independent of their builder
+  // — same builder might have other contacts not yet on the deal. Optional
+  // for legacy callers (the prototype views, the old ContactsTable) that
+  // don't have this info on hand.
+  excludeContactIds?: Set<string>;
 };
 
-// Sentinel for the "+ Create new builder" option in the standalone target
-// picker. Picking it reveals an inline name + classification input.
+// Sentinels for the standalone target picker.
+// - UNAFFILIATED: skip builder assignment, contact stays standalone and
+//   shows up in the deal's Unaffiliated card. New default under the
+//   deal_contacts model.
+// - NEW_BUILDER: reveal inline name + classification inputs to create
+//   a brand-new builder + attach to the deal.
+const UNAFFILIATED = "__unaffiliated__";
 const NEW_BUILDER = "__new__";
 
 export function PickExistingContactModal({
@@ -65,10 +76,14 @@ export function PickExistingContactModal({
   dealId,
   dealBuilders,
   contacts,
+  excludeContactIds,
 }: PickExistingContactModalProps) {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [standaloneTargetChoice, setStandaloneTargetChoice] = useState<string>("");
+  // Default to UNAFFILIATED so standalones stay standalone unless the user
+  // explicitly picks a builder. Matches the new model where builder is
+  // grouping, not membership.
+  const [standaloneTargetChoice, setStandaloneTargetChoice] = useState<string>(UNAFFILIATED);
   const [newBuilderName, setNewBuilderName] = useState("");
   const [newBuilderClassification, setNewBuilderClassification] = useState<
     "private" | "public" | "developer"
@@ -76,14 +91,12 @@ export function PickExistingContactModal({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // Reset everything when the modal closes (with a small delay so users
-  // don't see the form clear during the close animation).
   useEffect(() => {
     if (!open) {
       const t = setTimeout(() => {
         setSearch("");
         setSelectedIds(new Set());
-        setStandaloneTargetChoice("");
+        setStandaloneTargetChoice(UNAFFILIATED);
         setNewBuilderName("");
         setNewBuilderClassification("private");
         setError(null);
@@ -92,16 +105,13 @@ export function PickExistingContactModal({
     }
   }, [open]);
 
-  // Hide contacts already attached to one of the deal's builders — they're
-  // already on the deal. Surfacing them again would be confusing.
-  const dealBuilderIds = useMemo(
-    () => new Set(dealBuilders.map((b) => b.id)),
-    [dealBuilders],
-  );
-
+  // Hide contacts already on the deal (per deal_contacts) so users don't
+  // see duplicates. Builder presence no longer auto-includes contacts —
+  // someone at a deal-builder might still not be on the deal yet.
   const candidates = useMemo(() => {
-    return contacts.filter((c) => !c.builderId || !dealBuilderIds.has(c.builderId));
-  }, [contacts, dealBuilderIds]);
+    if (!excludeContactIds || excludeContactIds.size === 0) return contacts;
+    return contacts.filter((c) => !excludeContactIds.has(c.id));
+  }, [contacts, excludeContactIds]);
 
   const visibleCandidates = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -123,8 +133,11 @@ export function PickExistingContactModal({
   );
   const standaloneCount = selected.filter((c) => !c.builderId).length;
   const withBuilderCount = selected.length - standaloneCount;
-  const needsStandaloneTarget = standaloneCount > 0;
+  // Picker only shown when the selection actually has standalones — for
+  // pure has-builder selections there's nothing to assign.
+  const showStandalonePicker = standaloneCount > 0;
   const isNewBuilder = standaloneTargetChoice === NEW_BUILDER;
+  const isUnaffiliated = standaloneTargetChoice === UNAFFILIATED;
 
   function toggle(id: string) {
     setSelectedIds((prev) => {
@@ -152,17 +165,16 @@ export function PickExistingContactModal({
     if (selected.length === 0) return;
     setError(null);
 
-    if (needsStandaloneTarget && !standaloneTargetChoice) {
-      setError(`Pick a builder for the ${standaloneCount} standalone contact${standaloneCount === 1 ? "" : "s"}.`);
-      return;
-    }
-    if (needsStandaloneTarget && isNewBuilder && !newBuilderName.trim()) {
+    if (showStandalonePicker && isNewBuilder && !newBuilderName.trim()) {
       setError("Enter a name for the new builder.");
       return;
     }
 
+    // standaloneTarget is undefined when:
+    // - no standalones in selection (showStandalonePicker = false), OR
+    // - user picked UNAFFILIATED (skip builder assignment, leave standalone)
     let standaloneTarget: BulkStandaloneTarget | undefined;
-    if (needsStandaloneTarget) {
+    if (showStandalonePicker && !isUnaffiliated) {
       standaloneTarget = isNewBuilder
         ? {
             type: "new",
@@ -187,6 +199,7 @@ export function PickExistingContactModal({
   }
 
   const targetLabel = (() => {
+    if (standaloneTargetChoice === UNAFFILIATED) return "Keep as Unaffiliated";
     if (standaloneTargetChoice === NEW_BUILDER) return "+ Create new builder";
     return (
       dealBuilders.find((b) => b.id === standaloneTargetChoice)?.name ?? "Pick a builder"
@@ -315,16 +328,18 @@ export function PickExistingContactModal({
               )}
             </div>
 
-            {/* Standalone target picker — only renders when at least one
-                selected contact is standalone. Single picker for the whole
-                batch (per-row would be more flexible but slower; can revisit
-                if Chris needs it). */}
-            {needsStandaloneTarget && (
+            {/* Standalone target picker — surfaces when the selection
+                contains contacts without a builder. Picking a builder is
+                OPTIONAL: default keeps them as Unaffiliated (they show up
+                in the deal's Unaffiliated card). Single picker for the
+                whole batch (per-row could come later if needed). */}
+            {showStandalonePicker && (
               <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/50 px-4 py-3">
                 <Label htmlFor="standalone-target">
                   {standaloneCount === 1
-                    ? "1 standalone contact needs a builder"
-                    : `${standaloneCount} standalone contacts need a builder`}
+                    ? "1 standalone contact"
+                    : `${standaloneCount} standalone contacts`}{" "}
+                  — assign to a builder? (optional)
                 </Label>
                 <Select
                   value={standaloneTargetChoice}
@@ -334,6 +349,7 @@ export function PickExistingContactModal({
                     <SelectValue>{targetLabel}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value={UNAFFILIATED}>Keep as Unaffiliated</SelectItem>
                     <SelectItem value={NEW_BUILDER}>+ Create new builder</SelectItem>
                     {dealBuilders.map((b) => (
                       <SelectItem key={b.id} value={b.id}>
@@ -408,8 +424,9 @@ export function PickExistingContactModal({
             onClick={handleSubmit}
             disabled={(() => {
               if (isPending || selected.length === 0) return true;
-              if (needsStandaloneTarget && !standaloneTargetChoice) return true;
-              if (needsStandaloneTarget && isNewBuilder && !newBuilderName.trim()) return true;
+              // Standalone picker is optional, but if user picked
+              // "+ Create new builder" they have to name it.
+              if (showStandalonePicker && isNewBuilder && !newBuilderName.trim()) return true;
               return false;
             })()}
           >

@@ -11,6 +11,7 @@ import {
   consultants,
   contacts,
   dealBuyers,
+  dealContacts,
   deals,
   issues,
   qaItems,
@@ -208,13 +209,12 @@ export async function setBuyerLead(input: {
 
 export type AddContactInput = {
   dealId: string;
-  // Either builderId (existing builder, must already be on this deal) or
-  // newBuilderName (will be created + added to the deal). Exactly one of
-  // the two must be provided.
+  // Builder is OPTIONAL under the deal_contacts model. Provide builderId
+  // (must already be on this deal) OR newBuilderName (will be created +
+  // attached) OR neither (contact lands in the Unaffiliated card).
   builderId?: string;
   newBuilderName?: string;
-  // Only relevant when newBuilderName is set. Defaults to "private" if
-  // omitted — most "I just learned about this builder" cases are private.
+  // Only relevant when newBuilderName is set.
   newBuilderClassification?: "private" | "public" | "developer";
   firstName: string;
   lastName: string;
@@ -232,63 +232,86 @@ export async function addContact(input: AddContactInput) {
   const lastName = input.lastName.trim();
   if (!firstName || !lastName) throw new Error("First and last name are required");
 
-  if (!input.builderId && !input.newBuilderName?.trim()) {
-    throw new Error("Builder is required");
-  }
   if (input.builderId && input.newBuilderName?.trim()) {
     throw new Error("Provide either builderId or newBuilderName, not both");
   }
 
-  let builderId = input.builderId;
+  await db.transaction(async (tx) => {
+    let builderId: string | null = input.builderId ?? null;
 
-  // Caller wants a brand-new builder created + attached to this deal in one
-  // shot. Defaults: classification = private (most common case for the kind
-  // of unknown-to-the-org builder you'd hand-add via the contact form), tier
-  // = not_selected (Chris explicitly tiers them later in the workflow).
-  if (input.newBuilderName?.trim()) {
-    const name = input.newBuilderName.trim();
-    const [builder] = await db
-      .insert(builders)
+    // Caller wants a brand-new builder created + attached to this deal.
+    if (input.newBuilderName?.trim()) {
+      const name = input.newBuilderName.trim();
+      const [builder] = await tx
+        .insert(builders)
+        .values({
+          orgId: org.id,
+          name,
+          classification: input.newBuilderClassification ?? "private",
+        })
+        .returning();
+      await tx.insert(dealBuyers).values({
+        orgId: org.id,
+        dealId: input.dealId,
+        builderId: builder.id,
+        tier: "not_selected",
+      });
+      builderId = builder.id;
+    } else if (builderId) {
+      // Existing builder must belong to this org. We no longer require it
+      // to be already on the deal — if it isn't, attach it now (idempotent
+      // via the existing-link check) so the contact has a builder card to
+      // appear under.
+      const [b] = await tx
+        .select({ id: builders.id })
+        .from(builders)
+        .where(and(eq(builders.id, builderId), eq(builders.orgId, org.id)))
+        .limit(1);
+      if (!b) throw new Error("Builder not found");
+
+      const [existingLink] = await tx
+        .select({ id: dealBuyers.id })
+        .from(dealBuyers)
+        .where(
+          and(
+            eq(dealBuyers.dealId, input.dealId),
+            eq(dealBuyers.builderId, builderId),
+          ),
+        )
+        .limit(1);
+      if (!existingLink) {
+        await tx.insert(dealBuyers).values({
+          orgId: org.id,
+          dealId: input.dealId,
+          builderId,
+          tier: "not_selected",
+        });
+      }
+    }
+    // builderId may still be null here — that's intentional, contact lands
+    // in the Unaffiliated card.
+
+    const [created] = await tx
+      .insert(contacts)
       .values({
         orgId: org.id,
-        name,
-        classification: input.newBuilderClassification ?? "private",
+        builderId,
+        firstName,
+        lastName,
+        title: input.title?.trim() || null,
+        email: input.email?.trim() || null,
+        phone: formatPhone(input.phone),
+        notes: input.notes?.trim() || null,
       })
       .returning();
-    await db.insert(dealBuyers).values({
+
+    // Explicit assignment to the deal — required under the new model for
+    // the contact to show up.
+    await tx.insert(dealContacts).values({
       orgId: org.id,
       dealId: input.dealId,
-      builderId: builder.id,
-      tier: "not_selected",
+      contactId: created.id,
     });
-    builderId = builder.id;
-  } else {
-    // Existing builder must belong to this org AND be on this deal — both
-    // checks needed to prevent forging a cross-tenant or wrong-deal id.
-    const [link] = await db
-      .select({ id: dealBuyers.id })
-      .from(dealBuyers)
-      .innerJoin(builders, eq(dealBuyers.builderId, builders.id))
-      .where(
-        and(
-          eq(dealBuyers.dealId, input.dealId),
-          eq(dealBuyers.builderId, input.builderId!),
-          eq(builders.orgId, org.id),
-        ),
-      )
-      .limit(1);
-    if (!link) throw new Error("Builder is not a buyer on this deal");
-  }
-
-  await db.insert(contacts).values({
-    orgId: org.id,
-    builderId: builderId!,
-    firstName,
-    lastName,
-    title: input.title?.trim() || null,
-    email: input.email?.trim() || null,
-    phone: formatPhone(input.phone),
-    notes: input.notes?.trim() || null,
   });
 
   revalidatePath(`/deals/${input.dealId}`);
@@ -748,12 +771,11 @@ export async function bulkAddContactsToDeal(input: {
 
   const standalones = rows.filter((r) => !r.builderId);
   const withBuilder = rows.filter((r) => r.builderId);
-  if (standalones.length > 0 && !input.standaloneTarget) {
-    throw new Error("standaloneTarget is required when any selected contact is standalone");
-  }
 
-  // Validate the new-builder name up front so the transaction can't fail
-  // partway through on bad input.
+  // standaloneTarget is OPTIONAL under the new model — picking one re-points
+  // the standalone contacts to that builder (and attaches it to the deal so
+  // the card shows up). Skipping it leaves them as standalones; they show
+  // up in the "Unaffiliated" card on the deal.
   if (input.standaloneTarget?.type === "new") {
     if (!input.standaloneTarget.name.trim()) {
       throw new Error("New builder name is required");
@@ -763,10 +785,12 @@ export async function bulkAddContactsToDeal(input: {
   let buildersCreated = 0;
   let buildersAttached = 0;
   let contactsRepointed = 0;
+  let dealContactsAdded = 0;
 
   await db.transaction(async (tx) => {
     // Step 1: resolve the standalone target builder (creating it if needed)
-    // and ensure it's attached to the deal.
+    // and ensure it's attached to the deal. Skipped entirely when no target
+    // was picked — standalones stay standalone.
     let standaloneBuilderId: string | null = null;
     if (input.standaloneTarget) {
       if (input.standaloneTarget.type === "new") {
@@ -781,7 +805,6 @@ export async function bulkAddContactsToDeal(input: {
         standaloneBuilderId = b.id;
         buildersCreated++;
       } else {
-        // Confirm the picked builder belongs to this org.
         const [b] = await tx
           .select({ id: builders.id })
           .from(builders)
@@ -795,8 +818,7 @@ export async function bulkAddContactsToDeal(input: {
         if (!b) throw new Error("Standalone target builder not found");
         standaloneBuilderId = b.id;
       }
-      // Attach the standalone target to the deal (idempotent — skip when
-      // already on the deal).
+      // Attach the standalone target to the deal (idempotent).
       const [existingLink] = await tx
         .select({ id: dealBuyers.id })
         .from(dealBuyers)
@@ -818,9 +840,9 @@ export async function bulkAddContactsToDeal(input: {
       }
     }
 
-    // Step 2: attach each has-builder contact's builder to the deal
-    // (idempotent). De-dupe builder ids so we don't redundantly check the
-    // same one N times.
+    // Step 2: attach each has-builder contact's builder to the deal so the
+    // builder card has the metadata (tier, lead, called/OM-sent) it needs.
+    // De-duped per builder so 5 Lennar contacts → 1 attach attempt not 5.
     const uniqueBuilderIds = Array.from(
       new Set(withBuilder.map((r) => r.builderId).filter((id): id is string => id !== null)),
     );
@@ -849,21 +871,65 @@ export async function bulkAddContactsToDeal(input: {
       }
     }
 
-    // Step 3: re-point each standalone contact at the resolved builder.
+    // Step 3: re-point standalone contacts at the resolved builder if one
+    // was picked. Skipped when no target — they remain standalones.
     if (standalones.length > 0 && standaloneBuilderId) {
       const ids = standalones.map((r) => r.id);
       await tx.update(contacts).set({ builderId: standaloneBuilderId }).where(inArray(contacts.id, ids));
       contactsRepointed = ids.length;
     }
+
+    // Step 4: insert a deal_contacts row for each selected contact. THIS is
+    // the new explicit assignment — without these rows, the contact won't
+    // show up on the deal regardless of builder presence. ON CONFLICT DO
+    // NOTHING handles the re-add-already-on-deal case as a no-op.
+    const allContactIds = rows.map((r) => r.id);
+    const insertResult = await tx
+      .insert(dealContacts)
+      .values(
+        allContactIds.map((contactId) => ({
+          orgId: org.id,
+          dealId: input.dealId,
+          contactId,
+        })),
+      )
+      .onConflictDoNothing()
+      .returning();
+    dealContactsAdded = insertResult.length;
   });
 
   revalidatePath(`/deals/${input.dealId}`);
   return {
-    added: rows.length,
+    added: dealContactsAdded,
     buildersAttached,
     buildersCreated,
     contactsRepointed,
   };
+}
+
+// Removes a single contact from a deal. Deletes their deal_contacts row;
+// if that was the last contact for their builder on the deal, the builder
+// card disappears from the UI on next render (purely query-derived — the
+// dealBuyer row stays so any tier/lead/called metadata persists for if the
+// builder gets re-added later via another contact).
+export async function removeContactFromDeal(input: {
+  dealId: string;
+  contactId: string;
+}): Promise<void> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  await db
+    .delete(dealContacts)
+    .where(
+      and(
+        eq(dealContacts.dealId, input.dealId),
+        eq(dealContacts.contactId, input.contactId),
+        eq(dealContacts.orgId, org.id),
+      ),
+    );
+
+  revalidatePath(`/deals/${input.dealId}`);
 }
 
 // Verifies that an item belongs to the active deal — useful for any action

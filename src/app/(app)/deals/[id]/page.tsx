@@ -6,8 +6,7 @@ import {
   checklistCategories,
   checklistItems,
   consultants,
-  contacts,
-  dealBuyers,
+  dealContacts,
   deals,
   documents,
   issues,
@@ -83,9 +82,8 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
         .orderBy(checklistItems.sortOrder),
       db
         .select({ n: count() })
-        .from(contacts)
-        .innerJoin(dealBuyers, eq(dealBuyers.builderId, contacts.builderId))
-        .where(eq(dealBuyers.dealId, id))
+        .from(dealContacts)
+        .where(eq(dealContacts.dealId, id))
         .then((r) => r[0]),
       db
         .select({

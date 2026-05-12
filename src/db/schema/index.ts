@@ -4,6 +4,7 @@ export * from "./users";
 export * from "./deals";
 export * from "./builders";
 export * from "./deal-buyers";
+export * from "./deal-contacts";
 export * from "./checklist";
 export * from "./qa-items";
 export * from "./issues";

@@ -78,6 +78,13 @@
       "when": 1778547209503,
       "tag": "0010_hard_scarlet_witch",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1778550553805,
+      "tag": "0011_old_otto_octavius",
+      "breakpoints": true
     }
   ]
 }
