@@ -151,7 +151,13 @@ export function BuyerCommentsEditor({
   if (savedValue) {
     return (
       <div className="group flex items-start gap-2 rounded border border-gray-200 bg-white px-3 py-2">
-        <MessageSquarePlus className="mt-0.5 h-3 w-3 flex-shrink-0 text-gray-400" />
+        {/* Icon wrapped in a one-line-tall flex box so it centers
+            vertically with the FIRST line of text rather than drifting up
+            with items-start or floating to the middle of multi-line content
+            with items-center. 21px ≈ 13px font × ~1.6 line-height. */}
+        <span className="flex h-[21px] flex-shrink-0 items-center">
+          <MessageSquarePlus className="h-3 w-3 text-gray-400" />
+        </span>
         <div className="flex-1 text-[13px] leading-relaxed whitespace-pre-wrap text-gray-700">
           {savedValue}
         </div>
