@@ -144,9 +144,6 @@ export async function Sidebar({ activeDealId }: SidebarProps) {
         <SidebarNavLink href="/contacts" icon={<Contact className="h-3.5 w-3.5" />}>
           Contacts
         </SidebarNavLink>
-        <SidebarNavLink href="/feedback" icon={<MessageSquare className="h-3.5 w-3.5" />}>
-          My feedback
-        </SidebarNavLink>
       </div>
 
       {me?.role === "owner" && (

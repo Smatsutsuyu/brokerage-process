@@ -46,13 +46,16 @@ Two unrelated polish items in the same session.
 
 2. Plan B: sign up for free Microsoft 365 Developer Program account → get a real `*.onmicrosoft.com` work account → have Chris re-invite that. Chris is the business owner and a non-technical client who already accommodated one access request that didn't work; a "let's hop on a call so you can run the edits" reframe would push work back onto him after he asked me to handle it.
 
-**Plan:** when DNS edits are actually needed (Phase 2 Resend setup, eventual `brokerage.lakebridgecap.com` subdomain cutover):
-- Stand up the Microsoft 365 Developer Program account ahead of time (https://developer.microsoft.com/microsoft-365/dev-program — free, ~10 min, gives `you@<your-tenant>.onmicrosoft.com`)
-- Verify it signs into admin.microsoft.com cleanly in own dev tenant before bothering Chris
-- Send Chris one clean message: "Hit a Microsoft quirk with personal accounts; new work-account address is X — could you re-send the invite to that and re-assign Domain Name Administrator?"
-- Don't re-litigate the failed first invite
+**Status (2026-05-07 evening):** punted the access decision back to Chris. Tried the M365 Developer Program path on Sean's side — Microsoft tightened signups in late 2024/early 2025 to require an active VS Enterprise subscription or qualifying dev activity, signup got stuck partway through, can't re-attempt for 60 days. Sean emailed Chris asking him to either (a) provision `sean@lakebridgecap.com` (Business Basic, ~$6/mo, creates one offboarding task at handoff) or (b) make the DNS edits himself when the time comes. Awaiting his pick.
 
-**Backstop if dev-account path also fails (~5% chance per Entra cross-tenant settings or guest-admin restrictions):** ask Chris to provision a real `sean@lakebridgecap.com` user. Costs ~$6/mo for a Business Basic license, creates handoff offboarding step. Reserve as last resort.
+**Notes for whichever path Chris picks:**
+- If `sean@lakebridgecap.com`: he assigns Domain Name Administrator role, Sean signs into admin.microsoft.com → Settings → Domains → `lakebridgecap.com` → DNS records, adds the Resend TXT/MX/CNAMEs at Resend dashboard's instruction
+- If Chris does it himself: Sean prepares a record-by-record list (TXT for SPF/DKIM, possibly MX/CNAME) ahead of time so Chris can paste them in one sitting without back-and-forth
+- Either way, defer until Phase 2 email work actually starts — there's nothing time-sensitive about resolving this now
+
+**Lessons logged:**
+- Microsoft admin center categorically rejects personal MS accounts as guests, even with full Domain Name Admin role assigned. Should have surfaced this constraint up front instead of waiting for Chris to send an invite that couldn't work
+- M365 Developer Program is no longer a viable "spin up a free work account" path; Microsoft Entra free tenant (entra.microsoft.com → Manage tenants → Create) is the actual primitive but Sean didn't reach for it before emailing Chris
 
 ---
 
