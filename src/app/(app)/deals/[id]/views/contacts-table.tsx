@@ -49,7 +49,7 @@ export type BuyerRow = {
   tier: Tier;
   builderId: string;
   builderName: string;
-  builderClassification: "private" | "public";
+  builderClassification: "private" | "public" | "developer";
   contactId: string | null;
   contactFirstName: string | null;
   contactLastName: string | null;

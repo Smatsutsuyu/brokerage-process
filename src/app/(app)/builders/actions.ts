@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { builders, dealBuyers } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
-export type Classification = "private" | "public";
+export type Classification = "private" | "public" | "developer";
 
 export type BuilderInput = {
   name: string;

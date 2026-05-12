@@ -215,7 +215,7 @@ export type AddContactInput = {
   newBuilderName?: string;
   // Only relevant when newBuilderName is set. Defaults to "private" if
   // omitted — most "I just learned about this builder" cases are private.
-  newBuilderClassification?: "private" | "public";
+  newBuilderClassification?: "private" | "public" | "developer";
   firstName: string;
   lastName: string;
   title?: string;
@@ -616,7 +616,7 @@ export async function deleteConsultant(input: { dealId: string; consultantId: st
 export async function addBuilderToDeal(input: {
   dealId: string;
   name: string;
-  classification: "private" | "public";
+  classification: "private" | "public" | "developer";
   tier?: "green" | "yellow" | "red" | "not_selected";
   notes?: string;
 }): Promise<{ builderId: string; dealBuyerId: string }> {

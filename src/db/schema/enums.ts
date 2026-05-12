@@ -15,7 +15,14 @@ export const dealPriorityEnum = pgEnum("deal_priority", ["normal", "high"]);
 // or "na" when undecided / outside-counsel arrangement.
 export const psaDraftingEnum = pgEnum("psa_drafting", ["buyer", "seller", "na"]);
 
-export const builderClassificationEnum = pgEnum("builder_classification", ["private", "public"]);
+// "developer" added 2026-05-12 (Chris feedback) — third category for land
+// developers as distinct from private/public homebuilders. Excel importer
+// recognizes "developer" / "dev" / "land developer" / "land dev".
+export const builderClassificationEnum = pgEnum("builder_classification", [
+  "private",
+  "public",
+  "developer",
+]);
 
 export const buyerTierEnum = pgEnum("buyer_tier", ["green", "yellow", "red", "not_selected"]);
 

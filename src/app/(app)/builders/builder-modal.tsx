@@ -35,6 +35,13 @@ type BuilderModalProps = {
 const CLASSIFICATION_HELP: Record<Classification, string> = {
   private: "Private — privately held (e.g. Intracorp, Shea, New Home Co.)",
   public: "Public — publicly traded (e.g. Lennar, Pulte, KB Home)",
+  developer: "Developer — land developer (entitles + sells land, doesn't build homes)",
+};
+
+const CLASSIFICATION_LABEL: Record<Classification, string> = {
+  private: "Private",
+  public: "Public",
+  developer: "Developer",
 };
 
 export function BuilderModal({ open, onOpenChange, editing }: BuilderModalProps) {
@@ -119,8 +126,8 @@ export function BuilderModal({ open, onOpenChange, editing }: BuilderModalProps)
 
           <div className="grid gap-2">
             <Label>Classification</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {(["private", "public"] satisfies Classification[]).map((value) => {
+            <div className="grid grid-cols-3 gap-2">
+              {(["private", "public", "developer"] satisfies Classification[]).map((value) => {
                 const isActive = value === classification;
                 return (
                   <button
@@ -134,7 +141,7 @@ export function BuilderModal({ open, onOpenChange, editing }: BuilderModalProps)
                         : "border-gray-200 bg-white text-gray-600 hover:border-gray-400",
                     )}
                   >
-                    {value === "private" ? "Private" : "Public"}
+                    {CLASSIFICATION_LABEL[value]}
                   </button>
                 );
               })}

@@ -73,7 +73,7 @@ export function PickExistingContactModal({
   const [targetBuilderChoice, setTargetBuilderChoice] = useState<string>("");
   const [newBuilderName, setNewBuilderName] = useState("");
   const [newBuilderClassification, setNewBuilderClassification] = useState<
-    "private" | "public"
+    "private" | "public" | "developer"
   >("private");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -325,9 +325,15 @@ export function PickExistingContactModal({
                       <div className="mb-1.5 text-[11px] font-medium text-gray-700">
                         Classification
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(["private", "public"] as const).map((value) => {
+                      <div className="grid grid-cols-3 gap-2">
+                        {(["private", "public", "developer"] as const).map((value) => {
                           const isActive = value === newBuilderClassification;
+                          const label =
+                            value === "private"
+                              ? "Private"
+                              : value === "public"
+                                ? "Public"
+                                : "Developer";
                           return (
                             <button
                               key={value}
@@ -340,7 +346,7 @@ export function PickExistingContactModal({
                                   : "border-gray-200 bg-white text-gray-600 hover:border-gray-400",
                               )}
                             >
-                              {value === "private" ? "Private" : "Public"}
+                              {label}
                             </button>
                           );
                         })}

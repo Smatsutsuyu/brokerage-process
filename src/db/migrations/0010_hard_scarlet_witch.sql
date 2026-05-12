@@ -1,0 +1,1 @@
+ALTER TYPE "public"."builder_classification" ADD VALUE 'developer';

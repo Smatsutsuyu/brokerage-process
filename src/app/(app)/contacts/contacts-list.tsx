@@ -48,7 +48,7 @@ export type ContactRow = {
   notes: string | null;
   builderId: string | null;
   builderName: string | null;
-  builderClassification: "private" | "public" | null;
+  builderClassification: "private" | "public" | "developer" | null;
   // Deals the contact's builder is on. Empty for standalone contacts (no
   // builder) since the deal association flows builder → deal.
   deals: Array<{ id: string; name: string }>;

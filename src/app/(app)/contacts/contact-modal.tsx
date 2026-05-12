@@ -28,7 +28,7 @@ import { createContact, findOrCreateBuilder, updateContact } from "./actions";
 export type BuilderOption = {
   id: string;
   name: string;
-  classification: "private" | "public";
+  classification: "private" | "public" | "developer";
 };
 
 export type EditingContact = {

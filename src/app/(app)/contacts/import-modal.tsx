@@ -59,7 +59,7 @@ type ParsedRow = {
   builderId: string | null;
   // Classification for the new builder (only used when builderResolution
   // is "create"). null = use the default ("private").
-  newBuilderClassification: "private" | "public" | null;
+  newBuilderClassification: "private" | "public" | "developer" | null;
   email: string;
   phone: string;
   title: string;
@@ -124,13 +124,17 @@ function splitFullName(full: string): { firstName: string; lastName: string } {
 }
 
 // Coerce a free-text classification cell to our enum. Lenient — accepts the
-// canonical "public" / "private" plus common short forms. Returns null for
-// blank or unrecognized values; the import treats null as "use the default."
-function parseClassification(raw: string): "private" | "public" | null {
+// canonical "public" / "private" / "developer" plus common short forms.
+// Returns null for blank or unrecognized values; the import treats null as
+// "use the default" (currently private — pending Chris confirming whether
+// developer should become the new default).
+function parseClassification(raw: string): "private" | "public" | "developer" | null {
   const v = raw.trim().toLowerCase();
   if (!v) return null;
   if (v === "public" || v === "pub" || v === "publicly traded") return "public";
   if (v === "private" || v === "priv" || v === "privately held") return "private";
+  if (v === "developer" || v === "dev" || v === "land developer" || v === "land dev")
+    return "developer";
   return null;
 }
 

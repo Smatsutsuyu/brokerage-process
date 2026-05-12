@@ -45,12 +45,13 @@ export type BuilderRow = {
   deals: Array<{ id: string; name: string }>;
 };
 
-type FilterValue = "all" | "private" | "public";
+type FilterValue = "all" | "private" | "public" | "developer";
 
 const FILTER_LABEL: Record<FilterValue, string> = {
   all: "All",
   private: "Private",
   public: "Public",
+  developer: "Developer",
 };
 
 type SortColumn = "name" | "classification" | "contacts" | "deals";
@@ -76,6 +77,7 @@ type BuildersListProps = {
 const CLASSIFICATION_BADGE: Record<Classification, string> = {
   private: "bg-purple-100 text-purple-800",
   public: "bg-sky-100 text-sky-800",
+  developer: "bg-emerald-100 text-emerald-800",
 };
 
 export function BuildersList({ builders }: BuildersListProps) {
@@ -112,6 +114,7 @@ export function BuildersList({ builders }: BuildersListProps) {
       all: builders.length,
       private: builders.filter((b) => b.classification === "private").length,
       public: builders.filter((b) => b.classification === "public").length,
+      developer: builders.filter((b) => b.classification === "developer").length,
     } satisfies Record<FilterValue, number>;
   }, [builders]);
 
@@ -176,7 +179,7 @@ export function BuildersList({ builders }: BuildersListProps) {
             <ChevronDown className="h-3 w-3 opacity-60" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52">
-            {(["all", "private", "public"] satisfies FilterValue[]).map((value) => {
+            {(["all", "private", "public", "developer"] satisfies FilterValue[]).map((value) => {
               const isCurrent = value === filter;
               return (
                 <DropdownMenuItem

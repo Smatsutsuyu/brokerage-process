@@ -8,7 +8,7 @@ import type { LeadOption } from "../lead-picker";
 import type { ExistingContactOption } from "../pick-existing-contact-modal";
 
 export type Tier = "green" | "yellow" | "red" | "not_selected";
-export type Classification = "private" | "public";
+export type Classification = "private" | "public" | "developer";
 
 export type ContactRow = {
   id: string;

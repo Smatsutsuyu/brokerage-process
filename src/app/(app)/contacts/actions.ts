@@ -125,7 +125,7 @@ export async function deleteContact(contactId: string): Promise<void> {
 // data the user might have intentionally curated elsewhere).
 export async function findOrCreateBuilder(
   name: string,
-  classification: "private" | "public" = "private",
+  classification: "private" | "public" | "developer" = "private",
 ): Promise<{
   builderId: string;
   created: boolean;
@@ -170,7 +170,7 @@ export type ImportContactRow = {
   newBuilderName: string | null;
   // Classification for the new builder — only honored when newBuilderName
   // is set. null falls back to the default ("private").
-  newBuilderClassification: "private" | "public" | null;
+  newBuilderClassification: "private" | "public" | "developer" | null;
 };
 
 export type ImportResult = {
