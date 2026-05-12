@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader2, ShieldOff, UserPlus } from "lucide-react";
+import { Loader2, ShieldOff, Trash2, UserPlus } from "lucide-react";
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-import { changeMemberRole, setMemberDisabled, type Role } from "../actions";
+import {
+  changeMemberRole,
+  removeMember,
+  setMemberDisabled,
+  type Role,
+} from "../actions";
 
 import { InviteMemberModal } from "./invite-member-modal";
 
@@ -77,6 +82,28 @@ export function MembersList({ currentUserId, members }: MembersListProps) {
     startTransition(async () => {
       await setMemberDisabled({ userId: member.id, disabled: next });
       setPendingId(null);
+    });
+  }
+
+  async function handleRemove(member: MemberRow) {
+    const ok = await confirm({
+      title: `Remove ${memberName(member)}?`,
+      description:
+        "Permanently removes the membership AND the auth account. The email becomes available for a fresh invite. This can't be undone — deal-attached references (lead assignments, audit log) will null out.",
+      confirmLabel: "Remove permanently",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    setPendingId(member.id);
+    startTransition(async () => {
+      try {
+        await removeMember({ userId: member.id });
+      } catch (err) {
+        console.error("[members] remove failed", err);
+        alert(err instanceof Error ? err.message : "Could not remove member");
+      } finally {
+        setPendingId(null);
+      }
     });
   }
 
@@ -173,21 +200,35 @@ export function MembersList({ currentUserId, members }: MembersListProps) {
                   </td>
                   <td className="px-4 py-3 text-right">
                     {!isMe && (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleDisabled(member)}
-                        disabled={isPending}
-                        className="text-xs font-medium text-gray-500 hover:text-gray-900 disabled:opacity-50"
-                      >
-                        {member.disabled ? (
-                          "Re-enable"
-                        ) : (
+                      <div className="inline-flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleDisabled(member)}
+                          disabled={isPending}
+                          className="text-xs font-medium text-gray-500 hover:text-gray-900 disabled:opacity-50"
+                        >
+                          {member.disabled ? (
+                            "Re-enable"
+                          ) : (
+                            <span className="inline-flex items-center gap-1">
+                              <ShieldOff className="h-3 w-3" />
+                              Disable
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemove(member)}
+                          disabled={isPending}
+                          title="Permanently remove this member"
+                          className="text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+                        >
                           <span className="inline-flex items-center gap-1">
-                            <ShieldOff className="h-3 w-3" />
-                            Disable
+                            <Trash2 className="h-3 w-3" />
+                            Remove
                           </span>
-                        )}
-                      </button>
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>

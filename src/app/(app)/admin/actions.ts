@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { authUser, users } from "@/db/schema";
+import { authAccount, authSession, authUser, users } from "@/db/schema";
 import { auth } from "@/lib/auth/auth";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
@@ -43,16 +44,105 @@ export async function inviteMember(input: {
   });
   if (existingAuth) throw new Error("A member with that email already exists");
 
-  // Use Better Auth to create the credential — it hashes the password for us
-  // and creates the auth_user + auth_account rows.
+  // Snapshot the inviter's session cookie BEFORE signUpEmail. Better Auth
+  // is configured with autoSignIn=true (correct for the regular flow), so
+  // signUpEmail's after-hook writes a Set-Cookie for the new user's
+  // session — overwriting the inviter's session and effectively logging
+  // them out. We restore the inviter's cookie below to undo that.
+  const ctx = await auth.$context;
+  const sessionCookieMeta = ctx.authCookies.sessionToken;
+  const cookieStore = await cookies();
+  const inviterToken = cookieStore.get(sessionCookieMeta.name)?.value;
+
   const result = await auth.api.signUpEmail({
     body: { name, email, password: input.initialPassword },
   });
+
+  // Restore the inviter's session cookie so they stay signed in.
+  // Attributes mirror Better Auth's own (httpOnly, sameSite=lax,
+  // secure-in-prod, path=/) so the next request validates correctly.
+  // Normalize sameSite to lowercase since Better Auth allows
+  // "Strict"/"Lax"/"None" but Next's ResponseCookie type is strict.
+  if (inviterToken) {
+    const a = sessionCookieMeta.attributes;
+    const normalizedSameSite =
+      typeof a.sameSite === "string"
+        ? (a.sameSite.toLowerCase() as "lax" | "strict" | "none")
+        : a.sameSite;
+    cookieStore.set(sessionCookieMeta.name, inviterToken, {
+      httpOnly: a.httpOnly,
+      secure: a.secure,
+      sameSite: normalizedSameSite,
+      path: a.path,
+      domain: a.domain,
+      maxAge: a.maxAge,
+    });
+  }
+
+  // signUpEmail also created an auth_session row for the new user that
+  // will never be used (we just discarded their cookie). Best-effort
+  // cleanup so we don't accumulate orphan sessions; harmless if it fails.
+  try {
+    await db.delete(authSession).where(eq(authSession.userId, result.user.id));
+  } catch (err) {
+    console.warn("[invite] failed to clean up new user's orphan session", err);
+  }
 
   await db.insert(users).values({
     orgId: org.id,
     authUserId: result.user.id,
     role: input.role,
+  });
+
+  revalidatePath("/admin/members");
+}
+
+// Hard-deletes a member: drops the membership row AND the auth identity.
+// Cascades clean up auth_session + auth_account via the FK with onDelete
+// cascade. The contact's email becomes available for a fresh invite.
+//
+// Owner can't remove themselves. Owner can't remove the only remaining
+// owner — leaving an org without an owner would lock everyone else out
+// of /admin and break the role-management flow.
+export async function removeMember(input: { userId: string }): Promise<void> {
+  const me = await requireOwner();
+  if (input.userId === me.id) {
+    throw new Error("You can't remove your own account");
+  }
+
+  // Lookup the target + sanity-check the owner-count invariant when
+  // removing another owner.
+  const [target] = await db
+    .select({
+      id: users.id,
+      authUserId: users.authUserId,
+      role: users.role,
+    })
+    .from(users)
+    .where(and(eq(users.id, input.userId), eq(users.orgId, me.orgId)))
+    .limit(1);
+  if (!target) throw new Error("Member not found");
+
+  if (target.role === "owner") {
+    const ownerCount = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.orgId, me.orgId), eq(users.role, "owner")));
+    if (ownerCount.length <= 1) {
+      throw new Error("Can't remove the only remaining owner");
+    }
+  }
+
+  // Delete in transaction: membership row first (FK to authUser is
+  // onDelete set null, so this would orphan), then the auth identity.
+  // Cascades on auth_session + auth_account drop them automatically.
+  await db.transaction(async (tx) => {
+    await tx.delete(users).where(eq(users.id, input.userId));
+    if (target.authUserId) {
+      await tx.delete(authAccount).where(eq(authAccount.userId, target.authUserId));
+      await tx.delete(authSession).where(eq(authSession.userId, target.authUserId));
+      await tx.delete(authUser).where(eq(authUser.id, target.authUserId));
+    }
   });
 
   revalidatePath("/admin/members");
