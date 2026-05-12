@@ -184,8 +184,11 @@ async function main() {
       reviewedAt: ts.reviewedAt,
       actionedAt: ts.actionedAt,
     };
-    // Only touch response when --response was passed; empty string clears
-    // it (consistent with the UI's "save empty textarea = clear" behavior).
+    // TODO: feedback_items.response is being replaced by feedback_comments
+    // (threaded). Once that lands and the response column is dropped,
+    // --response should insert a comment via feedback_comments instead. For
+    // now this still writes the legacy single-field response, which is
+    // ignored by the UI (which renders the thread).
     if (args.response !== undefined) {
       update.response = args.response.trim() || null;
     }

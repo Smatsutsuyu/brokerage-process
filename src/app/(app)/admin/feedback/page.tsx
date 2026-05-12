@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
-import { feedbackItems } from "@/db/schema";
+import { feedbackComments, feedbackItems } from "@/db/schema";
 import { Sidebar } from "@/components/layout/sidebar";
+import type { CommentRow } from "@/components/feedback/comment-thread";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 
@@ -32,7 +33,6 @@ export default async function FeedbackAdminPage() {
       severity: feedbackItems.severity,
       status: feedbackItems.status,
       comment: feedbackItems.comment,
-      response: feedbackItems.response,
       userEmail: feedbackItems.userEmail,
       createdAt: feedbackItems.createdAt,
       reviewedAt: feedbackItems.reviewedAt,
@@ -42,6 +42,39 @@ export default async function FeedbackAdminPage() {
     .where(eq(feedbackItems.orgId, org.id))
     .orderBy(desc(feedbackItems.createdAt));
 
+  // Fetch all comments for these items in one query, then bucket by id.
+  // Volume is small (per-feedback comments measured in single digits) so a
+  // single inArray query is fine; no need for a per-row lookup.
+  const itemIds = rows.map((r) => r.id);
+  const commentRows = itemIds.length
+    ? await db
+        .select({
+          id: feedbackComments.id,
+          feedbackId: feedbackComments.feedbackId,
+          authorId: feedbackComments.userId,
+          authorEmail: feedbackComments.userEmail,
+          body: feedbackComments.body,
+          createdAt: feedbackComments.createdAt,
+          updatedAt: feedbackComments.updatedAt,
+        })
+        .from(feedbackComments)
+        .where(inArray(feedbackComments.feedbackId, itemIds))
+        .orderBy(asc(feedbackComments.createdAt))
+    : [];
+
+  const commentsByFeedback: Record<string, CommentRow[]> = {};
+  for (const c of commentRows) {
+    const list = (commentsByFeedback[c.feedbackId] ??= []);
+    list.push({
+      id: c.id,
+      authorId: c.authorId,
+      authorEmail: c.authorEmail,
+      body: c.body,
+      createdAt: c.createdAt.toISOString(),
+      updatedAt: c.updatedAt.toISOString(),
+    });
+  }
+
   const items: FeedbackRow[] = rows.map((r) => ({
     id: r.id,
     section: r.section,
@@ -50,11 +83,11 @@ export default async function FeedbackAdminPage() {
     severity: r.severity,
     status: r.status,
     comment: r.comment,
-    response: r.response,
     userEmail: r.userEmail,
     createdAt: r.createdAt.toISOString(),
     reviewedAt: r.reviewedAt?.toISOString() ?? null,
     actionedAt: r.actionedAt?.toISOString() ?? null,
+    comments: commentsByFeedback[r.id] ?? [],
   }));
 
   return (
@@ -64,11 +97,11 @@ export default async function FeedbackAdminPage() {
         <header className="mb-6">
           <h1 className="text-[26px] leading-tight font-bold text-gray-900">Feedback</h1>
           <p className="text-[13px] text-gray-400">
-            In-app feedback submissions. Update status as you triage, and add responses or working
-            notes inline. Owner-only.
+            In-app feedback submissions. Update status as you triage; reply via the thread on each
+            item. Owner-only.
           </p>
         </header>
-        <FeedbackList items={items} />
+        <FeedbackList items={items} currentUserId={me.id} />
       </main>
     </>
   );

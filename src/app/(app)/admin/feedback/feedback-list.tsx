@@ -11,12 +11,13 @@ import {
   ChevronRight,
   ExternalLink,
   Loader2,
-  Save,
+  MessageSquare,
   Trash2,
 } from "lucide-react";
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
 import { Button } from "@/components/ui/button";
+import { CommentThread, type CommentRow } from "@/components/feedback/comment-thread";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,10 +25,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-import { deleteFeedback, setFeedbackResponse, setFeedbackStatus } from "./actions";
+import { deleteFeedback, setFeedbackStatus } from "./actions";
 
 type FeedbackStatus = "new" | "reviewed" | "actioned" | "complete" | "wontfix";
 type FeedbackSeverity = "nit" | "suggestion" | "bug" | "blocker";
@@ -40,11 +40,11 @@ export type FeedbackRow = {
   severity: FeedbackSeverity;
   status: FeedbackStatus;
   comment: string;
-  response: string | null;
   userEmail: string | null;
   createdAt: string;
   reviewedAt: string | null;
   actionedAt: string | null;
+  comments: CommentRow[];
 };
 
 type StatusFilter = FeedbackStatus | "all" | "open";
@@ -109,9 +109,13 @@ function relTime(iso: string): string {
 
 type FeedbackListProps = {
   items: FeedbackRow[];
+  // The signed-in owner viewing the page. Passed through to the comment
+  // thread so it can decide which comments are this user's own (and thus
+  // editable inline) vs. someone else's.
+  currentUserId: string;
 };
 
-export function FeedbackList({ items }: FeedbackListProps) {
+export function FeedbackList({ items, currentUserId }: FeedbackListProps) {
   const [filter, setFilter] = useState<StatusFilter>("open");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortColumn>("created");
@@ -161,7 +165,7 @@ export function FeedbackList({ items }: FeedbackListProps) {
       return (
         it.comment.toLowerCase().includes(q) ||
         it.section.toLowerCase().includes(q) ||
-        (it.response?.toLowerCase().includes(q) ?? false) ||
+        it.comments.some((c) => c.body.toLowerCase().includes(q)) ||
         (it.userEmail?.toLowerCase().includes(q) ?? false) ||
         it.pagePath.toLowerCase().includes(q)
       );
@@ -269,6 +273,7 @@ export function FeedbackList({ items }: FeedbackListProps) {
                   item={it}
                   expanded={expanded.has(it.id)}
                   onToggle={() => toggleExpanded(it.id)}
+                  currentUserId={currentUserId}
                 />
               ))}
             </tbody>
@@ -283,16 +288,14 @@ type FeedbackRowViewProps = {
   item: FeedbackRow;
   expanded: boolean;
   onToggle: () => void;
+  currentUserId: string;
 };
 
-function FeedbackRowView({ item, expanded, onToggle }: FeedbackRowViewProps) {
+function FeedbackRowView({ item, expanded, onToggle, currentUserId }: FeedbackRowViewProps) {
   const status = STATUS_META[item.status];
   const severity = SEVERITY_META[item.severity];
   const [statusPending, startStatus] = useTransition();
-  const [responsePending, startResponse] = useTransition();
   const [deletePending, startDelete] = useTransition();
-  const [response, setResponse] = useState(item.response ?? "");
-  const [responseDirty, setResponseDirty] = useState(false);
   const confirm = useConfirm();
 
   function handleStatus(next: FeedbackStatus) {
@@ -302,18 +305,11 @@ function FeedbackRowView({ item, expanded, onToggle }: FeedbackRowViewProps) {
     });
   }
 
-  function handleSaveResponse() {
-    startResponse(async () => {
-      await setFeedbackResponse({ feedbackId: item.id, response });
-      setResponseDirty(false);
-    });
-  }
-
   async function handleDelete() {
     const ok = await confirm({
       title: "Delete this feedback?",
       description:
-        "Permanently removes the item and any response. Use this for spam or duplicates — for triaged work, set status to Won't fix instead.",
+        "Permanently removes the item and its entire comment thread. Use this for spam or duplicates — for triaged work, set status to Won't fix instead.",
       confirmLabel: "Delete",
       variant: "destructive",
     });
@@ -390,8 +386,11 @@ function FeedbackRowView({ item, expanded, onToggle }: FeedbackRowViewProps) {
         <td className="px-4 py-2.5 font-medium text-gray-700">{item.section}</td>
         <td className="px-4 py-2.5 text-gray-600">
           <div className="line-clamp-2 max-w-md">{item.comment}</div>
-          {item.response && !expanded && (
-            <div className="mt-0.5 text-[11px] text-blue-600">↳ has response</div>
+          {item.comments.length > 0 && !expanded && (
+            <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-blue-600">
+              <MessageSquare className="h-3 w-3" />
+              {item.comments.length} {item.comments.length === 1 ? "reply" : "replies"}
+            </div>
           )}
         </td>
         <td className="px-4 py-2.5 text-right text-xs whitespace-nowrap text-gray-500">
@@ -453,42 +452,16 @@ function FeedbackRowView({ item, expanded, onToggle }: FeedbackRowViewProps) {
                 </div>
               </div>
 
-              {/* Response editor */}
-              <div className="rounded border border-blue-200 bg-blue-50/30 px-3 py-2">
-                <div className="mb-1 flex items-center justify-between">
-                  <div className="text-[10px] font-semibold tracking-wider text-blue-700 uppercase">
-                    Response / working notes
-                  </div>
-                  {responseDirty && (
-                    <span className="text-[10px] text-amber-700">unsaved changes</span>
-                  )}
-                </div>
-                <Textarea
-                  value={response}
-                  onChange={(e) => {
-                    setResponse(e.target.value);
-                    setResponseDirty(e.target.value !== (item.response ?? ""));
-                  }}
-                  rows={3}
-                  placeholder="Add a reply, link to a fix, or notes for yourself…"
-                  className="bg-white"
-                />
-                <div className="mt-2 flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleSaveResponse}
-                    disabled={responsePending || !responseDirty}
-                  >
-                    {responsePending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Save className="h-3.5 w-3.5" />
-                    )}
-                    Save response
-                  </Button>
-                </div>
-              </div>
+              {/* Comment thread — replaces the old single-field response.
+                  Owners can edit/delete any comment; non-owners can only
+                  edit/delete their own (admin page is owner-only so the
+                  canModerate=true is implicit). */}
+              <CommentThread
+                feedbackId={item.id}
+                comments={item.comments}
+                currentUserId={currentUserId}
+                canModerate
+              />
 
               {/* Danger zone */}
               <div className="flex justify-end">
