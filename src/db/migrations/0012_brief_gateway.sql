@@ -1,0 +1,1 @@
+ALTER TABLE "deals" ADD COLUMN "banner_image_path" text;

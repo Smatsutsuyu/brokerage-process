@@ -26,6 +26,7 @@
     "@neondatabase/serverless": "^1.1.0",
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.8",
+    "@react-pdf/renderer": "^4.5.1",
     "@t3-oss/env-nextjs": "^0.13.11",
     "@types/ws": "^8.18.1",
     "@vercel/blob": "^2.3.3",

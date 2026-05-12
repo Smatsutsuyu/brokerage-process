@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { removeContactFromDeal } from "../../actions";
 import { AddContactModal, type EditingContact } from "../add-contact-modal";
 import { BuyerCheckbox } from "../buyer-checkbox";
+import { BuyerCommentsEditor } from "../buyer-comments-editor";
 import { LeadPicker, type LeadOption } from "../lead-picker";
 import {
   PickExistingContactModal,
@@ -425,14 +426,16 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
 
                 {/* Expanded contacts panel. */}
                 {isOpen && (
-                  <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-3">
-                    {g.kind === "builder" && g.comments && (
-                      <div className="mb-3 rounded border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-700">
-                        <div className="mb-0.5 text-[10px] font-semibold tracking-wider text-gray-500 uppercase">
-                          Notes
-                        </div>
-                        {g.comments}
-                      </div>
+                  <div className="space-y-3 border-t border-gray-100 bg-gray-50/50 px-4 py-3">
+                    {/* Comments editor — per-builder interest notes that
+                        feed into the Marketing Report PDF. Only on builder
+                        cards (Unaffiliated has no dealBuyer row). */}
+                    {g.kind === "builder" && (
+                      <BuyerCommentsEditor
+                        dealBuyerId={g.dealBuyerId}
+                        dealId={dealId}
+                        initialComments={g.comments}
+                      />
                     )}
 
                     {g.contacts.length === 0 ? (

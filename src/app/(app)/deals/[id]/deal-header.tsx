@@ -9,9 +9,17 @@ type DealHeaderProps = {
   priority: "normal" | "high";
   progressPct: number;
   deal: EditingDeal;
+  hasBanner: boolean;
 };
 
-export function DealHeader({ name, subtitle, priority, progressPct, deal }: DealHeaderProps) {
+export function DealHeader({
+  name,
+  subtitle,
+  priority,
+  progressPct,
+  deal,
+  hasBanner,
+}: DealHeaderProps) {
   return (
     <header className="mb-5">
       <div className="mb-1 flex items-center gap-3">
@@ -23,7 +31,7 @@ export function DealHeader({ name, subtitle, priority, progressPct, deal }: Deal
           </span>
         )}
         <div className="ml-auto">
-          <DealMenu deal={deal} />
+          <DealMenu deal={deal} hasBanner={hasBanner} />
         </div>
       </div>
       <p className="text-[13px] text-gray-400">{subtitle}</p>

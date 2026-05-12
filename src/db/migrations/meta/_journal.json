@@ -85,6 +85,13 @@
       "when": 1778550553805,
       "tag": "0011_old_otto_octavius",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1778554470319,
+      "tag": "0012_brief_gateway",
+      "breakpoints": true
     }
   ]
 }

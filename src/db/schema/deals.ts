@@ -25,6 +25,11 @@ export const deals = pgTable("deals", {
   psaAttorneyName: text("psa_attorney_name"),
   psaAttorneyFirm: text("psa_attorney_firm"),
   psaDrafting: psaDraftingEnum("psa_drafting"),
+  // Banner image used in generated PDFs (Marketing Report header, etc.).
+  // Stores the Vercel Blob pathname (NOT the URL) so we can re-stream via
+  // the SDK rather than baking signed URLs into the PDFs. Null falls back
+  // to the Land Advisors-branded default header.
+  bannerImagePath: text("banner_image_path"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

@@ -207,6 +207,26 @@ export async function setBuyerLead(input: {
   revalidatePath(`/deals/${input.dealId}`);
 }
 
+// Free-text comments on a builder's interest in this deal. Surfaces in the
+// Marketing Report PDF as the right-hand "Comments" column. Empty string
+// clears the field (stored as null).
+export async function setBuyerComments(input: {
+  dealBuyerId: string;
+  dealId: string;
+  comments: string;
+}) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  const trimmed = input.comments.trim();
+  await db
+    .update(dealBuyers)
+    .set({ comments: trimmed || null })
+    .where(and(eq(dealBuyers.id, input.dealBuyerId), eq(dealBuyers.orgId, org.id)));
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
 export type AddContactInput = {
   dealId: string;
   // Builder is OPTIONAL under the deal_contacts model. Provide builderId

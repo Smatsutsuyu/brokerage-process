@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import {
   FileStack,
   FileText,
+  ImageIcon,
   Mail,
   MoreHorizontal,
   Pencil,
@@ -22,13 +23,16 @@ import {
 
 import { deleteDeal } from "../actions";
 import { DealModal, type EditingDeal } from "../deal-modal";
+import { BannerUploaderModal } from "./banner-uploader-modal";
 
 type DealMenuProps = {
   deal: EditingDeal;
+  hasBanner: boolean;
 };
 
-export function DealMenu({ deal }: DealMenuProps) {
+export function DealMenu({ deal, hasBanner }: DealMenuProps) {
   const [editOpen, setEditOpen] = useState(false);
+  const [bannerOpen, setBannerOpen] = useState(false);
   const [, startDelete] = useTransition();
   const confirm = useConfirm();
 
@@ -63,13 +67,11 @@ export function DealMenu({ deal }: DealMenuProps) {
             Planned actions
           </div>
           <DropdownMenuItem
-            onClick={() =>
-              toastComingSoon({
-                feature: "Marketing Report PDF",
-                description:
-                  "Renders the buyer list grouped by Green / Yellow / Red interest tier as a Land Advisors-branded PDF.",
-              })
-            }
+            onClick={() => {
+              // Direct browser navigation triggers the file download via
+              // the API route's Content-Disposition: attachment header.
+              window.open(`/api/deals/${deal.dealId}/marketing-report.pdf`, "_blank");
+            }}
             className="text-[13px]"
           >
             <FileText className="h-3.5 w-3.5" />
@@ -104,6 +106,10 @@ export function DealMenu({ deal }: DealMenuProps) {
 
           <div className="my-1 border-t border-gray-100" />
 
+          <DropdownMenuItem onClick={() => setBannerOpen(true)} className="text-[13px]">
+            <ImageIcon className="h-3.5 w-3.5" />
+            {hasBanner ? "Change banner image" : "Set banner image"}
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setEditOpen(true)} className="text-[13px]">
             <Pencil className="h-3.5 w-3.5" />
             Edit deal
@@ -119,6 +125,13 @@ export function DealMenu({ deal }: DealMenuProps) {
       </DropdownMenu>
 
       <DealModal open={editOpen} onOpenChange={setEditOpen} editing={deal} />
+      <BannerUploaderModal
+        open={bannerOpen}
+        onOpenChange={setBannerOpen}
+        dealId={deal.dealId}
+        dealName={deal.name}
+        hasBanner={hasBanner}
+      />
     </>
   );
 }

@@ -191,6 +191,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
               priority: deal.priority,
               notes: deal.notes,
             }}
+            hasBanner={Boolean(deal.bannerImagePath)}
           />
         </FeedbackZone>
         <DealTabs counts={counts}>
