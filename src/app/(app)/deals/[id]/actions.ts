@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -700,6 +700,170 @@ export async function attachBuilderToDeal(input: {
 
   revalidatePath(`/deals/${input.dealId}`);
   return { dealBuyerId: created.id };
+}
+
+// Bulk-add the "Add Existing Contact" flow. Replaces N round-trips of
+// attachBuilderToDeal + updateContact with a single transaction. Per Chris's
+// feedback (2026-05-12): adding 30 contacts one modal at a time was painful.
+//
+// Each selected contact is one of two shapes:
+// - has-builder    → just attach their builder to the deal (idempotent)
+// - standalone     → re-point them at standaloneTarget AND attach that
+//                    builder to the deal (idempotent). Required when any
+//                    selected contact is standalone.
+//
+// Whole thing is wrapped in a transaction so a partial failure doesn't
+// leave the deal half-updated.
+export type BulkStandaloneTarget =
+  | { type: "existing"; builderId: string }
+  | {
+      type: "new";
+      name: string;
+      classification: "private" | "public" | "developer";
+    };
+
+export async function bulkAddContactsToDeal(input: {
+  dealId: string;
+  contactIds: string[];
+  standaloneTarget?: BulkStandaloneTarget;
+}): Promise<{
+  added: number;
+  buildersAttached: number;
+  buildersCreated: number;
+  contactsRepointed: number;
+}> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+  if (input.contactIds.length === 0) throw new Error("No contacts selected");
+
+  // Look up every selected contact in one query (org-scoped — prevents a
+  // forged id from another tenant slipping in).
+  const rows = await db
+    .select({ id: contacts.id, builderId: contacts.builderId })
+    .from(contacts)
+    .where(and(inArray(contacts.id, input.contactIds), eq(contacts.orgId, org.id)));
+  if (rows.length !== input.contactIds.length) {
+    throw new Error("One or more contacts not found");
+  }
+
+  const standalones = rows.filter((r) => !r.builderId);
+  const withBuilder = rows.filter((r) => r.builderId);
+  if (standalones.length > 0 && !input.standaloneTarget) {
+    throw new Error("standaloneTarget is required when any selected contact is standalone");
+  }
+
+  // Validate the new-builder name up front so the transaction can't fail
+  // partway through on bad input.
+  if (input.standaloneTarget?.type === "new") {
+    if (!input.standaloneTarget.name.trim()) {
+      throw new Error("New builder name is required");
+    }
+  }
+
+  let buildersCreated = 0;
+  let buildersAttached = 0;
+  let contactsRepointed = 0;
+
+  await db.transaction(async (tx) => {
+    // Step 1: resolve the standalone target builder (creating it if needed)
+    // and ensure it's attached to the deal.
+    let standaloneBuilderId: string | null = null;
+    if (input.standaloneTarget) {
+      if (input.standaloneTarget.type === "new") {
+        const [b] = await tx
+          .insert(builders)
+          .values({
+            orgId: org.id,
+            name: input.standaloneTarget.name.trim(),
+            classification: input.standaloneTarget.classification,
+          })
+          .returning();
+        standaloneBuilderId = b.id;
+        buildersCreated++;
+      } else {
+        // Confirm the picked builder belongs to this org.
+        const [b] = await tx
+          .select({ id: builders.id })
+          .from(builders)
+          .where(
+            and(
+              eq(builders.id, input.standaloneTarget.builderId),
+              eq(builders.orgId, org.id),
+            ),
+          )
+          .limit(1);
+        if (!b) throw new Error("Standalone target builder not found");
+        standaloneBuilderId = b.id;
+      }
+      // Attach the standalone target to the deal (idempotent — skip when
+      // already on the deal).
+      const [existingLink] = await tx
+        .select({ id: dealBuyers.id })
+        .from(dealBuyers)
+        .where(
+          and(
+            eq(dealBuyers.dealId, input.dealId),
+            eq(dealBuyers.builderId, standaloneBuilderId),
+          ),
+        )
+        .limit(1);
+      if (!existingLink) {
+        await tx.insert(dealBuyers).values({
+          orgId: org.id,
+          dealId: input.dealId,
+          builderId: standaloneBuilderId,
+          tier: "not_selected",
+        });
+        buildersAttached++;
+      }
+    }
+
+    // Step 2: attach each has-builder contact's builder to the deal
+    // (idempotent). De-dupe builder ids so we don't redundantly check the
+    // same one N times.
+    const uniqueBuilderIds = Array.from(
+      new Set(withBuilder.map((r) => r.builderId).filter((id): id is string => id !== null)),
+    );
+    if (uniqueBuilderIds.length > 0) {
+      const existing = await tx
+        .select({ builderId: dealBuyers.builderId })
+        .from(dealBuyers)
+        .where(
+          and(
+            eq(dealBuyers.dealId, input.dealId),
+            inArray(dealBuyers.builderId, uniqueBuilderIds),
+          ),
+        );
+      const alreadyAttached = new Set(existing.map((r) => r.builderId));
+      const toAttach = uniqueBuilderIds.filter((id) => !alreadyAttached.has(id));
+      if (toAttach.length > 0) {
+        await tx.insert(dealBuyers).values(
+          toAttach.map((builderId) => ({
+            orgId: org.id,
+            dealId: input.dealId,
+            builderId,
+            tier: "not_selected" as const,
+          })),
+        );
+        buildersAttached += toAttach.length;
+      }
+    }
+
+    // Step 3: re-point each standalone contact at the resolved builder.
+    if (standalones.length > 0 && standaloneBuilderId) {
+      const ids = standalones.map((r) => r.id);
+      await tx.update(contacts).set({ builderId: standaloneBuilderId }).where(inArray(contacts.id, ids));
+      contactsRepointed = ids.length;
+    }
+  });
+
+  revalidatePath(`/deals/${input.dealId}`);
+  return {
+    added: rows.length,
+    buildersAttached,
+    buildersCreated,
+    contactsRepointed,
+  };
 }
 
 // Verifies that an item belongs to the active deal — useful for any action

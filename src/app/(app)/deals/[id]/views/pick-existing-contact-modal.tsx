@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Building2, Loader2, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -23,8 +24,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-import { addBuilderToDeal, attachBuilderToDeal } from "../actions";
-import { updateContact } from "@/app/(app)/contacts/actions";
+import { bulkAddContactsToDeal, type BulkStandaloneTarget } from "../actions";
 
 export type ExistingContactOption = {
   id: string;
@@ -47,18 +47,16 @@ type PickExistingContactModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   dealId: string;
-  // Builders currently on the deal — these are the assignment targets,
-  // alongside an inline "+ Create new builder" option.
+  // Builders currently on the deal — these are the assignment targets for
+  // standalone contacts, alongside an inline "+ Create new builder" option.
   dealBuilders: DealBuilderOption[];
   // All contacts in the org. The modal filters out anyone already at one of
   // the deal's builders since they already show up in the table.
   contacts: ExistingContactOption[];
 };
 
-// Sentinel for the "+ Create new builder" option in the target picker. Picking
-// it reveals an inline name + classification input and routes the submit
-// through addBuilderToDeal first (creates builder + deal_buyer), then
-// updateContact (re-points the picked contact at the new builder).
+// Sentinel for the "+ Create new builder" option in the standalone target
+// picker. Picking it reveals an inline name + classification input.
 const NEW_BUILDER = "__new__";
 
 export function PickExistingContactModal({
@@ -69,8 +67,8 @@ export function PickExistingContactModal({
   contacts,
 }: PickExistingContactModalProps) {
   const [search, setSearch] = useState("");
-  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
-  const [targetBuilderChoice, setTargetBuilderChoice] = useState<string>("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [standaloneTargetChoice, setStandaloneTargetChoice] = useState<string>("");
   const [newBuilderName, setNewBuilderName] = useState("");
   const [newBuilderClassification, setNewBuilderClassification] = useState<
     "private" | "public" | "developer"
@@ -78,12 +76,14 @@ export function PickExistingContactModal({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // Reset everything when the modal closes (with a small delay so users
+  // don't see the form clear during the close animation).
   useEffect(() => {
     if (!open) {
       const t = setTimeout(() => {
         setSearch("");
-        setSelectedContactId(null);
-        setTargetBuilderChoice("");
+        setSelectedIds(new Set());
+        setStandaloneTargetChoice("");
         setNewBuilderName("");
         setNewBuilderClassification("private");
         setError(null);
@@ -115,94 +115,98 @@ export function PickExistingContactModal({
     );
   }, [candidates, search]);
 
+  // Selection summary derived from the id set. Splitting into has-builder
+  // vs standalone counts drives whether the standalone target picker shows.
   const selected = useMemo(
-    () => candidates.find((c) => c.id === selectedContactId) ?? null,
-    [candidates, selectedContactId],
+    () => candidates.filter((c) => selectedIds.has(c.id)),
+    [candidates, selectedIds],
   );
+  const standaloneCount = selected.filter((c) => !c.builderId).length;
+  const withBuilderCount = selected.length - standaloneCount;
+  const needsStandaloneTarget = standaloneCount > 0;
+  const isNewBuilder = standaloneTargetChoice === NEW_BUILDER;
 
-  const isNewBuilder = targetBuilderChoice === NEW_BUILDER;
-
-  function handleSelect(contact: ExistingContactOption) {
-    setSelectedContactId(contact.id);
-    // Picker is only relevant for standalone contacts. For contacts who
-    // already have a builder, we silently bring that builder along — no
-    // need to ask. Default-fill the picker for standalone contacts so the
-    // common "use the first deal-builder" case is one click.
-    setTargetBuilderChoice(contact.builderId ? "" : (dealBuilders[0]?.id ?? NEW_BUILDER));
+  function toggle(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
     setError(null);
   }
 
-  function handleSubmit() {
-    if (!selected) return;
+  function selectAllVisible() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const c of visibleCandidates) next.add(c.id);
+      return next;
+    });
+  }
 
-    const contactHasBuilder = Boolean(selected.builderId);
-    if (!contactHasBuilder) {
-      if (!targetBuilderChoice) {
-        setError("Pick a builder or create a new one.");
-        return;
-      }
-      if (isNewBuilder && !newBuilderName.trim()) {
-        setError("Enter a name for the new builder.");
-        return;
-      }
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  function handleSubmit() {
+    if (selected.length === 0) return;
+    setError(null);
+
+    if (needsStandaloneTarget && !standaloneTargetChoice) {
+      setError(`Pick a builder for the ${standaloneCount} standalone contact${standaloneCount === 1 ? "" : "s"}.`);
+      return;
+    }
+    if (needsStandaloneTarget && isNewBuilder && !newBuilderName.trim()) {
+      setError("Enter a name for the new builder.");
+      return;
+    }
+
+    let standaloneTarget: BulkStandaloneTarget | undefined;
+    if (needsStandaloneTarget) {
+      standaloneTarget = isNewBuilder
+        ? {
+            type: "new",
+            name: newBuilderName.trim(),
+            classification: newBuilderClassification,
+          }
+        : { type: "existing", builderId: standaloneTargetChoice };
     }
 
     startTransition(async () => {
       try {
-        if (contactHasBuilder) {
-          // Contact's builder isn't yet on this deal (the candidate filter
-          // already excluded contacts whose builder IS on the deal). Just
-          // attach their existing builder — idempotent action, safe to call.
-          await attachBuilderToDeal({ dealId, builderId: selected.builderId! });
-          // No updateContact needed — they're already at the right builder.
-        } else {
-          let builderId: string;
-          if (isNewBuilder) {
-            // Bootstrap the new builder + attach it to the deal first, then
-            // re-point the standalone contact at it.
-            const result = await addBuilderToDeal({
-              dealId,
-              name: newBuilderName,
-              classification: newBuilderClassification,
-              tier: "not_selected",
-            });
-            builderId = result.builderId;
-          } else {
-            builderId = targetBuilderChoice;
-          }
-
-          await updateContact({
-            contactId: selected.id,
-            data: {
-              firstName: selected.firstName,
-              lastName: selected.lastName,
-              title: selected.title ?? undefined,
-              email: selected.email ?? undefined,
-              geography: selected.geography ?? undefined,
-              builderId,
-            },
-          });
-        }
+        await bulkAddContactsToDeal({
+          dealId,
+          contactIds: Array.from(selectedIds),
+          standaloneTarget,
+        });
         onOpenChange(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not add contact to deal.");
+        setError(err instanceof Error ? err.message : "Could not add contacts to deal.");
       }
     });
   }
 
   const targetLabel = (() => {
-    if (targetBuilderChoice === NEW_BUILDER) return "+ Create new builder";
-    return dealBuilders.find((b) => b.id === targetBuilderChoice)?.name ?? "Pick a builder";
+    if (standaloneTargetChoice === NEW_BUILDER) return "+ Create new builder";
+    return (
+      dealBuilders.find((b) => b.id === standaloneTargetChoice)?.name ?? "Pick a builder"
+    );
   })();
+
+  // Visible-list "select all" affordance state.
+  const allVisibleSelected =
+    visibleCandidates.length > 0 &&
+    visibleCandidates.every((c) => selectedIds.has(c.id));
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Add Existing Contact</DialogTitle>
+          <DialogTitle>Add Existing Contacts</DialogTitle>
           <DialogDescription>
-            Pick a contact from the org directory and assign them to a builder on this deal.
-            They&rsquo;ll appear in the deal&rsquo;s Contacts list immediately.
+            Pick one or more contacts from the org directory. Each selected contact&rsquo;s
+            builder gets attached to this deal automatically; standalone contacts need you to
+            pick (or create) a builder for them below.
           </DialogDescription>
         </DialogHeader>
 
@@ -224,26 +228,69 @@ export function PickExistingContactModal({
               />
             </div>
 
+            {/* Selection toolbar — count + select-all/clear shortcuts.
+                Always rendered so the layout doesn't jump when the first
+                contact gets ticked. */}
+            <div className="flex items-center justify-between gap-2 text-[12px]">
+              <div className="text-gray-500">
+                {selected.length === 0 ? (
+                  <span>None selected</span>
+                ) : (
+                  <span>
+                    <span className="font-semibold text-gray-700">
+                      {selected.length} selected
+                    </span>
+                    {selected.length > 0 && (
+                      <span className="ml-1 text-gray-400">
+                        ({withBuilderCount} with builder · {standaloneCount} standalone)
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {visibleCandidates.length > 0 && !allVisibleSelected && (
+                  <button
+                    type="button"
+                    onClick={selectAllVisible}
+                    className="text-brand-blue hover:underline"
+                  >
+                    Select all {search ? "matching" : ""} ({visibleCandidates.length})
+                  </button>
+                )}
+                {selected.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearSelection}
+                    className="text-gray-500 hover:underline"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="max-h-[280px] overflow-y-auto rounded-lg border border-gray-200">
               {visibleCandidates.length === 0 ? (
-                <div className="p-6 text-center text-xs text-gray-400">
-                  No matches.
-                </div>
+                <div className="p-6 text-center text-xs text-gray-400">No matches.</div>
               ) : (
                 <ul className="divide-y divide-gray-100">
                   {visibleCandidates.map((c) => {
-                    const isSelected = c.id === selectedContactId;
+                    const isSelected = selectedIds.has(c.id);
                     return (
                       <li key={c.id}>
-                        <button
-                          type="button"
-                          onClick={() => handleSelect(c)}
+                        <label
                           className={cn(
-                            "flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors",
+                            "flex w-full cursor-pointer items-start gap-3 px-4 py-2.5 text-left transition-colors",
                             isSelected ? "bg-blue-50" : "hover:bg-gray-50",
                           )}
                         >
-                          <div className="flex-1 min-w-0">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggle(c.id)}
+                            className="mt-0.5"
+                          />
+                          <div className="min-w-0 flex-1">
                             <div className="text-[13px] font-medium text-gray-900">
                               {c.fullName}
                             </div>
@@ -254,13 +301,13 @@ export function PickExistingContactModal({
                                   {c.builderName}
                                 </span>
                               ) : (
-                                <span className="text-gray-400">—</span>
+                                <span className="text-amber-600">standalone</span>
                               )}
                               {c.title && <span>· {c.title}</span>}
                               {c.email && <span>· {c.email}</span>}
                             </div>
                           </div>
-                        </button>
+                        </label>
                       </li>
                     );
                   })}
@@ -268,40 +315,22 @@ export function PickExistingContactModal({
               )}
             </div>
 
-            {selected && selected.builderId && selected.builderName ? (
-              // Contact already has a builder. We bring that builder onto
-              // the deal automatically — no picker needed. Just confirm what
-              // will happen so it's not invisible.
-              <div className="space-y-1 rounded-lg border border-blue-200 bg-blue-50/50 px-4 py-3 text-[13px]">
-                <div className="font-medium text-gray-900">
-                  Add {selected.fullName} to this deal
-                </div>
-                <div className="text-gray-600">
-                  via{" "}
-                  <span className="inline-flex items-center gap-1 font-medium text-gray-800">
-                    <Building2 className="h-3 w-3 flex-shrink-0" />
-                    {selected.builderName}
-                  </span>
-                  {!dealBuilderIds.has(selected.builderId) && (
-                    <span className="text-gray-500">
-                      {" "}
-                      ({selected.builderName} will be added to the deal too)
-                    </span>
-                  )}
-                </div>
-              </div>
-            ) : selected ? (
-              // Standalone contact — needs a builder assignment to surface
-              // on the deal. Pick existing or create new.
-              <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 px-4 py-3">
-                <Label htmlFor="target-builder">
-                  {selected.fullName} has no builder yet. Pick or create one for this deal.
+            {/* Standalone target picker — only renders when at least one
+                selected contact is standalone. Single picker for the whole
+                batch (per-row would be more flexible but slower; can revisit
+                if Chris needs it). */}
+            {needsStandaloneTarget && (
+              <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/50 px-4 py-3">
+                <Label htmlFor="standalone-target">
+                  {standaloneCount === 1
+                    ? "1 standalone contact needs a builder"
+                    : `${standaloneCount} standalone contacts need a builder`}
                 </Label>
                 <Select
-                  value={targetBuilderChoice}
-                  onValueChange={(v) => v && setTargetBuilderChoice(v)}
+                  value={standaloneTargetChoice}
+                  onValueChange={(v) => v && setStandaloneTargetChoice(v)}
                 >
-                  <SelectTrigger id="target-builder" className="w-full bg-white">
+                  <SelectTrigger id="standalone-target" className="w-full bg-white">
                     <SelectValue>{targetLabel}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
@@ -315,7 +344,7 @@ export function PickExistingContactModal({
                 </Select>
 
                 {isNewBuilder && (
-                  <div className="space-y-2 rounded-md border border-blue-200 bg-white p-3">
+                  <div className="space-y-2 rounded-md border border-amber-200 bg-white p-3">
                     <Input
                       value={newBuilderName}
                       onChange={(e) => setNewBuilderName(e.target.value)}
@@ -355,10 +384,12 @@ export function PickExistingContactModal({
                   </div>
                 )}
               </div>
-            ) : null}
+            )}
 
             {error && (
-              <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+              <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </div>
             )}
           </div>
         )}
@@ -376,17 +407,14 @@ export function PickExistingContactModal({
             type="button"
             onClick={handleSubmit}
             disabled={(() => {
-              if (isPending || !selected) return true;
-              // Contacts who already have a builder can submit immediately —
-              // no picker. Standalone contacts need a target picked.
-              if (selected.builderId) return false;
-              if (!targetBuilderChoice) return true;
-              if (isNewBuilder && !newBuilderName.trim()) return true;
+              if (isPending || selected.length === 0) return true;
+              if (needsStandaloneTarget && !standaloneTargetChoice) return true;
+              if (needsStandaloneTarget && isNewBuilder && !newBuilderName.trim()) return true;
               return false;
             })()}
           >
             {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Add to Deal
+            Add {selected.length > 0 ? `${selected.length} ` : ""}to deal
           </Button>
         </DialogFooter>
       </DialogContent>
