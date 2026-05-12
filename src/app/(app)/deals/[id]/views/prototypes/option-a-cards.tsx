@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   Check,
   ChevronDown,
@@ -86,11 +86,48 @@ type OptionACardsProps = {
 
 export function OptionACards({ dealId, groups, leadOptions, orgContacts }: OptionACardsProps) {
   const [filter, setFilter] = useState<FilterValue>("all");
-  const [expanded, setExpanded] = useState<Set<string>>(() => {
-    // Default: expand any builder with at least one contact so the user
-    // sees something on first visit. Empty builders stay collapsed.
-    return new Set(groups.filter((g) => g.contacts.length > 0).map((g) => g.dealBuyerId));
-  });
+
+  // Initial mount: expand every group with contacts so first-visit shows
+  // populated cards open. Lazy init avoids touching refs during render
+  // (lint rule: react-hooks/refs).
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set(groups.filter((g) => g.contacts.length > 0).map((g) => g.dealBuyerId)),
+  );
+
+  // Tracks which group ids we've reconciled. The effect below uses it to
+  // tell "this card was already here, the user might have collapsed it"
+  // apart from "this card just appeared, expand it so new contacts are
+  // visible." Starts empty; populated by the effect on first run.
+  const seenIdsRef = useRef<Set<string>>(new Set());
+
+  // After mount, whenever groups changes (server action revalidate, etc.):
+  // - Drop seen-ids no longer present so a card that disappeared (last
+  //   contact removed) and later reappears (re-added) re-expands instead
+  //   of staying collapsed.
+  // - Expand any newly-appeared id with contacts. The bail-out `return
+  //   prev` skips the re-render when nothing actually changed (which is
+  //   the common case on first effect run, where seenIds catches up to
+  //   what the lazy initializer already expanded).
+  useEffect(() => {
+    const currentIds = new Set(groups.map((g) => g.dealBuyerId));
+    for (const id of seenIdsRef.current) {
+      if (!currentIds.has(id)) seenIdsRef.current.delete(id);
+    }
+    setExpanded((prev) => {
+      let added = false;
+      const next = new Set(prev);
+      for (const g of groups) {
+        if (!seenIdsRef.current.has(g.dealBuyerId)) {
+          seenIdsRef.current.add(g.dealBuyerId);
+          if (g.contacts.length > 0 && !next.has(g.dealBuyerId)) {
+            next.add(g.dealBuyerId);
+            added = true;
+          }
+        }
+      }
+      return added ? next : prev;
+    });
+  }, [groups]);
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [pickExistingOpen, setPickExistingOpen] = useState(false);
   const [addContactFor, setAddContactFor] = useState<{ id: string; name: string } | null>(null);
