@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -105,7 +105,13 @@ export async function loadBuyers(dealId: string): Promise<BuyerData> {
     .leftJoin(builders, eq(builders.id, contacts.builderId))
     .leftJoin(
       dealBuyers,
-      eq(dealBuyers.builderId, contacts.builderId),
+      // Scope to THIS deal's dealBuyers row — without the dealId predicate,
+      // a builder on N deals causes N joined rows per contact, which the
+      // bucket-by-dealBuyerId logic below turns into N duplicate cards.
+      and(
+        eq(dealBuyers.builderId, contacts.builderId),
+        eq(dealBuyers.dealId, dealId),
+      ),
     )
     .leftJoin(users, eq(users.id, dealBuyers.leadUserId))
     .leftJoin(authUser, eq(authUser.id, users.authUserId))
