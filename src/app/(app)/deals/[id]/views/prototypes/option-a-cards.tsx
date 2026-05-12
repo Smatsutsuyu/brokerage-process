@@ -5,6 +5,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  FileText,
   Mail,
   MessageSquare,
   Pencil,
@@ -245,6 +246,21 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
         </DropdownMenu>
 
         <div className="ml-auto flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              // Same destination as the deal-menu Generate Marketing
+              // Report item — duplicated here because the data is
+              // derived from this tab and the natural place to find
+              // "give me the PDF of this" is right next to the data.
+              window.open(`/api/deals/${dealId}/marketing-report.pdf`, "_blank");
+            }}
+            title="Download the per-builder Marketing Report PDF for this deal"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Marketing Report
+          </Button>
           <PlannedAction
             label="Send OM blast"
             icon={Mail}

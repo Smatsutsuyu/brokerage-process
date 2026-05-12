@@ -9,11 +9,17 @@
 
 import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { get } from "@vercel/blob";
 
 import { db } from "@/db";
-import { builders, dealBuyers, deals } from "@/db/schema";
+import {
+  builders,
+  contacts,
+  dealBuyers,
+  dealContacts,
+  deals,
+} from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import {
@@ -73,8 +79,11 @@ export async function GET(
     return NextResponse.json({ error: "Deal not found" }, { status: 404 });
   }
 
-  // Pull every dealBuyer for this deal joined to its builder. Tier + the
-  // freeform comments column drive the table rows.
+  // Pull every dealBuyer for this deal that has at least one contact on
+  // the deal. Mirrors the cards-UI behavior: a builder card disappears
+  // when its last contact is removed (the dealBuyer row persists for
+  // tier/lead retention but is hidden), so the PDF should drop those too.
+  // EXISTS subquery keeps the result one-row-per-builder without DISTINCT.
   const rows = await db
     .select({
       tier: dealBuyers.tier,
@@ -83,7 +92,18 @@ export async function GET(
     })
     .from(dealBuyers)
     .innerJoin(builders, eq(builders.id, dealBuyers.builderId))
-    .where(eq(dealBuyers.dealId, id))
+    .where(
+      and(
+        eq(dealBuyers.dealId, id),
+        sql`EXISTS (
+          SELECT 1
+          FROM ${dealContacts}
+          INNER JOIN ${contacts} ON ${contacts.id} = ${dealContacts.contactId}
+          WHERE ${dealContacts.dealId} = ${id}
+            AND ${contacts.builderId} = ${dealBuyers.builderId}
+        )`,
+      ),
+    )
     .orderBy(asc(builders.name));
 
   const reportRows: MarketingReportRow[] = rows.map((r) => ({
