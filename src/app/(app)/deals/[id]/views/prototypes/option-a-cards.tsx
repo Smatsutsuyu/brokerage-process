@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
-  BellOff,
   Check,
   ChevronDown,
   ChevronRight,
@@ -33,6 +32,7 @@ import { BlastModal } from "../blast-modal";
 import { BuyerCheckbox } from "../buyer-checkbox";
 import { BuyerCommentsEditor } from "../buyer-comments-editor";
 import { LeadPicker, type LeadOption } from "../lead-picker";
+import { ReceivesCommunicationToggle } from "../receives-communication-toggle";
 import {
   PickExistingContactModal,
   type ExistingContactOption,
@@ -481,15 +481,11 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
                               <div className="flex-1">
                                 <div className="flex items-center gap-1.5 text-[13px] font-medium text-gray-900">
                                   {c.fullName}
-                                  {!c.receivesCommunication && (
-                                    <span
-                                      title="Will be excluded from email blasts"
-                                      className="inline-flex items-center gap-0.5 rounded bg-gray-200 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-gray-600 uppercase"
-                                    >
-                                      <BellOff className="h-2.5 w-2.5" />
-                                      no blast
-                                    </span>
-                                  )}
+                                  <ReceivesCommunicationToggle
+                                    dealId={dealId}
+                                    contactId={c.id}
+                                    receivesCommunication={c.receivesCommunication}
+                                  />
                                 </div>
                                 {c.title && (
                                   <div className="text-[11px] text-gray-500">{c.title}</div>

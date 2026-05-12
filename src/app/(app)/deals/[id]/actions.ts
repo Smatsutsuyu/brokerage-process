@@ -979,6 +979,25 @@ export async function removeContactFromDeal(input: {
   revalidatePath(`/deals/${input.dealId}`);
 }
 
+// Quick on/off toggle for the per-contact "receives communication" flag.
+// Used by the inline toggle on the cards UI so the user doesn't have to
+// open the edit modal just to opt someone in / out of email blasts.
+export async function setContactReceivesCommunication(input: {
+  dealId: string;
+  contactId: string;
+  receivesCommunication: boolean;
+}): Promise<void> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  await db
+    .update(contacts)
+    .set({ receivesCommunication: input.receivesCommunication })
+    .where(and(eq(contacts.id, input.contactId), eq(contacts.orgId, org.id)));
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
 // Preview computation for the OM-blast modal. Returns the contacts that
 // WOULD be emailed given the chosen filters — no email is actually sent
 // (Phase 2 work, blocked on landadvisors.com DNS / Resend setup).
