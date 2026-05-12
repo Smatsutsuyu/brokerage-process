@@ -67,7 +67,12 @@ export function BannerUploaderModal({
       const result = await upload(pathname, file, {
         access: "private",
         handleUploadUrl: "/api/upload/blob",
-        clientPayload: JSON.stringify({ dealId, checklistItemId: null }),
+        // kind="banner" tells the server-side handler to issue a token
+        // with allowOverwrite=true so replacing keeps the same stable
+        // blob path. Documents (kind="document" / unset) keep the
+        // default no-overwrite behavior since they auto-version via
+        // unique filenames per upload.
+        clientPayload: JSON.stringify({ dealId, checklistItemId: null, kind: "banner" }),
         onUploadProgress: (e) => setProgress(Math.round(e.percentage)),
       });
       await setDealBanner({ dealId, pathname: result.pathname });

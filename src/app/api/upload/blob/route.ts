@@ -20,9 +20,17 @@ import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { authorizeDealAccess } from "@/lib/documents";
 
+type UploadKind = "document" | "banner";
+
 type UploadClientPayload = {
   dealId: string;
   checklistItemId: string | null;
+  // Determines per-blob policy: documents get the default no-overwrite
+  // behavior (each upload is a new versioned file); banners use a stable
+  // path per deal and need allowOverwrite=true so replacing in place
+  // works. Defaults to "document" for backward compat with older callers
+  // that didn't send a kind field.
+  kind: UploadKind;
 };
 
 function parsePayload(raw: string | null | undefined): UploadClientPayload {
@@ -31,9 +39,11 @@ function parsePayload(raw: string | null | undefined): UploadClientPayload {
   if (!parsed.dealId || typeof parsed.dealId !== "string") {
     throw new Error("Missing dealId in upload payload");
   }
+  const kind: UploadKind = parsed.kind === "banner" ? "banner" : "document";
   return {
     dealId: parsed.dealId,
     checklistItemId: parsed.checklistItemId ?? null,
+    kind,
   };
 }
 
@@ -72,6 +82,11 @@ export async function POST(request: Request): Promise<NextResponse> {
             "text/csv",
             "text/plain",
           ],
+          // Banners use a stable path per deal (deals/{id}/banner/...) and
+          // are meant to replace in place; documents use the default
+          // no-overwrite to protect existing versioned uploads from being
+          // accidentally clobbered.
+          allowOverwrite: payload.kind === "banner",
           // No tokenPayload needed — completion is handled client-side
           // (see file header), so the server doesn't need to read context
           // from a webhook callback.
