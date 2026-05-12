@@ -57,14 +57,14 @@ export function ReceivesCommunicationToggle({
         onClick={toggle}
         title="Receiving email blasts. Click to opt out."
         className={cn(
-          "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-600",
+          "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800",
           isPending && "opacity-60",
         )}
       >
         {isPending ? (
-          <Loader2 className="h-3 w-3 animate-spin" />
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
         ) : (
-          <Bell className="h-3 w-3" />
+          <Bell className="h-3.5 w-3.5" />
         )}
       </button>
     );
