@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { userRoleEnum } from "./enums";
 import { organizations } from "./organizations";
@@ -19,6 +19,17 @@ export const users = pgTable("users", {
   // Owner can disable a member without deleting them; disabled users can't
   // sign in (getCurrentUser returns null for them).
   disabledAt: timestamp("disabled_at", { withTimezone: true }),
+  // Developer-mode flag. When true, this user receives dev-team
+  // notifications (new feedback, comments). Self-toggleable from /profile
+  // and only meaningful for owners — non-owners with the flag set are
+  // ignored by the notification query. Defaults false so new accounts
+  // never get notification spam without opting in.
+  isDeveloper: boolean("is_developer").notNull().default(false),
+  // Per-channel notification preferences. Default true so enabling
+  // developer mode immediately turns the firehose on; user can mute either
+  // channel from /profile. Only consulted when isDeveloper = true.
+  notifyOnNewFeedback: boolean("notify_on_new_feedback").notNull().default(true),
+  notifyOnNewComment: boolean("notify_on_new_comment").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

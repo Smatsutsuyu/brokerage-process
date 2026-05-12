@@ -9,6 +9,7 @@ import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 
 import { FeedbackList, type FeedbackRow } from "./feedback-list";
+import { TestSendButton } from "./test-send-button";
 
 export const dynamic = "force-dynamic";
 
@@ -94,12 +95,15 @@ export default async function FeedbackAdminPage() {
     <>
       <Sidebar />
       <main className="bg-brand-bg flex-1 overflow-y-auto px-8 py-8 [scrollbar-gutter:stable]">
-        <header className="mb-6">
-          <h1 className="text-[26px] leading-tight font-bold text-gray-900">Feedback</h1>
-          <p className="text-[13px] text-gray-400">
-            In-app feedback submissions. Update status as you triage; reply via the thread on each
-            item. Owner-only.
-          </p>
+        <header className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-[26px] leading-tight font-bold text-gray-900">Feedback</h1>
+            <p className="text-[13px] text-gray-400">
+              In-app feedback submissions. Update status as you triage; reply via the thread on
+              each item. Owner-only.
+            </p>
+          </div>
+          <TestSendButton defaultRecipient={me.email} />
         </header>
         <FeedbackList items={items} currentUserId={me.id} />
       </main>

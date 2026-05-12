@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 
 import { ChangePasswordForm } from "./change-password-form";
+import { DeveloperSettings } from "./developer-settings";
 import { ProfileForm } from "./profile-form";
 import { SignOutButton } from "./sign-out-button";
 
@@ -83,6 +84,14 @@ export default async function ProfilePage() {
               </div>
             </div>
           </section>
+
+          {me.role === "owner" && (
+            <DeveloperSettings
+              initialIsDeveloper={me.isDeveloper}
+              initialNotifyOnNewFeedback={me.notifyOnNewFeedback}
+              initialNotifyOnNewComment={me.notifyOnNewComment}
+            />
+          )}
 
           <section className="rounded-xl bg-white p-6 shadow-sm">
             <div className="mb-1 text-sm font-semibold text-gray-900">Change password</div>

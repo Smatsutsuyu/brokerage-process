@@ -17,6 +17,13 @@ export type CurrentUser = {
   disabledAt: Date | null;
   email: string;
   name: string;
+  // Developer-mode flag — owners can self-toggle from /profile. When true,
+  // additional dev-team UI (notification toggles, /admin pages) become
+  // visible for this user. Notifications are sent based on this flag plus
+  // the per-channel preferences below.
+  isDeveloper: boolean;
+  notifyOnNewFeedback: boolean;
+  notifyOnNewComment: boolean;
 };
 
 // Wrapped in React's cache() so multiple callers within a single request
@@ -37,6 +44,9 @@ async function _getCurrentUser(): Promise<CurrentUser | null> {
       authUserId: users.authUserId,
       role: users.role,
       disabledAt: users.disabledAt,
+      isDeveloper: users.isDeveloper,
+      notifyOnNewFeedback: users.notifyOnNewFeedback,
+      notifyOnNewComment: users.notifyOnNewComment,
       email: authUser.email,
       name: authUser.name,
     })
@@ -57,6 +67,9 @@ async function _getCurrentUser(): Promise<CurrentUser | null> {
     authUserId: row.authUserId,
     role: row.role,
     disabledAt: row.disabledAt,
+    isDeveloper: row.isDeveloper,
+    notifyOnNewFeedback: row.notifyOnNewFeedback,
+    notifyOnNewComment: row.notifyOnNewComment,
     email: row.email,
     name: row.name,
   };

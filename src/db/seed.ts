@@ -77,6 +77,9 @@ async function main() {
         orgId: org.id,
         authUserId: seanAuth.user.id,
         role: "owner",
+        // Sean's the dev — mark him so notifications route to him by
+        // default after a fresh seed. Chris stays as a non-dev owner.
+        isDeveloper: true,
       },
     ])
     .returning();

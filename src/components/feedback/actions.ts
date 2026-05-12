@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { feedbackComments, feedbackItems } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { notifyFeedbackComment, notifyFeedbackCreated } from "@/lib/email/notify";
 
 export type SubmitFeedbackInput = {
   section: string;
@@ -36,6 +37,20 @@ export async function submitFeedback(input: SubmitFeedbackInput) {
     comment: trimmed,
   });
 
+  // Fire-and-forget notification. Awaited so the Resend call completes
+  // before the serverless function exits, but errors are swallowed inside
+  // notifyFeedbackCreated so a notification failure can't break submission.
+  await notifyFeedbackCreated({
+    orgId: org.id,
+    props: {
+      submitterEmail: user?.email ?? null,
+      section: input.section.slice(0, 200),
+      pagePath: input.pagePath.slice(0, 500),
+      severity: input.severity,
+      body: trimmed,
+      commitSha: input.commitSha?.slice(0, 64) ?? null,
+    },
+  });
 }
 
 const COMMENT_MAX = 5000;
@@ -53,10 +68,11 @@ export async function addFeedbackComment(input: { feedbackId: string; body: stri
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
 
-  // Must belong to the same org as the feedback item.
+  // Must belong to the same org as the feedback item. Pull a few item
+  // fields up front for the notification payload (saves a second query).
   const item = await db.query.feedbackItems.findFirst({
     where: and(eq(feedbackItems.id, input.feedbackId), eq(feedbackItems.orgId, org.id)),
-    columns: { id: true },
+    columns: { id: true, section: true, comment: true, pagePath: true },
   });
   if (!item) throw new Error("Feedback item not found");
 
@@ -65,6 +81,22 @@ export async function addFeedbackComment(input: { feedbackId: string; body: stri
     userId: me.id,
     userEmail: me.email,
     body: trimmed,
+  });
+
+  // Notify all developer-mode owners with the new-comment channel enabled.
+  // Excludes the comment's own author (so a developer commenting on
+  // something doesn't email themselves). The notify helper handles the
+  // recipient query + the channel/preference filtering.
+  await notifyFeedbackComment({
+    orgId: org.id,
+    authorUserId: me.id,
+    props: {
+      authorEmail: me.email,
+      feedbackSection: item.section,
+      feedbackBody: item.comment,
+      feedbackPagePath: item.pagePath,
+      commentBody: trimmed,
+    },
   });
 
   revalidatePath("/admin/feedback");
