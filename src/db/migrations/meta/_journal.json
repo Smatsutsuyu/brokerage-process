@@ -99,6 +99,13 @@
       "when": 1778620683778,
       "tag": "0013_sweet_the_liberteens",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1778634233207,
+      "tag": "0014_pale_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }

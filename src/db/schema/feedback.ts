@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { feedbackSeverityEnum, feedbackStatusEnum } from "./enums";
 import { organizations } from "./organizations";
@@ -54,3 +54,34 @@ export const feedbackComments = pgTable("feedback_comments", {
 
 export type FeedbackComment = typeof feedbackComments.$inferSelect;
 export type NewFeedbackComment = typeof feedbackComments.$inferInsert;
+
+// Files attached to a feedback item. Stored in private Vercel Blob (same
+// store as the per-checklist documents); blob_path is the pathname only,
+// the binary streams via /api/feedback/[id]/attachments/[attachmentId]
+// with auth gating. Cascade-delete with the parent feedback item so
+// removing a feedback row cleans up the row references too.
+export const feedbackAttachments = pgTable("feedback_attachments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  feedbackId: uuid("feedback_id")
+    .notNull()
+    .references(() => feedbackItems.id, { onDelete: "cascade" }),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  // Original filename as it was uploaded — used for the download
+  // Content-Disposition header so the user gets the file back with the
+  // name they recognize.
+  name: text("name").notNull(),
+  mimeType: text("mime_type"),
+  sizeBytes: integer("size_bytes"),
+  // Vercel Blob pathname (NOT the URL). The streaming route resolves it
+  // via the SDK with BLOB_READ_WRITE_TOKEN.
+  blobPath: text("blob_path").notNull(),
+  uploadedBy: uuid("uploaded_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type FeedbackAttachment = typeof feedbackAttachments.$inferSelect;
+export type NewFeedbackAttachment = typeof feedbackAttachments.$inferInsert;

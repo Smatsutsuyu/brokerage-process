@@ -10,13 +10,16 @@ import {
   ChevronDown,
   ChevronRight,
   ExternalLink,
+  FileText,
   Loader2,
   MessageSquare,
+  Paperclip,
   Trash2,
 } from "lucide-react";
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
 import { Button } from "@/components/ui/button";
+import { deleteFeedbackAttachment } from "@/components/feedback/actions";
 import { CommentThread, type CommentRow } from "@/components/feedback/comment-thread";
 import {
   DropdownMenu,
@@ -32,6 +35,14 @@ import { deleteFeedback, setFeedbackStatus } from "./actions";
 type FeedbackStatus = "new" | "reviewed" | "actioned" | "complete" | "wontfix";
 type FeedbackSeverity = "nit" | "suggestion" | "bug" | "blocker";
 
+export type AttachmentRow = {
+  id: string;
+  name: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  uploadedAt: string;
+};
+
 export type FeedbackRow = {
   id: string;
   section: string;
@@ -45,6 +56,7 @@ export type FeedbackRow = {
   reviewedAt: string | null;
   actionedAt: string | null;
   comments: CommentRow[];
+  attachments: AttachmentRow[];
 };
 
 type StatusFilter = FeedbackStatus | "all" | "open";
@@ -408,10 +420,21 @@ function FeedbackRowView({ item, expanded, onToggle, currentUserId }: FeedbackRo
         <td className="px-4 py-2.5 font-medium text-gray-700">{item.section}</td>
         <td className="px-4 py-2.5 text-gray-600">
           <div className="line-clamp-2 max-w-md">{item.comment}</div>
-          {item.comments.length > 0 && !expanded && (
-            <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-blue-600">
-              <MessageSquare className="h-3 w-3" />
-              {item.comments.length} {item.comments.length === 1 ? "reply" : "replies"}
+          {!expanded && (item.comments.length > 0 || item.attachments.length > 0) && (
+            <div className="mt-0.5 inline-flex items-center gap-3 text-[11px]">
+              {item.comments.length > 0 && (
+                <span className="inline-flex items-center gap-1 text-blue-600">
+                  <MessageSquare className="h-3 w-3" />
+                  {item.comments.length} {item.comments.length === 1 ? "reply" : "replies"}
+                </span>
+              )}
+              {item.attachments.length > 0 && (
+                <span className="inline-flex items-center gap-1 text-amber-700">
+                  <Paperclip className="h-3 w-3" />
+                  {item.attachments.length}{" "}
+                  {item.attachments.length === 1 ? "file" : "files"}
+                </span>
+              )}
             </div>
           )}
         </td>
@@ -482,6 +505,14 @@ function FeedbackRowView({ item, expanded, onToggle, currentUserId }: FeedbackRo
                 </div>
               </div>
 
+              {/* Attachments — files uploaded with the original submission
+                  (example PDFs, screenshots, mockups). Click downloads /
+                  opens via /api/feedback/[id]/attachments/[id]. Owner can
+                  remove individual files. */}
+              {item.attachments.length > 0 && (
+                <AttachmentsList feedbackId={item.id} attachments={item.attachments} />
+              )}
+
               {/* Comment thread — replaces the old single-field response.
                   Owners can edit/delete any comment; non-owners can only
                   edit/delete their own (admin page is owner-only so the
@@ -546,5 +577,88 @@ function SortHeader({ column, sortBy, sortDir, onSort, className, children }: So
         {isActive && sortDir === "desc" && <ArrowDown className="h-3 w-3" />}
       </button>
     </th>
+  );
+}
+
+type AttachmentsListProps = {
+  feedbackId: string;
+  attachments: AttachmentRow[];
+};
+
+// Renders the per-item attachment list with download links + per-row
+// remove. Files are private blobs streamed through
+// /api/feedback/[id]/attachments/[attachmentId] (auth-checked + Content-
+// Disposition: inline so PDFs/images render in a tab; user can save from
+// there).
+function AttachmentsList({ feedbackId, attachments }: AttachmentsListProps) {
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [, startDelete] = useTransition();
+  const confirm = useConfirm();
+
+  async function handleDelete(att: AttachmentRow) {
+    const ok = await confirm({
+      title: "Remove this file?",
+      description: `${att.name} will be deleted from storage. This can't be undone.`,
+      confirmLabel: "Remove",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    setPendingId(att.id);
+    startDelete(async () => {
+      try {
+        await deleteFeedbackAttachment(att.id);
+      } finally {
+        setPendingId(null);
+      }
+    });
+  }
+
+  return (
+    <div className="rounded border border-amber-200 bg-amber-50/30 px-3 py-2">
+      <div className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold tracking-wider text-amber-800 uppercase">
+        <Paperclip className="h-3 w-3" />
+        Attachments ({attachments.length})
+      </div>
+      <ul className="space-y-1">
+        {attachments.map((att) => {
+          const isPending = pendingId === att.id;
+          return (
+            <li
+              key={att.id}
+              className="group flex items-center gap-2 rounded bg-white px-2 py-1.5 text-[12px]"
+            >
+              <FileText className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+              <a
+                href={`/api/feedback/${feedbackId}/attachments/${att.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={att.name}
+                className="hover:text-brand-blue flex-1 truncate font-medium text-gray-700"
+              >
+                {att.name}
+              </a>
+              {att.sizeBytes && (
+                <span className="flex-shrink-0 text-[10px] tabular-nums text-gray-400">
+                  {(att.sizeBytes / 1024).toFixed(0)} KB
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => handleDelete(att)}
+                disabled={isPending}
+                title="Remove"
+                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded text-gray-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 disabled:opacity-50"
+              >
+                {isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3 w-3" />
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

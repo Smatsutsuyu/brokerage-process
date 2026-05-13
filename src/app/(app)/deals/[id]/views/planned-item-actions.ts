@@ -124,6 +124,14 @@ const EXACT: Record<string, PlannedItemAction[]> = {
   "send out om / blast": [
     {
       kind: "send-email",
+      label: "Send OM blast",
+      feature: "OM blast email",
+      description:
+        "Composes templated OM-distribution emails per buyer tier (Green / Yellow), opens a review screen, then sends via Resend.",
+      phase: "phase_2",
+    },
+    {
+      kind: "send-email",
       label: "Send to buyers",
       feature: "OM blast email",
       description:

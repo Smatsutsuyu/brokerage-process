@@ -14,36 +14,65 @@
 // URL as a "document."
 
 import { NextResponse } from "next/server";
+import { and, eq } from "drizzle-orm";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 
+import { db } from "@/db";
+import { feedbackItems } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { authorizeDealAccess } from "@/lib/documents";
 
-type UploadKind = "document" | "banner";
-
-type UploadClientPayload = {
-  dealId: string;
-  checklistItemId: string | null;
-  // Determines per-blob policy: documents get the default no-overwrite
-  // behavior (each upload is a new versioned file); banners use a stable
-  // path per deal and need allowOverwrite=true so replacing in place
-  // works. Defaults to "document" for backward compat with older callers
-  // that didn't send a kind field.
-  kind: UploadKind;
-};
+// Discriminated union over upload contexts. Each kind has its own
+// authorization check + per-blob policy:
+//   document             — checklist file attached to a deal item.
+//                          No-overwrite (versioned by random suffix on
+//                          the client).
+//   banner               — per-deal hero image. Stable pathname so
+//                          replacing overwrites in place.
+//   feedback-attachment  — file attached to a feedback item from the
+//                          floating widget. Org-scoped; no overwrite.
+type UploadClientPayload =
+  | {
+      kind: "document";
+      dealId: string;
+      checklistItemId: string | null;
+    }
+  | {
+      kind: "banner";
+      dealId: string;
+    }
+  | {
+      kind: "feedback-attachment";
+      feedbackId: string;
+    };
 
 function parsePayload(raw: string | null | undefined): UploadClientPayload {
   if (!raw) throw new Error("Missing upload context");
-  const parsed = JSON.parse(raw) as Partial<UploadClientPayload>;
-  if (!parsed.dealId || typeof parsed.dealId !== "string") {
+  const parsed = JSON.parse(raw) as Partial<{
+    kind: string;
+    dealId: string;
+    checklistItemId: string | null;
+    feedbackId: string;
+  }>;
+
+  if (parsed.kind === "feedback-attachment") {
+    if (!parsed.feedbackId) {
+      throw new Error("Missing feedbackId in feedback-attachment payload");
+    }
+    return { kind: "feedback-attachment", feedbackId: parsed.feedbackId };
+  }
+  // Default to "document" for backward compat.
+  if (!parsed.dealId) {
     throw new Error("Missing dealId in upload payload");
   }
-  const kind: UploadKind = parsed.kind === "banner" ? "banner" : "document";
+  if (parsed.kind === "banner") {
+    return { kind: "banner", dealId: parsed.dealId };
+  }
   return {
+    kind: "document",
     dealId: parsed.dealId,
     checklistItemId: parsed.checklistItemId ?? null,
-    kind,
   };
 }
 
@@ -62,11 +91,29 @@ export async function POST(request: Request): Promise<NextResponse> {
       request,
       onBeforeGenerateToken: async (_pathname, clientPayload) => {
         const payload = parsePayload(clientPayload);
-        await authorizeDealAccess({
-          orgId: org.id,
-          dealId: payload.dealId,
-          checklistItemId: payload.checklistItemId,
-        });
+        // Per-kind authorization. Each branch verifies the caller can
+        // attach to the named target (deal/item or feedback item) before
+        // the token is issued.
+        if (payload.kind === "feedback-attachment") {
+          const [item] = await db
+            .select({ id: feedbackItems.id })
+            .from(feedbackItems)
+            .where(
+              and(
+                eq(feedbackItems.id, payload.feedbackId),
+                eq(feedbackItems.orgId, org.id),
+              ),
+            )
+            .limit(1);
+          if (!item) throw new Error("Feedback item not found");
+        } else {
+          await authorizeDealAccess({
+            orgId: org.id,
+            dealId: payload.dealId,
+            checklistItemId:
+              payload.kind === "document" ? payload.checklistItemId : null,
+          });
+        }
         return {
           // Allow common doc / image types. Vercel Blob will reject anything
           // outside this list; tightens the surface area vs accepting "*/*".
