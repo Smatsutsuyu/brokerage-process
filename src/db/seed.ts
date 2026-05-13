@@ -4,7 +4,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 
 import { auth } from "@/lib/auth/auth";
 
-import { seedChecklistForDeal } from "./checklist-template";
+import { seedChecklistForDeal } from "./seed-checklist";
 import { db, schema } from "./index";
 
 const DEV_PASSWORD = "lakebridge-dev-password";

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { seedChecklistForDeal } from "@/db/checklist-template";
+import { seedChecklistForDeal } from "@/db/seed-checklist";
 import { deals } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 

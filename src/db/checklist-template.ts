@@ -16,9 +16,12 @@
 // handlers land, replace `actions` entries with real wiring (or remove them
 // and wire directly in phase-section.tsx).
 
-import type { PlannedPhase } from "@/components/planned-action";
+// This file is imported by client components (phase-section.tsx) — keep it
+// pure data + browser-safe helpers. The DB write logic lives in
+// `./seed-checklist.ts` so the postgres driver doesn't get bundled into the
+// browser chunk.
 
-import { db, schema } from "./index";
+import type { PlannedPhase } from "@/components/planned-action";
 
 export type Phase = "phase_1" | "phase_2" | "phase_3" | "phase_4";
 
@@ -457,40 +460,4 @@ const ACTION_INDEX: Map<string, PlannedItemAction[]> = (() => {
 
 export function getPlannedActionsForItem(name: string): PlannedItemAction[] {
   return ACTION_INDEX.get(name.trim().toLowerCase()) ?? [];
-}
-
-// Inserts the full hierarchical checklist for a deal. Caller is responsible
-// for transaction scoping — pass `db` for an autocommit insert, or a tx
-// handle to bundle with sibling writes (e.g. createDeal does this so a
-// failed checklist insert rolls back the deal too).
-type DbHandle = typeof db;
-
-export async function seedChecklistForDeal(
-  client: DbHandle,
-  args: { orgId: string; dealId: string },
-): Promise<void> {
-  let phaseIdx = 0;
-  for (const spec of CHECKLIST_TEMPLATE) {
-    for (const [catIdx, cat] of spec.categories.entries()) {
-      const [category] = await client
-        .insert(schema.checklistCategories)
-        .values({
-          orgId: args.orgId,
-          dealId: args.dealId,
-          phase: spec.phase,
-          name: cat.name,
-          sortOrder: phaseIdx * 100 + catIdx,
-        })
-        .returning();
-
-      const itemRows = cat.items.map((it, idx) => {
-        const base = { orgId: args.orgId, categoryId: category.id, sortOrder: idx };
-        return typeof it === "string"
-          ? { ...base, name: it }
-          : { ...base, name: it.name, optional: it.optional ?? false };
-      });
-      await client.insert(schema.checklistItems).values(itemRows);
-    }
-    phaseIdx++;
-  }
 }
