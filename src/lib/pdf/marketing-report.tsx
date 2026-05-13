@@ -26,6 +26,12 @@ Font.register({
   ],
 });
 
+// Disable React-PDF's automatic mid-word hyphenation when wrapping. The
+// default behavior produced things like "competitive ad-vantage" in the
+// comments column. Returning the word as a single segment forces wrap
+// on whole-word boundaries instead.
+Font.registerHyphenationCallback((word) => [word]);
+
 // LAO logo loaded once at module-load time. Falls back to a text wordmark
 // when the file isn't present so a missing-asset deploy doesn't crash the
 // PDF render — it's visible in output, the team will notice and add it.
@@ -60,10 +66,10 @@ const COLORS = {
   textSecondary: "#6b7280",
   rowAlt: "#f3f4f6",
   green: "#22c55e",
-  // Matches the Evaluating chip background on the contacts tab (Tailwind
-  // yellow-100). Softer than the mustard tier-yellow ribbon — Chris wants
-  // the lighter shade in the PDF.
-  yellow: "#fef9c3",
+  // Slightly darker than the Evaluating chip's bg (yellow-100, #fef9c3) —
+  // that read too faint in the PDF tier bar. yellow-200 still in the soft
+  // family but visibly present.
+  yellow: "#fef08a",
   red: "#ef4444",
   notSelected: "#d1d5db",
 };
