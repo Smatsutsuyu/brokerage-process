@@ -7,7 +7,10 @@ import { toast } from "sonner";
 import {
   EmailPreviewModal,
   type EmailAttachment,
+  type EmailCcInitialEntry,
+  type EmailCcUserOption,
   type EmailRecipient,
+  type EmailSenderChoice,
 } from "@/components/email/email-preview-modal";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,9 +33,12 @@ import { OM_BLAST_TEMPLATE } from "@/lib/email-templates";
 import { cn } from "@/lib/utils";
 
 import {
+  getCcSelectionsForBuilders,
   getOmAttachments,
   getOmBlastTemplateContext,
+  getOrgCcOptions,
   previewBlastRecipients,
+  setBuilderCcUsers,
   type BlastPreviewRow,
 } from "../actions";
 import type { LeadOption } from "./lead-picker";
@@ -92,6 +98,10 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
   const [previewVars, setPreviewVars] = useState<Record<string, string>>({});
   const [attachmentChoices, setAttachmentChoices] = useState<EmailAttachment[]>([]);
   const [defaultAttachmentIds, setDefaultAttachmentIds] = useState<string[]>([]);
+  const [senderOptions, setSenderOptions] = useState<EmailSenderChoice[]>([]);
+  const [defaultSenderId, setDefaultSenderId] = useState<string | undefined>();
+  const [ccOptions, setCcOptions] = useState<EmailCcUserOption[]>([]);
+  const [ccInitial, setCcInitial] = useState<EmailCcInitialEntry[]>([]);
   const [previewLoading, startPreviewLoading] = useTransition();
 
   // Recompute the preview whenever filters change OR the modal opens.
@@ -164,19 +174,31 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
   }, [recipients]);
 
   // Hand off to the preview modal: load the deal's template vars (deal
-  // name, city, units, type, sender first name) AND every OM attachment
-  // option in parallel, then open the second step. The second step
-  // closes both modals on send.
+  // name, city, units, type, sender first name), every OM attachment
+  // option, sender options (Chris + current user), the org-wide CC pool,
+  // and per-builder CC selections — all in parallel — then open the
+  // second step. The second step closes both modals on send.
   function handleProceedToPreview() {
+    // Builder ids in the current recipient set — used to scope the CC
+    // selection lookup to just the builders we'd actually email.
+    const builderIds = Array.from(new Set(recipients.map((r) => r.builderId)));
     startPreviewLoading(async () => {
       try {
-        const [ctx, att] = await Promise.all([
+        const [ctx, att, ccOpts, ccSelections] = await Promise.all([
           getOmBlastTemplateContext({ dealId }),
           getOmAttachments({ dealId }),
+          getOrgCcOptions(),
+          builderIds.length > 0
+            ? getCcSelectionsForBuilders({ dealId, builderIds })
+            : Promise.resolve([] as EmailCcInitialEntry[]),
         ]);
         setPreviewVars(ctx.vars);
         setAttachmentChoices(att.choices);
         setDefaultAttachmentIds(att.recommendedIds);
+        setSenderOptions(ctx.senderOptions);
+        setDefaultSenderId(ctx.defaultSenderId);
+        setCcOptions(ccOpts);
+        setCcInitial(ccSelections);
         setPreviewOpen(true);
       } catch (err) {
         console.error("[blast] preview context load failed", err);
@@ -363,6 +385,15 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
         vars={previewVars}
         attachmentChoices={attachmentChoices}
         defaultSelectedAttachmentIds={defaultAttachmentIds}
+        senderOptions={senderOptions}
+        defaultSenderId={defaultSenderId}
+        ccOptions={ccOptions}
+        ccInitial={ccInitial}
+        onCcChange={async ({ builderId, userIds }) => {
+          // Persist to deal_buyers.cc_user_ids so the same selection is
+          // pre-checked next time anyone composes a blast to this builder.
+          await setBuilderCcUsers({ dealId, builderId, userIds });
+        }}
         onSend={async (emails) => {
           // Mocked: real Resend wiring lands when the sender domain is
           // verified (landadvisors.com DNS pending). Close both modals so

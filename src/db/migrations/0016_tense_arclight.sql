@@ -1,0 +1,1 @@
+ALTER TABLE "deal_buyers" ADD COLUMN "cc_user_ids" uuid[] DEFAULT '{}' NOT NULL;

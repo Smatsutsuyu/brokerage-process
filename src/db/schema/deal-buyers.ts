@@ -21,6 +21,13 @@ export const dealBuyers = pgTable(
       .references(() => builders.id, { onDelete: "restrict" }),
     tier: buyerTierEnum("tier").notNull().default("not_selected"),
     leadUserId: uuid("lead_user_id").references(() => users.id, { onDelete: "set null" }),
+    // Per-builder CC list — users who get copied on every email blast
+    // sent to this builder (e.g. Loan + Tim get CC'd on all Lennar
+    // emails). Stored as a uuid array rather than a join table; FK
+    // integrity isn't enforced per-element so a deleted user's id may
+    // linger here, but the read path filters those out by joining to
+    // users at query time. Default empty.
+    ccUserIds: uuid("cc_user_ids").array().notNull().default([]),
     calledAt: timestamp("called_at", { withTimezone: true }),
     omSentAt: timestamp("om_sent_at", { withTimezone: true }),
     comments: text("comments"),

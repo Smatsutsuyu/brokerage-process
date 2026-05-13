@@ -247,6 +247,38 @@ export async function setBuyerLead(input: {
   revalidatePath(`/deals/${input.dealId}`);
 }
 
+// Per-builder CC list — users CC'd on every email blast to this builder.
+// Caller sends the full new list each time (idempotent set semantics);
+// no diffing/add/remove actions needed. Scoped by (dealId, builderId)
+// so the caller doesn't have to track dealBuyerId — same identity
+// underneath.
+export async function setBuilderCcUsers(input: {
+  dealId: string;
+  builderId: string;
+  userIds: string[];
+}) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  // Dedupe defensively — array column has no unique constraint, and the
+  // UI's checkbox toggling shouldn't be able to send dupes anyway, but
+  // belt-and-suspenders.
+  const deduped = Array.from(new Set(input.userIds));
+
+  await db
+    .update(dealBuyers)
+    .set({ ccUserIds: deduped })
+    .where(
+      and(
+        eq(dealBuyers.dealId, input.dealId),
+        eq(dealBuyers.builderId, input.builderId),
+        eq(dealBuyers.orgId, org.id),
+      ),
+    );
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
 // Free-text comments on a builder's interest in this deal. Surfaces in the
 // Marketing Report PDF as the right-hand "Comments" column. Empty string
 // clears the field (stored as null).
@@ -1164,11 +1196,38 @@ export async function getLeadOptionsForOrg(): Promise<{ id: string; name: string
   return rows.map((r) => ({ id: r.id, name: r.name || r.email }));
 }
 
+// Available "From:" choices for outbound emails. Always lists Chris's
+// landadvisors.com address first (the canonical client-facing sender),
+// then the signed-in user as a separate option below a section break.
+// When the signed-in user IS Chris, the second entry is suppressed to
+// avoid a confusing duplicate.
+export type EmailSenderOption = {
+  id: string;
+  // Display name shown alongside the address (e.g. "Chris Shiota").
+  name: string;
+  email: string;
+  // First name used for {{senderName}} substitution in templated bodies.
+  firstName: string;
+};
+
+const CHRIS_SENDER: EmailSenderOption = {
+  id: "chris-landadvisors",
+  name: "Chris Shiota",
+  email: "cshiota@landadvisors.com",
+  firstName: "Chris",
+};
+
 // Template variables for the OM-blast email composer. Pulled from the deal
 // row + the signed-in user. Sender first name uses the first whitespace-
 // delimited token of the user's display name (Chris's signature style).
+//
+// Returns sender options too so the preview modal can render a "From:"
+// dropdown without a second round-trip — keeps the picker open-blocking
+// to one server call.
 export async function getOmBlastTemplateContext(input: { dealId: string }): Promise<{
   vars: Record<string, string>;
+  senderOptions: EmailSenderOption[];
+  defaultSenderId: string;
 }> {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
@@ -1189,14 +1248,36 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
   const senderFull = me?.name?.trim() ?? "";
   const senderFirst = senderFull.split(/\s+/)[0] || senderFull || "Chris";
 
+  // Build the sender list: Chris first, then the current user (suppressed
+  // when current user IS Chris to avoid a duplicate row).
+  const isCurrentChris = (me?.email ?? "").toLowerCase() === CHRIS_SENDER.email.toLowerCase();
+  const senderOptions: EmailSenderOption[] = [CHRIS_SENDER];
+  if (me && !isCurrentChris) {
+    senderOptions.push({
+      id: `user-${me.id}`,
+      name: me.name || me.email,
+      email: me.email,
+      firstName: senderFirst,
+    });
+  }
+  // Default to the current user when they're not Chris (most natural —
+  // "send as me by default"); otherwise default to Chris (the only option).
+  const defaultSenderId =
+    !isCurrentChris && me ? `user-${me.id}` : CHRIS_SENDER.id;
+
   return {
     vars: {
       dealName: deal.name,
       city: deal.city ?? "",
       units: deal.units != null ? String(deal.units) : "",
       type: deal.type ?? "",
-      senderName: senderFirst,
+      // senderName starts as the default sender's first name. The preview
+      // modal re-interpolates the body when the user picks a different
+      // sender so the signature stays in sync.
+      senderName: defaultSenderId === CHRIS_SENDER.id ? CHRIS_SENDER.firstName : senderFirst,
     },
+    senderOptions,
+    defaultSenderId,
   };
 }
 
@@ -1307,6 +1388,61 @@ export async function getOmAttachments(input: {
   }
 
   return { choices, recommendedIds };
+}
+
+// Org-wide CC options — every org member, with email so the picker
+// chip can show "Name <email>". Loaded fresh each preview-open so a
+// just-added member is immediately CC-able.
+export type CcUserOption = {
+  id: string;
+  name: string;
+  email: string;
+};
+
+export async function getOrgCcOptions(): Promise<CcUserOption[]> {
+  const org = await getCurrentOrg();
+  if (!org) return [];
+  const rows = await db
+    .select({ id: users.id, name: authUser.name, email: authUser.email })
+    .from(users)
+    .innerJoin(authUser, eq(authUser.id, users.authUserId))
+    .where(eq(users.orgId, org.id))
+    .orderBy(asc(authUser.name));
+  return rows.map((r) => ({ id: r.id, name: r.name || r.email, email: r.email }));
+}
+
+// Existing per-builder CC selections — Map-of-builderId-to-userIds shape
+// expected by the EmailPreviewModal. Empty array for builders with no
+// CCs configured. Stale ids in cc_user_ids (e.g. a deleted user) are
+// kept here as-is; the modal filters them out at render time when it
+// can't resolve the id against ccOptions.
+export type BuilderCcSelection = {
+  builderId: string;
+  userIds: string[];
+};
+
+export async function getCcSelectionsForBuilders(input: {
+  dealId: string;
+  builderIds: string[];
+}): Promise<BuilderCcSelection[]> {
+  const org = await getCurrentOrg();
+  if (!org || input.builderIds.length === 0) return [];
+
+  const rows = await db
+    .select({
+      builderId: dealBuyers.builderId,
+      ccUserIds: dealBuyers.ccUserIds,
+    })
+    .from(dealBuyers)
+    .where(
+      and(
+        eq(dealBuyers.dealId, input.dealId),
+        eq(dealBuyers.orgId, org.id),
+        inArray(dealBuyers.builderId, input.builderIds),
+      ),
+    );
+
+  return rows.map((r) => ({ builderId: r.builderId, userIds: r.ccUserIds ?? [] }));
 }
 
 // Verifies that an item belongs to the active deal — useful for any action

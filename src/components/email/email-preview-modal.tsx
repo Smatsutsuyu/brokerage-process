@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   Building2,
   ChevronLeft,
@@ -22,6 +22,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CcPicker } from "@/components/email/cc-picker";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,6 +44,37 @@ export type EmailRecipient = {
   contactEmail: string | null;
   builderId: string;
   builderName: string;
+};
+
+// One pickable "From:" choice. The signature line in the body is
+// re-interpolated when the user swaps senders so {{senderName}} stays
+// in sync with whoever's "from" field is selected.
+export type EmailSenderChoice = {
+  id: string;
+  name: string;
+  email: string;
+  // First name token used as the {{senderName}} substitution value.
+  firstName: string;
+  // Optional grouping — choices with the same group render together,
+  // separated from other groups by a divider in the dropdown. Used for
+  // the "Chris (canonical sender) — separator — current user" pattern.
+  group?: string;
+};
+
+// One pickable CC user. Email is included so the modal can render the
+// CC chip with both name and address (matches the To: chip style).
+export type EmailCcUserOption = {
+  id: string;
+  name: string;
+  email: string;
+};
+
+// Initial per-builder CC selection passed in by the caller. The modal
+// owns the editable state from there — toggling a name updates the
+// modal's internal map AND fires onCcChange so the caller can persist.
+export type EmailCcInitialEntry = {
+  builderId: string;
+  userIds: string[];
 };
 
 // One possible attachment the user can pick from. "file" = a stored doc
@@ -77,6 +116,22 @@ type EmailPreviewModalProps = {
   // Pre-checked attachment ids on first open. Caller picks the default
   // (e.g. latest file). User can toggle from there.
   defaultSelectedAttachmentIds?: string[];
+  // Available "From:" choices. When omitted or empty, the modal shows
+  // no sender picker (back-compat). When provided, the user picks one
+  // and {{senderName}} is re-interpolated in body+subject.
+  senderOptions?: EmailSenderChoice[];
+  defaultSenderId?: string;
+  // Pool of CC users the picker can select from. Empty / omitted hides
+  // the CC affordance entirely.
+  ccOptions?: EmailCcUserOption[];
+  // Initial per-builder CC selection. Modal's internal state is seeded
+  // from here on open; toggling changes call onCcChange so the caller
+  // can persist (e.g. to deal_buyers.cc_user_ids).
+  ccInitial?: EmailCcInitialEntry[];
+  // Persistence callback. Called with builderId + the new full user-id
+  // list after every toggle. Async so the picker can show loading state.
+  // Optional: omit to make CC ephemeral (for-this-send-only).
+  onCcChange?: (input: { builderId: string; userIds: string[] }) => Promise<void> | void;
   // Called when the user clicks Send. The actual transport (Resend etc.)
   // is the caller's concern — this modal only owns the compose/preview UX.
   // For now every caller passes a no-op + toast since email infra isn't
@@ -88,7 +143,12 @@ type EmailPreviewModalProps = {
 export type ResolvedEmail = {
   builderId: string;
   builderName: string;
+  // Selected sender (From: line). Null when no sender options were
+  // provided to the modal — caller falls back to a default.
+  from: EmailSenderChoice | null;
   to: { contactId: string; name: string; email: string }[];
+  // CC list pulled from the builder's per-builder CC config.
+  cc: { userId: string; name: string; email: string }[];
   subject: string;
   body: string;
   // Attachments the user picked from `attachmentChoices`. Same selection
@@ -133,10 +193,31 @@ export function EmailPreviewModal({
   vars,
   attachmentChoices,
   defaultSelectedAttachmentIds,
+  senderOptions,
+  defaultSenderId,
+  ccOptions,
+  ccInitial,
+  onCcChange,
   onSend,
 }: EmailPreviewModalProps) {
   const groups = useMemo(() => groupByBuilder(recipients), [recipients]);
   const choices = attachmentChoices ?? [];
+  const senders = senderOptions ?? [];
+  const ccOpts = ccOptions ?? [];
+
+  // Lookup helper for resolving user IDs → {name, email}. Used to render
+  // the CC chip line from whatever is currently selected.
+  const ccUserById = useMemo(() => {
+    const m = new Map<string, EmailCcUserOption>();
+    for (const o of ccOpts) m.set(o.id, o);
+    return m;
+  }, [ccOpts]);
+
+  // Editable per-builder CC selection. Map<builderId, Set<userId>>.
+  // Seeded from ccInitial each time the modal opens.
+  const [ccByBuilder, setCcByBuilder] = useState<Map<string, Set<string>>>(
+    () => new Map(),
+  );
 
   // Subject/body are edited once and apply to every email (per Chris:
   // single template, multiple recipients). The paginator below changes
@@ -150,18 +231,47 @@ export function EmailPreviewModal({
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<Set<string>>(
     () => new Set(),
   );
+  // Selected sender id — null when no senderOptions were provided.
+  const [selectedSenderId, setSelectedSenderId] = useState<string | null>(null);
+  const selectedSender = useMemo(
+    () => senders.find((s) => s.id === selectedSenderId) ?? null,
+    [senders, selectedSenderId],
+  );
 
-  // Reset to the resolved template + default attachment selection every
-  // time the modal opens. Without this, reopening shows stale edits from
-  // the previous session, which is confusing.
+  // Effective vars for {{...}} substitution = caller's vars overlaid with
+  // the picked sender's first name. This way swapping senders re-derives
+  // the signature line without a second server round-trip.
+  const effectiveVars = useMemo(
+    () =>
+      selectedSender
+        ? { ...vars, senderName: selectedSender.firstName }
+        : vars,
+    [vars, selectedSender],
+  );
+
+  // Reset to the resolved template + default attachment selection + default
+  // sender + initial CC selection every time the modal opens. Without
+  // this, reopening shows stale edits from the previous session.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) return;
-    setSubject(interpolate(template.subject, vars));
-    setBody(interpolate(template.body, vars));
     setActiveIdx(0);
     setSelectedAttachmentIds(new Set(defaultSelectedAttachmentIds ?? []));
-  }, [open, template.subject, template.body, vars, defaultSelectedAttachmentIds]);
+    setSelectedSenderId(defaultSenderId ?? senders[0]?.id ?? null);
+    const m = new Map<string, Set<string>>();
+    for (const e of ccInitial ?? []) m.set(e.builderId, new Set(e.userIds));
+    setCcByBuilder(m);
+  }, [open, defaultSelectedAttachmentIds, defaultSenderId, senders, ccInitial]);
+
+  // Re-interpolate subject/body whenever the modal opens OR the user
+  // swaps senders (so the signature line stays in sync). Tradeoff: any
+  // body edits the user made get overwritten when they switch senders.
+  // Acceptable since users typically pick the sender BEFORE editing.
+  useEffect(() => {
+    if (!open) return;
+    setSubject(interpolate(template.subject, effectiveVars));
+    setBody(interpolate(template.body, effectiveVars));
+  }, [open, template.subject, template.body, effectiveVars]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   function toggleAttachment(id: string) {
@@ -171,6 +281,21 @@ export function EmailPreviewModal({
       else next.add(id);
       return next;
     });
+  }
+
+  // Apply a new CC selection for one builder. Updates local state and
+  // hands the new list to the caller so persistence (server write) can
+  // happen out-of-band — picker keeps working even if the persistence
+  // call is in flight.
+  function applyCcChange(builderId: string, userIds: string[]) {
+    setCcByBuilder((prev) => {
+      const next = new Map(prev);
+      next.set(builderId, new Set(userIds));
+      return next;
+    });
+    if (onCcChange) {
+      void onCcChange({ builderId, userIds });
+    }
   }
 
   const selectedAttachments = useMemo(
@@ -190,18 +315,28 @@ export function EmailPreviewModal({
 
   async function handleSend() {
     if (total === 0) return;
-    const resolved: ResolvedEmail[] = groups.map((g) => ({
-      builderId: g.builderId,
-      builderName: g.builderName,
-      to: g.recipients.map((r) => ({
-        contactId: r.contactId,
-        name: r.contactName,
-        email: r.contactEmail!,
-      })),
-      subject,
-      body,
-      attachments: selectedAttachments,
-    }));
+    const resolved: ResolvedEmail[] = groups.map((g) => {
+      const ccIds = ccByBuilder.get(g.builderId) ?? new Set<string>();
+      const cc: ResolvedEmail["cc"] = [];
+      for (const id of ccIds) {
+        const u = ccUserById.get(id);
+        if (u) cc.push({ userId: u.id, name: u.name, email: u.email });
+      }
+      return {
+        builderId: g.builderId,
+        builderName: g.builderName,
+        from: selectedSender,
+        to: g.recipients.map((r) => ({
+          contactId: r.contactId,
+          name: r.contactName,
+          email: r.contactEmail!,
+        })),
+        cc,
+        subject,
+        body,
+        attachments: selectedAttachments,
+      };
+    });
     setSending(true);
     try {
       if (onSend) {
@@ -271,6 +406,58 @@ export function EmailPreviewModal({
               </button>
             </div>
 
+            {/* From: dropdown — same sender for every per-builder email.
+                Sender choices come grouped via the `group` field; we
+                interleave a divider when the group changes (Chris's
+                landadvisors address sits in its own group above the
+                signed-in user). Hidden entirely when no senderOptions
+                were passed. */}
+            {senders.length > 0 && (
+              <div className="grid gap-1.5">
+                <Label className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+                  From
+                </Label>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    className={cn(
+                      "inline-flex w-full items-center justify-between rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-left text-[13px] text-gray-800 hover:bg-gray-50",
+                    )}
+                  >
+                    {selectedSender ? (
+                      <span className="flex items-center gap-2 truncate">
+                        <Mail className="h-3 w-3 flex-shrink-0 text-gray-400" />
+                        <span className="font-medium">{selectedSender.name}</span>
+                        <span className="truncate text-gray-500">
+                          &lt;{selectedSender.email}&gt;
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">Pick a sender</span>
+                    )}
+                    <ChevronRight className="h-3 w-3 rotate-90 text-gray-400" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[--radix-dropdown-menu-trigger-width]">
+                    {senders.map((s, idx) => {
+                      const prevGroup = idx > 0 ? senders[idx - 1].group : undefined;
+                      const groupChanged = idx > 0 && (s.group ?? "") !== (prevGroup ?? "");
+                      return (
+                        <Fragment key={s.id}>
+                          {groupChanged && <DropdownMenuSeparator />}
+                          <DropdownMenuItem
+                            onClick={() => setSelectedSenderId(s.id)}
+                            className="flex flex-col items-start gap-0 text-[13px]"
+                          >
+                            <span className="font-medium text-gray-800">{s.name}</span>
+                            <span className="text-[11px] text-gray-500">{s.email}</span>
+                          </DropdownMenuItem>
+                        </Fragment>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+
             {/* To: line for the active email */}
             <div className="grid gap-1.5">
               <Label className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
@@ -290,6 +477,53 @@ export function EmailPreviewModal({
                 ))}
               </div>
             </div>
+
+            {/* CC line — editable per builder. Picker on the right
+                shows checkbox list of org members; toggling fires
+                onCcChange so caller can persist (writes to
+                deal_buyers.cc_user_ids in the OM-blast wiring).
+                Selection persists across deals — set Loan + Tim once
+                for Lennar and they show up pre-selected on every
+                future Lennar email. Hidden entirely when no
+                ccOptions are passed. */}
+            {active && ccOpts.length > 0 && (
+              <div className="grid gap-1.5">
+                <div className="flex items-baseline justify-between">
+                  <Label className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+                    CC
+                  </Label>
+                  <CcPicker
+                    selectedUserIds={Array.from(
+                      ccByBuilder.get(active.builderId) ?? new Set<string>(),
+                    )}
+                    options={ccOpts.map((o) => ({ id: o.id, name: o.name }))}
+                    onChange={(ids) => applyCcChange(active.builderId, ids)}
+                    emptyLabel="+ Add CC"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5 min-h-[34px]">
+                  {Array.from(ccByBuilder.get(active.builderId) ?? new Set<string>())
+                    .map((id) => ccUserById.get(id))
+                    .filter((u): u is EmailCcUserOption => Boolean(u))
+                    .map((c) => (
+                      <span
+                        key={c.id}
+                        className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[11px] text-purple-900"
+                        title={c.email}
+                      >
+                        <Mail className="h-2.5 w-2.5 text-purple-500" />
+                        <span className="font-medium">{c.name}</span>
+                        <span className="text-purple-700/70">&lt;{c.email}&gt;</span>
+                      </span>
+                    ))}
+                  {(ccByBuilder.get(active.builderId)?.size ?? 0) === 0 && (
+                    <span className="text-[11px] text-gray-400 italic">
+                      No CC recipients
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Attachments — same selection goes on every per-builder
                 email. Checklist of every available file/link on the
