@@ -5,7 +5,7 @@ import { Mail } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-import { getLeadOptionsForOrg } from "../actions";
+import { getLeadsOnDeal } from "../actions";
 import { BlastModal } from "./blast-modal";
 import type { LeadOption } from "./lead-picker";
 
@@ -19,7 +19,8 @@ type OmBlastButtonProps = {
 
 // Fetches lead options on first open (rather than at mount) so the
 // checklist render doesn't pay a query for every deal page load — only
-// the deals where Chris actually clicks "Send OM blast".
+// the deals where Chris actually clicks "Send OM blast". Deal-scoped so
+// the picker matches the contacts tab's behavior.
 export function OmBlastButton({ dealId, compact = true }: OmBlastButtonProps) {
   const [open, setOpen] = useState(false);
   const [leadOptions, setLeadOptions] = useState<LeadOption[] | null>(null);
@@ -29,14 +30,14 @@ export function OmBlastButton({ dealId, compact = true }: OmBlastButtonProps) {
     if (!open || leadOptions !== null) return;
     startLoad(async () => {
       try {
-        const opts = await getLeadOptionsForOrg();
+        const opts = await getLeadsOnDeal({ dealId });
         setLeadOptions(opts);
       } catch (err) {
         console.error("[om-blast] lead options load failed", err);
         setLeadOptions([]);
       }
     });
-  }, [open, leadOptions]);
+  }, [open, leadOptions, dealId]);
 
   return (
     <>

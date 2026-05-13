@@ -46,8 +46,6 @@ export const checklistItems = pgTable("checklist_items", {
   completed: boolean("completed").notNull().default(false),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   completedBy: uuid("completed_by").references(() => users.id, { onDelete: "set null" }),
-  externalLinkUrl: text("external_link_url"),
-  externalLinkLabel: text("external_link_label"),
   // User-entered working notes for this item. Separate from `description`
   // (which is the canonical item description from the seed) so the user's
   // notes are clearly authored content vs. boilerplate.
@@ -57,6 +55,25 @@ export const checklistItems = pgTable("checklist_items", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
+});
+
+// External-link attachments per checklist item (Dropbox / SharePoint /
+// Drive URLs etc.). Replaces the prior single externalLinkUrl/label
+// columns on checklist_items so an item can carry many references — same
+// stacking model as documents per item. Cascade-deletes with the parent
+// item; sortOrder lets the UI show stable order.
+export const checklistItemLinks = pgTable("checklist_item_links", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  checklistItemId: uuid("checklist_item_id")
+    .notNull()
+    .references(() => checklistItems.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  label: text("label"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const checklistItemDependencies = pgTable(
@@ -76,5 +93,7 @@ export type ChecklistCategory = typeof checklistCategories.$inferSelect;
 export type NewChecklistCategory = typeof checklistCategories.$inferInsert;
 export type ChecklistItem = typeof checklistItems.$inferSelect;
 export type NewChecklistItem = typeof checklistItems.$inferInsert;
+export type ChecklistItemLink = typeof checklistItemLinks.$inferSelect;
+export type NewChecklistItemLink = typeof checklistItemLinks.$inferInsert;
 export type ChecklistItemDependency = typeof checklistItemDependencies.$inferSelect;
 export type NewChecklistItemDependency = typeof checklistItemDependencies.$inferInsert;

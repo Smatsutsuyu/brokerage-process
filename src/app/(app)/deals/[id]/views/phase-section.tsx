@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 import { ChecklistCheckbox } from "./checklist-checkbox";
 import { ChecklistDocument, type AttachedDocument } from "./checklist-document";
-import { ChecklistLink } from "./checklist-link";
+import { ChecklistLink, type AttachedLink } from "./checklist-link";
 import { ChecklistNotesPanel, ChecklistNotesToggle } from "./checklist-notes";
 import { getPlannedActionsForItem, type ItemActionKind } from "@/db/checklist-template";
 import { OmBlastButton } from "./om-blast-button";
@@ -53,8 +53,6 @@ type Item = {
   name: string;
   optional: boolean;
   completed: boolean;
-  externalLinkUrl: string | null;
-  externalLinkLabel: string | null;
   notes: string | null;
 };
 
@@ -68,6 +66,8 @@ type PhaseSectionProps = {
   // Many docs allowed per item; newest first. Items with zero docs are
   // simply absent from the record.
   documentsByItemId: Record<string, AttachedDocument[]>;
+  // External-link attachments per item, ordered by sortOrder + age.
+  linksByItemId: Record<string, AttachedLink[]>;
   psaAttorney: PsaAttorneyState;
 };
 
@@ -78,6 +78,7 @@ export function PhaseSection({
   categories,
   itemsByCategory,
   documentsByItemId,
+  linksByItemId,
   psaAttorney,
 }: PhaseSectionProps) {
   const allItems = categories.flatMap((c) => itemsByCategory[c.id] ?? []);
@@ -176,16 +177,11 @@ export function PhaseSection({
                     const isNotesOpen = notesOpen.has(item.id);
                     const hasNotes = Boolean(item.notes && item.notes.trim());
                     const docs = documentsByItemId[item.id] ?? [];
-                    const link = item.externalLinkUrl
-                      ? {
-                          url: item.externalLinkUrl,
-                          label: item.externalLinkLabel,
-                        }
-                      : null;
+                    const links = linksByItemId[item.id] ?? [];
                     // Sub-row only renders when there's at least one
-                    // attached doc OR a link — otherwise the main row
-                    // stands alone.
-                    const hasAttachments = docs.length > 0 || Boolean(link);
+                    // attached doc OR link — otherwise the main row stands
+                    // alone.
+                    const hasAttachments = docs.length > 0 || links.length > 0;
                     return (
                       <div
                         key={item.id}
@@ -247,7 +243,7 @@ export function PhaseSection({
                             <ChecklistLink
                               dealId={dealId}
                               itemId={item.id}
-                              link={link}
+                              links={links}
                               slot="trigger"
                             />
                             {isPsaAttorneyItem(item.name) && (
@@ -286,7 +282,7 @@ export function PhaseSection({
                             <ChecklistLink
                               dealId={dealId}
                               itemId={item.id}
-                              link={link}
+                              links={links}
                               slot="display"
                             />
                           </div>

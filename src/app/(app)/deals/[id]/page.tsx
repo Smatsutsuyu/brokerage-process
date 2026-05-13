@@ -1,9 +1,10 @@
 import { notFound, redirect } from "next/navigation";
-import { and, count, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
   checklistCategories,
+  checklistItemLinks,
   checklistItems,
   consultants,
   dealContacts,
@@ -50,6 +51,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     issuesOpenRow,
     consultantsFilledRow,
     documentRows,
+    linkRows,
   ] = await Promise.all([
       db.query.deals.findFirst({
         where: and(eq(deals.id, id), eq(deals.orgId, org.id)),
@@ -72,8 +74,6 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
           optional: checklistItems.optional,
           completed: checklistItems.completed,
           sortOrder: checklistItems.sortOrder,
-          externalLinkUrl: checklistItems.externalLinkUrl,
-          externalLinkLabel: checklistItems.externalLinkLabel,
           notes: checklistItems.notes,
         })
         .from(checklistItems)
@@ -122,6 +122,29 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
           and(eq(documents.dealId, id), isNotNull(documents.checklistItemId)),
         )
         .orderBy(desc(documents.version)),
+      // External-link attachments per checklist item. Joined to
+      // checklist_categories so we can scope by deal in one query rather
+      // than collecting item ids first then doing a second inArray pass.
+      db
+        .select({
+          id: checklistItemLinks.id,
+          checklistItemId: checklistItemLinks.checklistItemId,
+          url: checklistItemLinks.url,
+          label: checklistItemLinks.label,
+          sortOrder: checklistItemLinks.sortOrder,
+          createdAt: checklistItemLinks.createdAt,
+        })
+        .from(checklistItemLinks)
+        .innerJoin(
+          checklistItems,
+          eq(checklistItems.id, checklistItemLinks.checklistItemId),
+        )
+        .innerJoin(
+          checklistCategories,
+          eq(checklistCategories.id, checklistItems.categoryId),
+        )
+        .where(eq(checklistCategories.dealId, id))
+        .orderBy(asc(checklistItemLinks.sortOrder), asc(checklistItemLinks.createdAt)),
     ]);
 
   if (!deal) notFound();
@@ -160,6 +183,17 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
       mimeType: d.mimeType,
       uploadedAt: d.uploadedAt.toISOString(),
     });
+  }
+
+  // Same shape for external links — bucket per item, ordered already by
+  // sortOrder + createdAt from the query.
+  const linksByItemId: Record<
+    string,
+    Array<{ id: string; url: string; label: string | null }>
+  > = {};
+  for (const lnk of linkRows) {
+    const list = (linksByItemId[lnk.checklistItemId] ??= []);
+    list.push({ id: lnk.id, url: lnk.url, label: lnk.label });
   }
 
   const counts = {
@@ -210,6 +244,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                   categories={categories}
                   items={items}
                   documentsByItemId={documentsByItemId}
+                  linksByItemId={linksByItemId}
                   psaAttorney={{
                     name: deal.psaAttorneyName,
                     firm: deal.psaAttorneyFirm,

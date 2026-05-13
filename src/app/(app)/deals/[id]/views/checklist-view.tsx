@@ -1,4 +1,5 @@
 import type { AttachedDocument } from "./checklist-document";
+import type { AttachedLink } from "./checklist-link";
 import { PhaseSection } from "./phase-section";
 import type { PsaAttorneyState } from "./psa-attorney";
 
@@ -18,8 +19,6 @@ type Item = {
   optional: boolean;
   completed: boolean;
   sortOrder: number;
-  externalLinkUrl: string | null;
-  externalLinkLabel: string | null;
   notes: string | null;
 };
 
@@ -30,6 +29,8 @@ type ChecklistViewProps = {
   // All documents attached to each checklist item, newest first, keyed
   // by item id. Items with zero docs are simply absent from the record.
   documentsByItemId: Record<string, AttachedDocument[]>;
+  // All external-link attachments per item, ordered by sortOrder + age.
+  linksByItemId: Record<string, AttachedLink[]>;
   // Deal-level PSA Attorney decision (rendered inline on the
   // "Determine PSA Attorney" row).
   psaAttorney: PsaAttorneyState;
@@ -49,6 +50,7 @@ export function ChecklistView({
   categories,
   items,
   documentsByItemId,
+  linksByItemId,
   psaAttorney,
 }: ChecklistViewProps) {
   if (categories.length === 0) {
@@ -89,6 +91,7 @@ export function ChecklistView({
             categories={phaseCats.map((c) => ({ id: c.id, name: c.name }))}
             itemsByCategory={itemsByCategory}
             documentsByItemId={documentsByItemId}
+            linksByItemId={linksByItemId}
             psaAttorney={psaAttorney}
           />
         );

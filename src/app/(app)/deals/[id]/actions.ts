@@ -8,6 +8,7 @@ import {
   authUser,
   builders,
   checklistCategories,
+  checklistItemLinks,
   checklistItems,
   consultants,
   contacts,
@@ -44,25 +45,17 @@ export async function toggleChecklistItem(input: {
   revalidatePath(`/deals/${input.dealId}`);
 }
 
-// Attach an external link (Dropbox folder, SharePoint, Google Drive, any
-// URL) to a checklist item. Stored on the item itself (not as a document
-// row) since the platform never sees the file — it's just a pointer for
-// users. Optional label so a long share URL can display as something
-// readable like "HOA Budget folder."
-export async function setChecklistItemLink(input: {
-  itemId: string;
-  dealId: string;
-  url: string;
-  label?: string;
-}) {
-  const org = await getCurrentOrg();
-  if (!org) throw new Error("No organization context");
-
-  const url = input.url.trim();
+// External-link attachments per checklist item. Stored as their own rows
+// (checklist_item_links) so a single item can carry many references —
+// Dropbox folder + Drive backup + SharePoint mirror, etc. Each link has a
+// URL + optional human label that beats showing a long share URL raw.
+//
+// Light URL validation — accept anything that parses as a URL with an
+// http(s) scheme. We don't restrict by host; users link to SharePoint,
+// Drive, internal file shares, anything.
+function validateLinkUrl(raw: string): string {
+  const url = raw.trim();
   if (!url) throw new Error("URL is required");
-  // Light validation — accept anything that parses as a URL with a scheme.
-  // We don't restrict to specific hosts; users may legitimately link to
-  // SharePoint, Drive, internal file shares, etc.
   try {
     const parsed = new URL(url);
     if (!parsed.protocol.startsWith("http")) {
@@ -71,29 +64,73 @@ export async function setChecklistItemLink(input: {
   } catch {
     throw new Error("Not a valid URL");
   }
+  return url;
+}
+
+export async function addChecklistItemLink(input: {
+  itemId: string;
+  dealId: string;
+  url: string;
+  label?: string;
+}): Promise<{ linkId: string }> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+  const url = validateLinkUrl(input.url);
+
+  // Verify the parent item belongs to this org before creating the link.
+  const [item] = await db
+    .select({ id: checklistItems.id })
+    .from(checklistItems)
+    .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)))
+    .limit(1);
+  if (!item) throw new Error("Checklist item not found");
+
+  const [created] = await db
+    .insert(checklistItemLinks)
+    .values({
+      orgId: org.id,
+      checklistItemId: input.itemId,
+      url,
+      label: input.label?.trim() || null,
+    })
+    .returning();
+
+  revalidatePath(`/deals/${input.dealId}`);
+  return { linkId: created.id };
+}
+
+export async function updateChecklistItemLink(input: {
+  linkId: string;
+  dealId: string;
+  url: string;
+  label?: string;
+}): Promise<void> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+  const url = validateLinkUrl(input.url);
 
   await db
-    .update(checklistItems)
-    .set({
-      externalLinkUrl: url,
-      externalLinkLabel: input.label?.trim() || null,
-    })
-    .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)));
+    .update(checklistItemLinks)
+    .set({ url, label: input.label?.trim() || null })
+    .where(
+      and(eq(checklistItemLinks.id, input.linkId), eq(checklistItemLinks.orgId, org.id)),
+    );
 
   revalidatePath(`/deals/${input.dealId}`);
 }
 
-export async function clearChecklistItemLink(input: {
-  itemId: string;
+export async function deleteChecklistItemLink(input: {
+  linkId: string;
   dealId: string;
-}) {
+}): Promise<void> {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
 
   await db
-    .update(checklistItems)
-    .set({ externalLinkUrl: null, externalLinkLabel: null })
-    .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)));
+    .delete(checklistItemLinks)
+    .where(
+      and(eq(checklistItemLinks.id, input.linkId), eq(checklistItemLinks.orgId, org.id)),
+    );
 
   revalidatePath(`/deals/${input.dealId}`);
 }
@@ -1083,6 +1120,32 @@ export async function previewBlastRecipients(input: {
     leadUserId: r.leadUserId,
     leadName: r.leadName,
   }));
+}
+
+// Leads currently assigned on this deal — pulled from dealBuyers.leadUserId.
+// Used by the OM-blast filter dropdown so the picker only surfaces people
+// who are actually leading a builder on this deal (per Chris: org-wide
+// would show every member of the org including coordinators who never
+// lead a buyer relationship — noise).
+export async function getLeadsOnDeal(input: {
+  dealId: string;
+}): Promise<{ id: string; name: string }[]> {
+  const org = await getCurrentOrg();
+  if (!org) return [];
+
+  const rows = await db
+    .selectDistinct({
+      id: users.id,
+      name: authUser.name,
+      email: authUser.email,
+    })
+    .from(dealBuyers)
+    .innerJoin(users, eq(users.id, dealBuyers.leadUserId))
+    .innerJoin(authUser, eq(authUser.id, users.authUserId))
+    .where(and(eq(dealBuyers.dealId, input.dealId), eq(dealBuyers.orgId, org.id)))
+    .orderBy(asc(authUser.name));
+
+  return rows.map((r) => ({ id: r.id, name: r.name || r.email }));
 }
 
 // Org-wide lead options — for callers that need them without going through

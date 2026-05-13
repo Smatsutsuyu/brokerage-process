@@ -148,6 +148,16 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
 
   const recipientCount = recipients.length;
   const recipientsWithEmail = recipients.filter((r) => r.contactEmail).length;
+  // Email count = unique builders among recipients-with-email, since each
+  // builder gets one email with multiple To: addresses (matches the
+  // preview modal's grouping).
+  const emailCount = useMemo(() => {
+    const builders = new Set<string>();
+    for (const r of recipients) {
+      if (r.contactEmail) builders.add(r.builderId);
+    }
+    return builders.size;
+  }, [recipients]);
 
   // Hand off to the preview modal: load the deal's template vars (deal
   // name, city, units, type, sender first name) and open the second step.
@@ -326,8 +336,7 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
             ) : (
               <ArrowRight className="h-3.5 w-3.5" />
             )}
-            Next: review {recipientsWithEmail || "0"}{" "}
-            {recipientsWithEmail === 1 ? "email" : "emails"}
+            Next: review {emailCount || "0"} {emailCount === 1 ? "email" : "emails"}
           </Button>
         </DialogFooter>
       </DialogContent>

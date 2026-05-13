@@ -179,6 +179,22 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
     [groups],
   );
 
+  // Lead options for the OM-blast filter — only people actually leading a
+  // builder on this deal. Avoids the dropdown listing every org member
+  // (coordinators, analysts) who never lead a buyer relationship.
+  const dealLeadOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: LeadOption[] = [];
+    for (const g of groups) {
+      if (g.kind !== "builder") continue;
+      if (!g.leadUserId || !g.leadName || seen.has(g.leadUserId)) continue;
+      seen.add(g.leadUserId);
+      out.push({ id: g.leadUserId, name: g.leadName });
+    }
+    out.sort((a, b) => a.name.localeCompare(b.name));
+    return out;
+  }, [groups]);
+
   function toggleExpanded(id: string) {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -316,7 +332,7 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
         open={blastOpen}
         onOpenChange={setBlastOpen}
         dealId={dealId}
-        leadOptions={leadOptions}
+        leadOptions={dealLeadOptions}
       />
 
       <AddContactModal
