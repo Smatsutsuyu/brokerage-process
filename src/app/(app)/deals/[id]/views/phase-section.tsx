@@ -16,7 +16,7 @@ import { ChecklistCheckbox } from "./checklist-checkbox";
 import { ChecklistDocument, type AttachedDocument } from "./checklist-document";
 import { ChecklistLink } from "./checklist-link";
 import { ChecklistNotesPanel, ChecklistNotesToggle } from "./checklist-notes";
-import { getPlannedActionsForItem, type ItemActionKind } from "./planned-item-actions";
+import { getPlannedActionsForItem, type ItemActionKind } from "@/db/checklist-template";
 import { PsaAttorneyInline, type PsaAttorneyState } from "./psa-attorney";
 
 // Lowercased substring match — flexible to wording tweaks ("Determine PSA
