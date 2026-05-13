@@ -370,10 +370,11 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
     phase: "phase_4",
     categories: [
       {
-        name: "Items",
+        name: "Due Diligence Tracking",
         items: [
+          "Create Consultant Roster & Send Out",
           {
-            name: "Share All Due Diligence",
+            name: "Share Due Diligence Material / Set Meeting",
             actions: [
               {
                 kind: "send-email",
@@ -385,8 +386,9 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
               },
             ],
           },
+          "Create Index of Due Diligence Material",
           {
-            name: "Kick Off PSA",
+            name: "Kick off PSA",
             actions: [
               {
                 kind: "send-email",
@@ -398,32 +400,24 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
             ],
           },
           {
-            name: "Kickoff Call",
-            actions: [
-              {
-                kind: "send-email",
-                label: "Send invite",
-                feature: "Kickoff call invite",
-                description: "Drafts a calendar invite email to the Buyer Team and Owner Team.",
-                phase: "phase_2",
-              },
-            ],
-          },
-          {
-            name: "Bi-Weekly Meeting Schedule for DD",
+            name: "Schedule Recurring Call",
             actions: [
               {
                 kind: "schedule-reminder",
                 label: "Schedule meetings",
-                feature: "Bi-weekly DD recurring meetings",
-                description: "Schedules a recurring bi-weekly DD meeting reminder for this deal.",
+                feature: "Recurring DD call reminders",
+                description:
+                  "Schedules a recurring DD call reminder for this deal.",
                 phase: "phase_2",
               },
             ],
           },
-          "Determine CTC Date",
-          "Issues Tracking Sheet (living document)",
-          "Consultant Roster",
+          "Issues Tracking Sheet & Send Out before calls",
+          "Determine CTC Due Date",
+          "Finalize CTC / New Purchase Price",
+          "Investment Committee",
+          "Feasibility",
+          "Closing Date",
         ],
       },
     ],
