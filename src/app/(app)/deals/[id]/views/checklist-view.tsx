@@ -27,9 +27,9 @@ type ChecklistViewProps = {
   dealId: string;
   categories: Category[];
   items: Item[];
-  // Latest document attached to each checklist item, keyed by item id.
-  // Items with no document are simply absent from the record.
-  documentByItemId: Record<string, AttachedDocument>;
+  // All documents attached to each checklist item, newest first, keyed
+  // by item id. Items with zero docs are simply absent from the record.
+  documentsByItemId: Record<string, AttachedDocument[]>;
   // Deal-level PSA Attorney decision (rendered inline on the
   // "Determine PSA Attorney" row).
   psaAttorney: PsaAttorneyState;
@@ -48,7 +48,7 @@ export function ChecklistView({
   dealId,
   categories,
   items,
-  documentByItemId,
+  documentsByItemId,
   psaAttorney,
 }: ChecklistViewProps) {
   if (categories.length === 0) {
@@ -88,7 +88,7 @@ export function ChecklistView({
             headerBg={meta.bg}
             categories={phaseCats.map((c) => ({ id: c.id, name: c.name }))}
             itemsByCategory={itemsByCategory}
-            documentByItemId={documentByItemId}
+            documentsByItemId={documentsByItemId}
             psaAttorney={psaAttorney}
           />
         );

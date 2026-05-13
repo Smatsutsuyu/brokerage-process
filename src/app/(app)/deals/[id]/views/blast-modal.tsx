@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Building2, Loader2, Mail, Send } from "lucide-react";
+import { ArrowRight, Building2, Loader2, Mail } from "lucide-react";
+import { toast } from "sonner";
 
+import {
+  EmailPreviewModal,
+  type EmailRecipient,
+} from "@/components/email/email-preview-modal";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,10 +25,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toastComingSoon } from "@/components/planned-action";
+import { OM_BLAST_TEMPLATE } from "@/lib/email-templates";
 import { cn } from "@/lib/utils";
 
 import {
+  getOmBlastTemplateContext,
   previewBlastRecipients,
   type BlastPreviewRow,
 } from "../actions";
@@ -80,6 +86,9 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
   const [assigneeChoice, setAssigneeChoice] = useState<string>(ANY_ASSIGNEE);
   const [recipients, setRecipients] = useState<BlastPreviewRow[]>([]);
   const [isLoading, startLoading] = useTransition();
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewVars, setPreviewVars] = useState<Record<string, string>>({});
+  const [previewLoading, startPreviewLoading] = useTransition();
 
   // Recompute the preview whenever filters change OR the modal opens.
   // useEffect rather than onChange so the recompute is debounced naturally
@@ -139,6 +148,37 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
 
   const recipientCount = recipients.length;
   const recipientsWithEmail = recipients.filter((r) => r.contactEmail).length;
+
+  // Hand off to the preview modal: load the deal's template vars (deal
+  // name, city, units, type, sender first name) and open the second step.
+  // The second step closes both modals on send.
+  function handleProceedToPreview() {
+    startPreviewLoading(async () => {
+      try {
+        const ctx = await getOmBlastTemplateContext({ dealId });
+        setPreviewVars(ctx.vars);
+        setPreviewOpen(true);
+      } catch (err) {
+        console.error("[blast] template context failed", err);
+      }
+    });
+  }
+
+  // Recipients with an email address, mapped into the shape the preview
+  // modal expects. Filtered here so the modal can trust every row.
+  const previewRecipients = useMemo<EmailRecipient[]>(
+    () =>
+      recipients
+        .filter((r) => r.contactEmail)
+        .map((r) => ({
+          contactId: r.contactId,
+          contactName: r.contactName,
+          contactEmail: r.contactEmail,
+          builderId: r.builderId,
+          builderName: r.builderName,
+        })),
+    [recipients],
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -271,27 +311,51 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
 
         <DialogFooter>
           <div className="mr-auto text-[10px] text-gray-500">
-            Preview only — sending lands in Phase 2 once email infra is live.
+            Step 1 of 2 — pick recipients, then preview the email.
           </div>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            Cancel
           </Button>
           <Button
             type="button"
-            disabled={recipientsWithEmail === 0}
-            onClick={() =>
-              toastComingSoon({
-                feature: "OM blast send",
-                description:
-                  "Composes the templated OM-distribution email per tier and sends via Resend. Wiring up requires the landadvisors.com sender-domain verification.",
-              })
-            }
+            disabled={recipientsWithEmail === 0 || previewLoading}
+            onClick={handleProceedToPreview}
           >
-            <Send className="h-3.5 w-3.5" />
-            Send to {recipientsWithEmail || "0"}
+            {previewLoading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ArrowRight className="h-3.5 w-3.5" />
+            )}
+            Next: review {recipientsWithEmail || "0"}{" "}
+            {recipientsWithEmail === 1 ? "email" : "emails"}
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Step 2 — render alongside (sibling Dialog) so the two modals can
+          coordinate their open state. Closing the preview keeps the picker
+          modal open so the user can adjust filters and try again. */}
+      <EmailPreviewModal
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        title="OM blast"
+        recipients={previewRecipients}
+        template={OM_BLAST_TEMPLATE}
+        vars={previewVars}
+        onSend={async (emails) => {
+          // Mocked: real Resend wiring lands when the sender domain is
+          // verified (landadvisors.com DNS pending). Close both modals so
+          // the user lands back on the contacts/checklist they started from.
+          toast.success(
+            `Mock-sent ${emails.length} ${emails.length === 1 ? "email" : "emails"}`,
+            {
+              description: "Email infrastructure isn't wired yet — no real messages were sent.",
+              duration: 5000,
+            },
+          );
+          onOpenChange(false);
+        }}
+      />
     </Dialog>
   );
 }

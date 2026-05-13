@@ -1085,6 +1085,57 @@ export async function previewBlastRecipients(input: {
   }));
 }
 
+// Org-wide lead options — for callers that need them without going through
+// loadBuyers (e.g., the OM-blast button on the checklist row, where the
+// page hasn't loaded buyer data yet).
+export async function getLeadOptionsForOrg(): Promise<{ id: string; name: string }[]> {
+  const org = await getCurrentOrg();
+  if (!org) return [];
+  const rows = await db
+    .select({ id: users.id, name: authUser.name, email: authUser.email })
+    .from(users)
+    .innerJoin(authUser, eq(authUser.id, users.authUserId))
+    .where(eq(users.orgId, org.id))
+    .orderBy(asc(authUser.name));
+  return rows.map((r) => ({ id: r.id, name: r.name || r.email }));
+}
+
+// Template variables for the OM-blast email composer. Pulled from the deal
+// row + the signed-in user. Sender first name uses the first whitespace-
+// delimited token of the user's display name (Chris's signature style).
+export async function getOmBlastTemplateContext(input: { dealId: string }): Promise<{
+  vars: Record<string, string>;
+}> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+  const me = await getCurrentUser();
+
+  const [deal] = await db
+    .select({
+      name: deals.name,
+      city: deals.city,
+      units: deals.units,
+      type: deals.type,
+    })
+    .from(deals)
+    .where(and(eq(deals.id, input.dealId), eq(deals.orgId, org.id)))
+    .limit(1);
+  if (!deal) throw new Error("Deal not found");
+
+  const senderFull = me?.name?.trim() ?? "";
+  const senderFirst = senderFull.split(/\s+/)[0] || senderFull || "Chris";
+
+  return {
+    vars: {
+      dealName: deal.name,
+      city: deal.city ?? "",
+      units: deal.units != null ? String(deal.units) : "",
+      type: deal.type ?? "",
+      senderName: senderFirst,
+    },
+  };
+}
+
 // Verifies that an item belongs to the active deal — useful for any action
 // that takes an itemId from the client. Lightweight no-op if the join holds.
 export async function assertItemOnDeal(itemId: string, dealId: string) {

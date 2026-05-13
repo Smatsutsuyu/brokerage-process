@@ -137,22 +137,29 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
 
   // Latest doc per checklist item. documentRows is already sorted version
   // desc, so the first entry seen for each itemId is the most recent. Plain
-  // record (not a Map) so the data crosses the RSC → client-component
-  // boundary cleanly.
-  const documentByItemId: Record<
+  // All docs per checklist item, newest first (the source query already
+  // sorts by version desc, so we can append in iteration order). Plain
+  // record-of-arrays for clean RSC→client serialization.
+  const documentsByItemId: Record<
     string,
-    { id: string; name: string; version: number; mimeType: string | null; uploadedAt: string }
+    Array<{
+      id: string;
+      name: string;
+      version: number;
+      mimeType: string | null;
+      uploadedAt: string;
+    }>
   > = {};
   for (const d of documentRows) {
     if (!d.checklistItemId) continue;
-    if (documentByItemId[d.checklistItemId]) continue;
-    documentByItemId[d.checklistItemId] = {
+    const list = (documentsByItemId[d.checklistItemId] ??= []);
+    list.push({
       id: d.id,
       name: d.name,
       version: d.version,
       mimeType: d.mimeType,
       uploadedAt: d.uploadedAt.toISOString(),
-    };
+    });
   }
 
   const counts = {
@@ -202,7 +209,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                   dealId={id}
                   categories={categories}
                   items={items}
-                  documentByItemId={documentByItemId}
+                  documentsByItemId={documentsByItemId}
                   psaAttorney={{
                     name: deal.psaAttorneyName,
                     firm: deal.psaAttorneyFirm,

@@ -17,6 +17,7 @@ import { ChecklistDocument, type AttachedDocument } from "./checklist-document";
 import { ChecklistLink } from "./checklist-link";
 import { ChecklistNotesPanel, ChecklistNotesToggle } from "./checklist-notes";
 import { getPlannedActionsForItem, type ItemActionKind } from "@/db/checklist-template";
+import { OmBlastButton } from "./om-blast-button";
 import { PsaAttorneyInline, type PsaAttorneyState } from "./psa-attorney";
 
 // Lowercased substring match — flexible to wording tweaks ("Determine PSA
@@ -24,6 +25,14 @@ import { PsaAttorneyInline, type PsaAttorneyState } from "./psa-attorney";
 // exact name match.
 function isPsaAttorneyItem(name: string): boolean {
   return name.toLowerCase().includes("psa attorney");
+}
+
+// Same loose-match style as isPsaAttorneyItem so a slight rename of the
+// template item ("Send out OM Blast" vs "Send out OM / Blast") doesn't
+// silently lose the real button.
+function isOmBlastItem(name: string): boolean {
+  const n = name.toLowerCase();
+  return n.includes("send out om") && n.includes("blast");
 }
 
 const KIND_ICON: Record<ItemActionKind, typeof FileText> = {
@@ -56,7 +65,9 @@ type PhaseSectionProps = {
   categories: Category[];
   // Plain record (not Map) so it serializes cleanly across the RSC boundary.
   itemsByCategory: Record<string, Item[]>;
-  documentByItemId: Record<string, AttachedDocument>;
+  // Many docs allowed per item; newest first. Items with zero docs are
+  // simply absent from the record.
+  documentsByItemId: Record<string, AttachedDocument[]>;
   psaAttorney: PsaAttorneyState;
 };
 
@@ -66,7 +77,7 @@ export function PhaseSection({
   headerBg,
   categories,
   itemsByCategory,
-  documentByItemId,
+  documentsByItemId,
   psaAttorney,
 }: PhaseSectionProps) {
   const allItems = categories.flatMap((c) => itemsByCategory[c.id] ?? []);
@@ -164,16 +175,17 @@ export function PhaseSection({
                     const isNotesEditing = notesEditing.has(item.id);
                     const isNotesOpen = notesOpen.has(item.id);
                     const hasNotes = Boolean(item.notes && item.notes.trim());
-                    const doc = documentByItemId[item.id] ?? null;
+                    const docs = documentsByItemId[item.id] ?? [];
                     const link = item.externalLinkUrl
                       ? {
                           url: item.externalLinkUrl,
                           label: item.externalLinkLabel,
                         }
                       : null;
-                    // Sub-row only renders when there's an attached doc or
-                    // link — otherwise the main row stands alone.
-                    const hasAttachments = Boolean(doc || link);
+                    // Sub-row only renders when there's at least one
+                    // attached doc OR a link — otherwise the main row
+                    // stands alone.
+                    const hasAttachments = docs.length > 0 || Boolean(link);
                     return (
                       <div
                         key={item.id}
@@ -208,6 +220,12 @@ export function PhaseSection({
                               placeholders also live here since they're
                               short-lived chips, not artifacts. */}
                           <div className="flex items-center gap-0.5">
+                            {/* Real action: opens BlastModal → email
+                                preview. Replaces the placeholder toasts
+                                that used to live on this row. */}
+                            {isOmBlastItem(item.name) && (
+                              <OmBlastButton dealId={dealId} />
+                            )}
                             {itemActions.map((a) => (
                               <PlannedAction
                                 key={a.label}
@@ -222,7 +240,7 @@ export function PhaseSection({
                             <ChecklistDocument
                               dealId={dealId}
                               checklistItemId={item.id}
-                              document={doc}
+                              documents={docs}
                               itemName={item.name}
                               slot="trigger"
                             />
@@ -261,7 +279,7 @@ export function PhaseSection({
                             <ChecklistDocument
                               dealId={dealId}
                               checklistItemId={item.id}
-                              document={doc}
+                              documents={docs}
                               itemName={item.name}
                               slot="display"
                             />

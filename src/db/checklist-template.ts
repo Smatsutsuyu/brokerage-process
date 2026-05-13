@@ -213,27 +213,10 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
               },
             ],
           },
-          {
-            name: "Send out OM / Blast (personalized by buyer tier)",
-            actions: [
-              {
-                kind: "send-email",
-                label: "Send OM blast",
-                feature: "OM blast email",
-                description:
-                  "Composes templated OM-distribution emails per buyer tier (Green / Yellow), opens a review screen, then sends via Resend.",
-                phase: "phase_2",
-              },
-              {
-                kind: "send-email",
-                label: "Send to buyers",
-                feature: "OM blast email",
-                description:
-                  "Composes a templated OM-distribution email per buyer tier (Green / Yellow), opens a review screen, then sends via Resend.",
-                phase: "phase_2",
-              },
-            ],
-          },
+          // OM-blast row's "Send OM blast" button is real now — wired in
+          // phase-section.tsx via isOmBlastItem() → <OmBlastButton/>. No
+          // PlannedAction placeholder needed on this row.
+          "Send out OM / Blast (personalized by buyer tier)",
           {
             name: "Request In-Person Meeting with Top (Green) Buyers",
             actions: [
