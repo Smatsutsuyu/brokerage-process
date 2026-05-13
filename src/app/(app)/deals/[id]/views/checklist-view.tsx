@@ -76,6 +76,13 @@ export function ChecklistView({
     (itemsByCategory[item.categoryId] ??= []).push(item);
   }
 
+  // Identify the "Offering Memorandum" item once so the OM-blast button
+  // (in Phase 2) can draw a visual connector to it (in Phase 1) on hover.
+  // Match by name with the same loose-substring style used elsewhere so
+  // a slight rename doesn't silently break the connector.
+  const omItemId =
+    items.find((i) => i.name.toLowerCase().includes("offering memorandum"))?.id ?? null;
+
   return (
     <div className="space-y-6">
       {PHASES.map((phase) => {
@@ -93,6 +100,7 @@ export function ChecklistView({
             documentsByItemId={documentsByItemId}
             linksByItemId={linksByItemId}
             psaAttorney={psaAttorney}
+            omItemId={omItemId}
           />
         );
       })}

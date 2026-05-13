@@ -69,6 +69,10 @@ type PhaseSectionProps = {
   // External-link attachments per item, ordered by sortOrder + age.
   linksByItemId: Record<string, AttachedLink[]>;
   psaAttorney: PsaAttorneyState;
+  // ID of the "Offering Memorandum" item — passed to the OM-blast button
+  // so it can draw a hover-time connector showing where the attached file
+  // lives. Null when no OM item exists on this deal.
+  omItemId: string | null;
 };
 
 export function PhaseSection({
@@ -80,6 +84,7 @@ export function PhaseSection({
   documentsByItemId,
   linksByItemId,
   psaAttorney,
+  omItemId,
 }: PhaseSectionProps) {
   const allItems = categories.flatMap((c) => itemsByCategory[c.id] ?? []);
   const done = allItems.filter((i) => i.completed).length;
@@ -185,8 +190,13 @@ export function PhaseSection({
                     return (
                       <div
                         key={item.id}
+                        // Stable DOM id so cross-phase visual connectors
+                        // (e.g. the OM-blast button's hover line back to
+                        // "Offering Memorandum") can target this row by
+                        // getElementById.
+                        id={`checklist-item-${item.id}`}
                         className={cn(
-                          "border-b border-gray-100 last:border-b-0",
+                          "border-b border-gray-100 last:border-b-0 transition-shadow",
                           item.completed && "bg-green-50",
                         )}
                       >
@@ -220,7 +230,10 @@ export function PhaseSection({
                                 preview. Replaces the placeholder toasts
                                 that used to live on this row. */}
                             {isOmBlastItem(item.name) && (
-                              <OmBlastButton dealId={dealId} />
+                              <OmBlastButton
+                                dealId={dealId}
+                                attachmentSourceItemId={omItemId}
+                              />
                             )}
                             {itemActions.map((a) => (
                               <PlannedAction
