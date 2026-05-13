@@ -37,7 +37,17 @@ export type PlannedItemAction = {
 
 export type TemplateItem =
   | string
-  | { name: string; optional?: boolean; actions?: PlannedItemAction[] };
+  | {
+      name: string;
+      optional?: boolean;
+      actions?: PlannedItemAction[];
+      // Items with `dateField: true` get a milestone-date affordance on
+      // the row (date chip + native picker). Used for Phase 4 CTC / IC /
+      // Feasibility / Closing milestones. The value lives on
+      // checklist_items.tracked_date; the flag here just tells the UI to
+      // surface the picker.
+      dateField?: boolean;
+    };
 
 export type TemplateCategory = {
   name: string;
@@ -413,11 +423,11 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
             ],
           },
           "Issues Tracking Sheet & Send Out before calls",
-          "Determine CTC Due Date",
-          "Finalize CTC / New Purchase Price",
-          "Investment Committee",
-          "Feasibility",
-          "Closing Date",
+          { name: "Determine CTC Due Date", dateField: true },
+          { name: "Finalize CTC / New Purchase Price", dateField: true },
+          { name: "Investment Committee", dateField: true },
+          { name: "Feasibility", dateField: true },
+          { name: "Closing Date", dateField: true },
         ],
       },
     ],
@@ -444,4 +454,24 @@ const ACTION_INDEX: Map<string, PlannedItemAction[]> = (() => {
 
 export function getPlannedActionsForItem(name: string): PlannedItemAction[] {
   return ACTION_INDEX.get(name.trim().toLowerCase()) ?? [];
+}
+
+// Names (normalized) of every template item flagged with dateField: true.
+// Render layer uses this to decide whether to show the milestone-date
+// chip on a row. Same name-keyed lookup pattern as ACTION_INDEX.
+const DATE_FIELD_INDEX: Set<string> = (() => {
+  const set = new Set<string>();
+  for (const spec of CHECKLIST_TEMPLATE) {
+    for (const cat of spec.categories) {
+      for (const it of cat.items) {
+        if (typeof it === "string") continue;
+        if (it.dateField) set.add(it.name.trim().toLowerCase());
+      }
+    }
+  }
+  return set;
+})();
+
+export function isItemDateField(name: string): boolean {
+  return DATE_FIELD_INDEX.has(name.trim().toLowerCase());
 }

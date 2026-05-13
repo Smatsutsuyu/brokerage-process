@@ -120,6 +120,13 @@
       "when": 1778643759752,
       "tag": "0016_tense_arclight",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1778700933605,
+      "tag": "0017_lame_skullbuster",
+      "breakpoints": true
     }
   ]
 }

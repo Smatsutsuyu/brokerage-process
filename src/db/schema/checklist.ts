@@ -1,5 +1,6 @@
 import {
   boolean,
+  date,
   integer,
   pgTable,
   primaryKey,
@@ -50,6 +51,12 @@ export const checklistItems = pgTable("checklist_items", {
   // (which is the canonical item description from the seed) so the user's
   // notes are clearly authored content vs. boilerplate.
   notes: text("notes"),
+  // Optional milestone date attached to the item. Only surfaced in the
+  // UI when the template flags the item with `dateField: true` (Phase 4
+  // CTC / IC / Feasibility / Closing milestones, etc.). Date-only, no
+  // time-of-day: these track when a thing happened or is scheduled, not
+  // a precise moment.
+  trackedDate: date("tracked_date"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

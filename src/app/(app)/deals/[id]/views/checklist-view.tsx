@@ -20,6 +20,10 @@ type Item = {
   completed: boolean;
   sortOrder: number;
   notes: string | null;
+  // YYYY-MM-DD or null. Only meaningful for items the template flags
+  // with `dateField: true` (Phase 4 milestones, etc.); other items
+  // never expose a date affordance even if this happens to be set.
+  trackedDate: string | null;
 };
 
 type ChecklistViewProps = {

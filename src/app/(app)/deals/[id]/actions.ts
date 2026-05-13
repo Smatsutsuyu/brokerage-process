@@ -136,9 +136,37 @@ export async function deleteChecklistItemLink(input: {
   revalidatePath(`/deals/${input.dealId}`);
 }
 
+// Milestone date attached to a checklist item (only meaningful for items
+// the template flags with `dateField: true`). Date stored as YYYY-MM-DD.
+// Pass null to clear. The UI defaults the picker to today's local-time
+// date on first set, since users typically record these on the day the
+// milestone happens.
+export async function setChecklistItemDate(input: {
+  itemId: string;
+  dealId: string;
+  date: string | null;
+}) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  // Light validation: must be empty string / null / a YYYY-MM-DD form.
+  // Drizzle's date column accepts a string in that shape; anything else
+  // would error noisily, so we fail early with a clearer message.
+  if (input.date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
+    throw new Error("Invalid date format; expected YYYY-MM-DD");
+  }
+
+  await db
+    .update(checklistItems)
+    .set({ trackedDate: input.date })
+    .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)));
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
 // Free-form working notes per checklist item. Empty string clears the
-// notes field — keeps the API simple (one action handles both save + clear)
-// vs needing a separate clear action.
+// notes field. Keeps the API simple (one action handles both save and
+// clear) vs needing a separate clear action.
 export async function setChecklistItemNotes(input: {
   itemId: string;
   dealId: string;

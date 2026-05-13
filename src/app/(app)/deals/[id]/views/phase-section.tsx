@@ -13,10 +13,15 @@ import { PlannedAction } from "@/components/planned-action";
 import { cn } from "@/lib/utils";
 
 import { ChecklistCheckbox } from "./checklist-checkbox";
+import { ChecklistDate } from "./checklist-date";
 import { ChecklistDocument, type AttachedDocument } from "./checklist-document";
 import { ChecklistLink, type AttachedLink } from "./checklist-link";
 import { ChecklistNotesPanel, ChecklistNotesToggle } from "./checklist-notes";
-import { getPlannedActionsForItem, type ItemActionKind } from "@/db/checklist-template";
+import {
+  getPlannedActionsForItem,
+  isItemDateField,
+  type ItemActionKind,
+} from "@/db/checklist-template";
 import { OmBlastButton } from "./om-blast-button";
 import { PsaAttorneyInline, type PsaAttorneyState } from "./psa-attorney";
 
@@ -54,6 +59,7 @@ type Item = {
   optional: boolean;
   completed: boolean;
   notes: string | null;
+  trackedDate: string | null;
 };
 
 type PhaseSectionProps = {
@@ -226,6 +232,19 @@ export function PhaseSection({
                               placeholders also live here since they're
                               short-lived chips, not artifacts. */}
                           <div className="flex items-center gap-0.5">
+                            {/* Milestone-date chip for items the
+                                template flags with dateField: true
+                                (Phase 4 CTC / IC / Feasibility /
+                                Closing, etc.). Sits ahead of the
+                                action buttons so the milestone is
+                                visible without scanning past clutter. */}
+                            {isItemDateField(item.name) && (
+                              <ChecklistDate
+                                itemId={item.id}
+                                dealId={dealId}
+                                value={item.trackedDate}
+                              />
+                            )}
                             {/* Real action: opens BlastModal → email
                                 preview. Replaces the placeholder toasts
                                 that used to live on this row. */}
