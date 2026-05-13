@@ -1,0 +1,2 @@
+ALTER TABLE "deal_team_members" ALTER COLUMN "name" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "deal_team_members" ADD CONSTRAINT "deal_team_member_has_identity" CHECK ("deal_team_members"."user_id" IS NOT NULL OR "deal_team_members"."contact_id" IS NOT NULL OR "deal_team_members"."name" IS NOT NULL);

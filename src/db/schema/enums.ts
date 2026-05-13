@@ -39,6 +39,12 @@ export const issuePriorityEnum = pgEnum("issue_priority", ["low", "medium", "hig
 
 export const consultantSideEnum = pgEnum("consultant_side", ["buyer", "seller"]);
 
+// Sub-teams within a deal's broader Deal Team.
+//   owner  = sellers / principals
+//   broker = Lakebridge's deal team for this deal
+//   buyer  = the chosen buyer's team (typically post-LOI selection)
+export const dealTeamEnum = pgEnum("deal_team", ["owner", "broker", "buyer"]);
+
 export const consultantRoleEnum = pgEnum("consultant_role", [
   "landscape_architect",
   "civil_engineer",

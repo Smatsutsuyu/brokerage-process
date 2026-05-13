@@ -16,6 +16,11 @@ export const users = pgTable("users", {
   // both together via the invite flow).
   authUserId: text("auth_user_id").unique(),
   role: userRoleEnum("role").notNull().default("viewer"),
+  // Optional phone number. Surfaces in the Deal Team Roster (Broker Team
+  // members linked to a user). User self-manages from /profile; admin
+  // can also set it at invite time. Better Auth doesn't model phone on
+  // auth_user so it lives here on our app-level membership row.
+  phone: text("phone"),
   // Owner can disable a member without deleting them; disabled users can't
   // sign in (getCurrentUser returns null for them).
   disabledAt: timestamp("disabled_at", { withTimezone: true }),

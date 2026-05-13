@@ -9,6 +9,7 @@ export * from "./checklist";
 export * from "./qa-items";
 export * from "./issues";
 export * from "./consultants";
+export * from "./deal-team";
 export * from "./documents";
 export * from "./audit-log";
 export * from "./feedback";

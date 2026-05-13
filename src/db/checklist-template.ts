@@ -35,6 +35,19 @@ export type PlannedItemAction = {
   phase: PlannedPhase;
 };
 
+// Tab keys an item can link to. Renders as a small "Open [Tab]" button
+// on the row so a user can jump from the checklist context into the
+// surface where the item's data lives (e.g. "Issues Tracking" on Phase
+// 4 jumps to the Issues tab; "Create Consultant Roster" jumps to the
+// Consultants tab). String literals match the DealTabs `?tab=` keys.
+export type LinksToTab =
+  | "checklist"
+  | "contacts"
+  | "qa"
+  | "issues"
+  | "consultants"
+  | "team";
+
 export type TemplateItem =
   | string
   | {
@@ -47,6 +60,11 @@ export type TemplateItem =
       // checklist_items.tracked_date; the flag here just tells the UI to
       // surface the picker.
       dateField?: boolean;
+      // When set, the row gets a small "Open [tab]" button that
+      // navigates to the matching tab on this deal. Used to bridge
+      // checklist rows that reference data living in a sibling tab
+      // (e.g. Phase 4 "Issues Tracking Sheet" -> Issues tab).
+      linksTo?: LinksToTab;
     };
 
 export type TemplateCategory = {
@@ -64,33 +82,13 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
     phase: "phase_1",
     categories: [
       {
-        name: "Listing & Buyer Setup",
-        items: ["Listing Agreement", "Initial List of Potential Buyers"],
-      },
-      {
-        name: "Third Party Marketing Reports",
-        items: [
-          "HOA Budget",
-          "Cost to Complete",
-          {
-            name: "CFD Analysis",
-            actions: [
-              {
-                kind: "generate-doc",
-                label: "Generate PDF",
-                feature: "CFD Analysis PDF",
-                description:
-                  "Renders a Land Advisors-branded PDF using the CFD template populated from this deal's structured data.",
-                phase: "phase_2",
-              },
-            ],
-          },
-          { name: "Market Study", optional: true },
-        ],
+        name: "Listing",
+        items: ["Signed Listing Agreement"],
       },
       {
         name: "Valuation",
         items: [
+          "CMA",
           {
             name: "Premium Analysis",
             actions: [
@@ -104,6 +102,7 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
               },
             ],
           },
+          "RPA",
           {
             name: "Valuation",
             actions: [
@@ -120,7 +119,32 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
         ],
       },
       {
-        name: "Marketing Documents",
+        name: "Third Party Marketing Reports",
+        items: [
+          "Cost to Complete (CTC)",
+          "Dry Utility Budget (if separate from CTC)",
+          {
+            name: "CFD analysis (if appropriate)",
+            actions: [
+              {
+                kind: "generate-doc",
+                label: "Generate PDF",
+                feature: "CFD Analysis PDF",
+                description:
+                  "Renders a Land Advisors-branded PDF using the CFD template populated from this deal's structured data.",
+                phase: "phase_2",
+              },
+            ],
+          },
+          { name: "Market Study", optional: true },
+        ],
+      },
+      {
+        // Single category holding the entitlement documents + the misc
+        // setup items (Marketing Report, dropbox folders, aerials).
+        // Renamed from "Marketing Documents" via apply-renames so
+        // existing deals merge cleanly.
+        name: "Marketing & Documents Setup",
         items: [
           {
             name: "Entitlement Schedule",
@@ -160,6 +184,22 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
               },
             ],
           },
+          {
+            name: "Marketing Report",
+            actions: [
+              {
+                kind: "generate-doc",
+                label: "Generate PDF",
+                feature: "Marketing Report PDF",
+                description:
+                  "Renders the buyer list grouped by Green / Yellow / Red interest tier as a branded PDF.",
+                phase: "phase_2",
+              },
+            ],
+          },
+          "Create Marketing Dropbox Folder",
+          "Create Full Due Diligence Dropbox Folder",
+          { name: "Fly Aerials", optional: true },
         ],
       },
       {
@@ -181,21 +221,8 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
           // Offering Memorandum: prose generation is explicitly out of scope
           // (deferred AI engagement). Upload is the universal action so no
           // item-specific affordance here.
-          "Offering Memorandum",
-          {
-            name: "Marketing Report (Green/Yellow/Red buyer categorization)",
-            actions: [
-              {
-                kind: "generate-doc",
-                label: "Generate PDF",
-                feature: "Marketing Report PDF",
-                description:
-                  "Renders the buyer list grouped by Green / Yellow / Red interest tier as a branded PDF.",
-                phase: "phase_2",
-              },
-            ],
-          },
-          "Determine PSA Attorney (drafting preference)",
+          "Offering Memorandum (OM)",
+          "Determine PSA Attorney (we or they draft)",
         ],
       },
     ],
@@ -204,12 +231,11 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
     phase: "phase_2",
     categories: [
       {
-        name: "Items",
+        name: "Marketing Process",
         items: [
-          // Per Chris's feedback (2026-05-07): the CA flow is upload + email-out
-          // with a custom template. Upload is wired (universal affordance on
-          // every row); email-out is deferred Phase 2 work. Surfaces as the
-          // standard placeholder until the Resend pipeline lands.
+          // Confidentiality Agreement is not in Excel v2 but Chris
+          // explicitly asked for it earlier (2026-05-07). Real workflow
+          // step. Email-out placeholder until the CA send pipeline lands.
           {
             name: "Confidentiality Agreement",
             actions: [
@@ -218,15 +244,14 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
                 label: "Email to marketing list",
                 feature: "Confidentiality Agreement distribution",
                 description:
-                  "Sends the uploaded CA to all buyers on this deal using a templated email — default body: \"We'd like to share some information on a proposed [X unit] [Type] deal in [City]. We'd like to keep information confidential and are sharing the proposed confidentiality agreement. Please review and let us know if this form works and we will send it out for signatures.\" Editable per send.",
+                  "Sends the uploaded CA to all buyers on this deal using a templated email. Default body: \"We'd like to share some information on a proposed [X unit] [Type] deal in [City]. We'd like to keep information confidential and are sharing the proposed confidentiality agreement. Please review and let us know if this form works and we will send it out for signatures.\" Editable per send.",
                 phase: "phase_2",
               },
             ],
           },
-          // OM-blast row's "Send OM blast" button is real now — wired in
-          // phase-section.tsx via isOmBlastItem() → <OmBlastButton/>. No
-          // PlannedAction placeholder needed on this row.
-          "Send out OM / Blast (personalized by buyer tier)",
+          // OM Blast row's "Send OM blast" button is real, wired via
+          // isOmBlastItem() in phase-section.tsx.
+          "Send out OM Blast",
           {
             name: "Request In-Person Meeting with Top (Green) Buyers",
             actions: [
@@ -240,9 +265,11 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
               },
             ],
           },
-          "Coordinate a Q&A File",
+          // Q&A File: consolidated to a single row per Excel. Has both
+          // the Generate PDF action (renders approved Q&A items) and
+          // the Send email action.
           {
-            name: "Send out Q&A File",
+            name: "Q&A File",
             actions: [
               {
                 kind: "generate-doc",
@@ -275,8 +302,12 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
               },
             ],
           },
+          // New per Excel v2: Share Marketing Due Diligence Folder.
+          // Excel says "will put in OM" so this is essentially a
+          // checkbox + link affordance (Dropbox folder URL).
+          "Share Marketing Due Diligence Folder",
           {
-            name: "Email Notification of Offers Due (X days before)",
+            name: "Email Notification of Offer Due Date - 1 week before",
             actions: [
               {
                 kind: "schedule-reminder",
@@ -301,7 +332,7 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
             ],
           },
           {
-            name: "Automated follow-up to Green & Yellow buyers whose offers haven't come in",
+            name: "Follow up Missing Offers",
             actions: [
               {
                 kind: "send-email",
@@ -382,20 +413,12 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
       {
         name: "Due Diligence Tracking",
         items: [
-          "Create Consultant Roster & Send Out",
-          {
-            name: "Share Due Diligence Material / Set Meeting",
-            actions: [
-              {
-                kind: "send-email",
-                label: "Email DD links",
-                feature: "Due Diligence distribution",
-                description:
-                  "Composes an email to the selected Buyer Team with links to all DD documents on this deal.",
-                phase: "phase_2",
-              },
-            ],
-          },
+          { name: "Create Consultant Roster & Send Out", linksTo: "consultants" },
+          // Share DD Material's "Send to Deal Team" button is now real,
+          // wired in phase-section.tsx via isShareDdMaterialItem ->
+          // ShareDdMaterialRowActions. No PlannedAction placeholder
+          // needed.
+          "Share Due Diligence Material / Set Meeting",
           "Create Index of Due Diligence Material",
           {
             name: "Kick off PSA",
@@ -422,7 +445,7 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
               },
             ],
           },
-          "Issues Tracking Sheet & Send Out before calls",
+          { name: "Issues Tracking Sheet & Send Out before calls", linksTo: "issues" },
           { name: "Determine CTC Due Date", dateField: true },
           { name: "Finalize CTC / New Purchase Price", dateField: true },
           { name: "Investment Committee", dateField: true },
@@ -474,4 +497,23 @@ const DATE_FIELD_INDEX: Set<string> = (() => {
 
 export function isItemDateField(name: string): boolean {
   return DATE_FIELD_INDEX.has(name.trim().toLowerCase());
+}
+
+// Map of normalized item name -> the tab key it links to. Render layer
+// uses this to decide whether to show the "Open [tab]" button on a row.
+const LINKS_TO_INDEX: Map<string, LinksToTab> = (() => {
+  const map = new Map<string, LinksToTab>();
+  for (const spec of CHECKLIST_TEMPLATE) {
+    for (const cat of spec.categories) {
+      for (const it of cat.items) {
+        if (typeof it === "string") continue;
+        if (it.linksTo) map.set(it.name.trim().toLowerCase(), it.linksTo);
+      }
+    }
+  }
+  return map;
+})();
+
+export function getLinksToForItem(name: string): LinksToTab | null {
+  return LINKS_TO_INDEX.get(name.trim().toLowerCase()) ?? null;
 }

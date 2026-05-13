@@ -11,15 +11,17 @@ import { updateMyProfile } from "./actions";
 
 type ProfileFormProps = {
   initialName: string;
+  initialPhone: string | null;
 };
 
-export function ProfileForm({ initialName }: ProfileFormProps) {
+export function ProfileForm({ initialName, initialPhone }: ProfileFormProps) {
   const [name, setName] = useState(initialName);
+  const [phone, setPhone] = useState(initialPhone ?? "");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const isDirty = name !== initialName;
+  const isDirty = name !== initialName || phone !== (initialPhone ?? "");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,7 +33,7 @@ export function ProfileForm({ initialName }: ProfileFormProps) {
     }
     startTransition(async () => {
       try {
-        await updateMyProfile({ name });
+        await updateMyProfile({ name, phone: phone || null });
         setSuccess(true);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not save changes.");
@@ -52,6 +54,24 @@ export function ProfileForm({ initialName }: ProfileFormProps) {
           }}
           required
         />
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="profile-phone">Phone</Label>
+        <Input
+          id="profile-phone"
+          type="tel"
+          value={phone}
+          onChange={(e) => {
+            setPhone(e.target.value);
+            setSuccess(false);
+          }}
+          placeholder="Optional"
+        />
+        <p className="text-[11px] text-gray-500">
+          Surfaces in the Deal Team Roster when you&apos;re added to a
+          broker team.
+        </p>
       </div>
 
       {error && (

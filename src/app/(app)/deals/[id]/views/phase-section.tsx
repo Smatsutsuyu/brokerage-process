@@ -17,12 +17,17 @@ import { ChecklistDate } from "./checklist-date";
 import { ChecklistDocument, type AttachedDocument } from "./checklist-document";
 import { ChecklistLink, type AttachedLink } from "./checklist-link";
 import { ChecklistNotesPanel, ChecklistNotesToggle } from "./checklist-notes";
+import { ChecklistTabLink } from "./checklist-tab-link";
 import {
+  getLinksToForItem,
   getPlannedActionsForItem,
   isItemDateField,
   type ItemActionKind,
 } from "@/db/checklist-template";
+import { ConsultantRosterRowActions } from "./consultant-roster-row-actions";
+import { IssuesRowActions } from "./issues-row-actions";
 import { OmBlastButton } from "./om-blast-button";
+import { ShareDdMaterialRowActions } from "./share-dd-material-row-actions";
 import { PsaAttorneyInline, type PsaAttorneyState } from "./psa-attorney";
 
 // Lowercased substring match — flexible to wording tweaks ("Determine PSA
@@ -38,6 +43,25 @@ function isPsaAttorneyItem(name: string): boolean {
 function isOmBlastItem(name: string): boolean {
   const n = name.toLowerCase();
   return n.includes("send out om") && n.includes("blast");
+}
+
+// Loose-match for the "Issues Tracking Sheet" row in Phase 4. Anchored
+// on "issues tracking" so minor copy edits don't lose the action buttons.
+function isIssuesTrackingItem(name: string): boolean {
+  return name.toLowerCase().includes("issues tracking");
+}
+
+// Loose-match for the "Create Consultant Roster & Send Out" row in
+// Phase 4. Excel functionality column says "See Tab" + "Send Out", so
+// the row gets both a tab link and a Send to Deal Team action.
+function isConsultantRosterItem(name: string): boolean {
+  return name.toLowerCase().includes("consultant roster");
+}
+
+// Loose-match for the "Share Due Diligence Material / Set Meeting" row
+// in Phase 4. Excel says: email the deal team with DD links.
+function isShareDdMaterialItem(name: string): boolean {
+  return name.toLowerCase().includes("due diligence material");
 }
 
 const KIND_ICON: Record<ItemActionKind, typeof FileText> = {
@@ -245,6 +269,16 @@ export function PhaseSection({
                                 value={item.trackedDate}
                               />
                             )}
+                            {/* Cross-tab nav for items whose data lives
+                                on a sibling tab (e.g. Phase 4 "Issues
+                                Tracking" -> Issues tab; "Create
+                                Consultant Roster" -> Consultants tab). */}
+                            {(() => {
+                              const linksTo = getLinksToForItem(item.name);
+                              return linksTo ? (
+                                <ChecklistTabLink dealId={dealId} tab={linksTo} />
+                              ) : null;
+                            })()}
                             {/* Real action: opens BlastModal → email
                                 preview. Replaces the placeholder toasts
                                 that used to live on this row. */}
@@ -253,6 +287,26 @@ export function PhaseSection({
                                 dealId={dealId}
                                 attachmentSourceItemId={omItemId}
                               />
+                            )}
+                            {/* Phase 4 Issues Tracking row: Generate
+                                PDF + Send to Deal Team. Matches Excel
+                                "PDF Report and Send to those checked
+                                on deal team from Roster Report." */}
+                            {isIssuesTrackingItem(item.name) && (
+                              <IssuesRowActions dealId={dealId} />
+                            )}
+                            {/* Phase 4 Consultant Roster row: Send to
+                                Deal Team. Matches Excel "Check Box,
+                                See Tab" (tab link is rendered via the
+                                linksTo lookup above). */}
+                            {isConsultantRosterItem(item.name) && (
+                              <ConsultantRosterRowActions dealId={dealId} />
+                            )}
+                            {/* Phase 4 Share DD Material row: email
+                                the linked DD folder + index attachment
+                                to the deal team. */}
+                            {isShareDdMaterialItem(item.name) && (
+                              <ShareDdMaterialRowActions dealId={dealId} />
                             )}
                             {itemActions.map((a) => (
                               <PlannedAction

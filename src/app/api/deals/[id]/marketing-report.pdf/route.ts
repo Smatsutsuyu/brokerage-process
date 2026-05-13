@@ -10,7 +10,6 @@
 import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { and, asc, eq, sql } from "drizzle-orm";
-import { get } from "@vercel/blob";
 
 import { db } from "@/db";
 import {
@@ -29,26 +28,6 @@ import {
 
 // Force Node runtime — React-PDF needs Node APIs that aren't in Edge.
 export const runtime = "nodejs";
-
-async function bannerToDataUri(pathname: string | null): Promise<string | null> {
-  if (!pathname) return null;
-  try {
-    const blob = await get(pathname, { access: "private" });
-    if (!blob) return null;
-    // Stream → buffer → base64. Banner blobs are <5 MB so memory is fine.
-    const arrayBuffer = await new Response(blob.stream).arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
-    // Best-effort MIME type — Vercel Blob doesn't include contentType in
-    // get() response, so we infer from the pathname extension and default
-    // to jpeg (most common for hero banners).
-    const ext = pathname.split(".").pop()?.toLowerCase() ?? "jpeg";
-    const mimeType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
-    return `data:${mimeType};base64,${base64}`;
-  } catch (err) {
-    console.warn("[marketing-report] failed to fetch banner; using fallback", err);
-    return null;
-  }
-}
 
 function formatDateLabel(d: Date): string {
   // "March 2026" — matches Chris's example header.
@@ -70,7 +49,6 @@ export async function GET(
     .select({
       id: deals.id,
       name: deals.name,
-      bannerImagePath: deals.bannerImagePath,
     })
     .from(deals)
     .where(and(eq(deals.id, id), eq(deals.orgId, org.id)))
@@ -112,23 +90,21 @@ export async function GET(
     comments: r.comments?.trim() ?? "",
   }));
 
-  const bannerDataUri = await bannerToDataUri(deal.bannerImagePath);
-
   const buffer = await renderToBuffer(
     MarketingReportDoc({
       dealName: deal.name,
       dateLabel: formatDateLabel(new Date()),
-      bannerDataUri,
       rows: reportRows,
     }),
   );
 
-  // Slug the filename so it lands cleanly in the user's downloads.
-  const slug = deal.name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  const filename = `${slug || "marketing-report"}-${new Date().toISOString().slice(0, 10)}.pdf`;
+  // Filename pattern: "Deal Name - Marketing Report.pdf". Strip only
+  // characters that are illegal in Windows / cross-platform filenames so
+  // the deal name reads naturally in the user's downloads.
+  const safeName = deal.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, "").trim();
+  const filename = safeName
+    ? `${safeName} - Marketing Report.pdf`
+    : "Marketing Report.pdf";
 
   const headers = new Headers();
   headers.set("Content-Type", "application/pdf");

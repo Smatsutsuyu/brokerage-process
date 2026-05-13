@@ -8,6 +8,7 @@ import {
   checklistItems,
   consultants,
   dealContacts,
+  dealTeamMembers,
   deals,
   documents,
   issues,
@@ -30,6 +31,7 @@ import {
   PrototypeDView,
 } from "./views/prototypes/prototype-views";
 import { QaView } from "./views/qa-view";
+import { TeamView } from "./views/team-view";
 
 
 export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
@@ -50,6 +52,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     qaTotalRow,
     issuesOpenRow,
     consultantsFilledRow,
+    teamCountRow,
     documentRows,
     linkRows,
   ] = await Promise.all([
@@ -105,6 +108,11 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
         .select({ n: count() })
         .from(consultants)
         .where(eq(consultants.dealId, id))
+        .then((r) => r[0]),
+      db
+        .select({ n: count() })
+        .from(dealTeamMembers)
+        .where(eq(dealTeamMembers.dealId, id))
         .then((r) => r[0]),
       // All checklist-attached docs for this deal. Sorted by version desc so
       // the JS-side dedupe below trivially keeps the latest per item without
@@ -203,6 +211,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     qa: { approved: Number(qaTotal?.approved ?? 0), total: Number(qaTotal?.total ?? 0) },
     issuesOpen: Number(issuesOpen?.open ?? 0),
     consultants: consultantsFilled?.n ?? 0,
+    team: teamCountRow?.n ?? 0,
   };
 
   return (
@@ -272,6 +281,11 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             consultants: (
               <FeedbackZone section="deal-consultants">
                 <ConsultantsView dealId={id} />
+              </FeedbackZone>
+            ),
+            team: (
+              <FeedbackZone section="deal-team">
+                <TeamView dealId={id} />
               </FeedbackZone>
             ),
             "proto-a": <PrototypeAView dealId={id} />,

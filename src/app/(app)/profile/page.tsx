@@ -64,7 +64,7 @@ export default async function ProfilePage() {
 
             <div className="border-t border-gray-100 pt-5">
               <div className="mb-3 text-sm font-semibold text-gray-900">Edit profile</div>
-              <ProfileForm initialName={me.name} />
+              <ProfileForm initialName={me.name} initialPhone={me.phone} />
             </div>
 
             <div className="mt-5 border-t border-gray-100 pt-5">

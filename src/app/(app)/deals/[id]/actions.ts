@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -14,6 +14,7 @@ import {
   contacts,
   dealBuyers,
   dealContacts,
+  dealTeamMembers,
   deals,
   documents,
   issues,
@@ -1473,8 +1474,602 @@ export async function getCcSelectionsForBuilders(input: {
   return rows.map((r) => ({ builderId: r.builderId, userIds: r.ccUserIds ?? [] }));
 }
 
-// Verifies that an item belongs to the active deal — useful for any action
-// that takes an itemId from the client. Lightweight no-op if the join holds.
+// ===== Deal Team Roster =====
+//
+// Three sub-teams per deal: owner / broker / buyer. Members are stored
+// as free-text rows (name/email/phone) so people can be recorded before
+// they exist in any other table. Each row has an include_in_emails
+// toggle that the email composer uses to decide who to CC on Deal-Team
+// send actions (Schedule SOO Review, Share DD Material, Send Issues
+// PDF, etc.).
+
+type DealTeam = "owner" | "broker" | "buyer";
+
+// One row per Deal Team member. Display fields (name, email, phone)
+// resolve from the canonical source (user or contact) when an FK is
+// set; otherwise from the row's free-text columns. `source` tells the
+// UI where the data came from so it can hide editable identity fields
+// for FK-linked rows.
+export type DealTeamMemberRow = {
+  id: string;
+  team: DealTeam;
+  roleLabel: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  includeInEmails: boolean;
+  sortOrder: number;
+  source:
+    | { kind: "user"; userId: string }
+    | { kind: "contact"; contactId: string; builderName: string | null }
+    | { kind: "freetext" };
+};
+
+// Pull every Deal Team member on this deal, joining to users / contacts
+// to resolve the canonical display data. Stale FKs (someone deleted the
+// canonical record) fall back to the row's columns; if those are also
+// null the row collapses to "Unknown" — shouldn't happen because of the
+// CHECK constraint but we render defensively.
+export async function listDealTeam(input: { dealId: string }): Promise<DealTeamMemberRow[]> {
+  const org = await getCurrentOrg();
+  if (!org) return [];
+  const rows = await db
+    .select({
+      id: dealTeamMembers.id,
+      team: dealTeamMembers.team,
+      roleLabel: dealTeamMembers.roleLabel,
+      notes: dealTeamMembers.notes,
+      includeInEmails: dealTeamMembers.includeInEmails,
+      sortOrder: dealTeamMembers.sortOrder,
+      // Free-text fallback columns
+      freeName: dealTeamMembers.name,
+      freeEmail: dealTeamMembers.email,
+      freePhone: dealTeamMembers.phone,
+      // FK identifiers (used for source kind)
+      userId: dealTeamMembers.userId,
+      contactId: dealTeamMembers.contactId,
+      // Joined canonical data
+      userName: authUser.name,
+      userEmail: authUser.email,
+      userPhone: users.phone,
+      contactFirst: contacts.firstName,
+      contactLast: contacts.lastName,
+      contactEmail: contacts.email,
+      contactPhone: contacts.phone,
+      contactBuilderName: builders.name,
+    })
+    .from(dealTeamMembers)
+    .leftJoin(users, eq(users.id, dealTeamMembers.userId))
+    .leftJoin(authUser, eq(authUser.id, users.authUserId))
+    .leftJoin(contacts, eq(contacts.id, dealTeamMembers.contactId))
+    .leftJoin(builders, eq(builders.id, contacts.builderId))
+    .where(
+      and(eq(dealTeamMembers.dealId, input.dealId), eq(dealTeamMembers.orgId, org.id)),
+    )
+    .orderBy(
+      dealTeamMembers.team,
+      dealTeamMembers.sortOrder,
+      dealTeamMembers.createdAt,
+    );
+
+  return rows.map((r): DealTeamMemberRow => {
+    if (r.userId && r.userName !== null && r.userEmail !== null) {
+      return {
+        id: r.id,
+        team: r.team,
+        roleLabel: r.roleLabel,
+        name: r.userName || r.userEmail,
+        email: r.userEmail,
+        phone: r.userPhone,
+        notes: r.notes,
+        includeInEmails: r.includeInEmails,
+        sortOrder: r.sortOrder,
+        source: { kind: "user", userId: r.userId },
+      };
+    }
+    if (r.contactId && (r.contactFirst !== null || r.contactLast !== null)) {
+      const fullName = `${r.contactFirst ?? ""} ${r.contactLast ?? ""}`.trim();
+      return {
+        id: r.id,
+        team: r.team,
+        roleLabel: r.roleLabel,
+        name: fullName || "(unnamed contact)",
+        email: r.contactEmail,
+        phone: r.contactPhone,
+        notes: r.notes,
+        includeInEmails: r.includeInEmails,
+        sortOrder: r.sortOrder,
+        source: {
+          kind: "contact",
+          contactId: r.contactId,
+          builderName: r.contactBuilderName,
+        },
+      };
+    }
+    // Free-text path. Or stale FK with null join (canonical record
+    // gone) — we fall back to the snapshot columns if any.
+    return {
+      id: r.id,
+      team: r.team,
+      roleLabel: r.roleLabel,
+      name: r.freeName || "(unknown)",
+      email: r.freeEmail,
+      phone: r.freePhone,
+      notes: r.notes,
+      includeInEmails: r.includeInEmails,
+      sortOrder: r.sortOrder,
+      source: { kind: "freetext" },
+    };
+  });
+}
+
+// Pickable user for the Broker picker.
+export type TeamPickerUser = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+};
+
+// Pickable contact for either the Broker (org-wide) or Buyer
+// (deal-scoped) picker. Builder name included so the modal can
+// disambiguate people with the same first name across builders.
+export type TeamPickerContact = {
+  id: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  title: string | null;
+  builderName: string | null;
+};
+
+// Org-wide users for the Broker picker.
+export async function listOrgUsersForTeamPicker(): Promise<TeamPickerUser[]> {
+  const org = await getCurrentOrg();
+  if (!org) return [];
+  const rows = await db
+    .select({
+      id: users.id,
+      name: authUser.name,
+      email: authUser.email,
+      phone: users.phone,
+    })
+    .from(users)
+    .innerJoin(authUser, eq(authUser.id, users.authUserId))
+    .where(eq(users.orgId, org.id))
+    .orderBy(asc(authUser.name));
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name || r.email,
+    email: r.email,
+    phone: r.phone,
+  }));
+}
+
+// Org-wide contacts for the Broker picker. Brokers might be cobrokers
+// from outside firms — add them to the contacts directory first, then
+// pick into the broker team.
+export async function listOrgContactsForTeamPicker(): Promise<TeamPickerContact[]> {
+  const org = await getCurrentOrg();
+  if (!org) return [];
+  const rows = await db
+    .select({
+      id: contacts.id,
+      firstName: contacts.firstName,
+      lastName: contacts.lastName,
+      email: contacts.email,
+      phone: contacts.phone,
+      title: contacts.title,
+      builderName: builders.name,
+    })
+    .from(contacts)
+    .leftJoin(builders, eq(builders.id, contacts.builderId))
+    .where(eq(contacts.orgId, org.id))
+    .orderBy(asc(contacts.lastName), asc(contacts.firstName));
+  return rows.map((r) => ({
+    id: r.id,
+    fullName: `${r.firstName} ${r.lastName}`.trim(),
+    email: r.email,
+    phone: r.phone,
+    title: r.title,
+    builderName: r.builderName,
+  }));
+}
+
+// Deal-scoped contacts for the Buyer picker. Limits options to people
+// already on this deal (via deal_contacts) so the buyer team is a
+// curated subset of "the buyers we're talking to."
+export async function listDealContactsForTeamPicker(input: {
+  dealId: string;
+}): Promise<TeamPickerContact[]> {
+  const org = await getCurrentOrg();
+  if (!org) return [];
+  const rows = await db
+    .select({
+      id: contacts.id,
+      firstName: contacts.firstName,
+      lastName: contacts.lastName,
+      email: contacts.email,
+      phone: contacts.phone,
+      title: contacts.title,
+      builderName: builders.name,
+    })
+    .from(dealContacts)
+    .innerJoin(contacts, eq(contacts.id, dealContacts.contactId))
+    .leftJoin(builders, eq(builders.id, contacts.builderId))
+    .where(
+      and(eq(dealContacts.dealId, input.dealId), eq(contacts.orgId, org.id)),
+    )
+    .orderBy(asc(contacts.lastName), asc(contacts.firstName));
+  return rows.map((r) => ({
+    id: r.id,
+    fullName: `${r.firstName} ${r.lastName}`.trim(),
+    email: r.email,
+    phone: r.phone,
+    title: r.title,
+    builderName: r.builderName,
+  }));
+}
+
+export type AddDealTeamMemberInput = {
+  dealId: string;
+  team: DealTeam;
+  roleLabel: string;
+  notes?: string | null;
+} & (
+  | { source: "user"; userId: string }
+  | { source: "contact"; contactId: string }
+  | {
+      source: "freetext";
+      name: string;
+      email?: string | null;
+      phone?: string | null;
+    }
+);
+
+// Per-member payload for the batch insert below. Mirrors
+// AddDealTeamMemberInput minus the deal-level `dealId` (lifted to the
+// top-level call). Spelled out as its own union (instead of Omit on
+// AddDealTeamMemberInput) so TypeScript narrows discriminated branches
+// correctly inside the batch loop.
+export type AddDealTeamMemberPayload = {
+  team: DealTeam;
+  roleLabel: string;
+  notes?: string | null;
+} & (
+  | { source: "user"; userId: string }
+  | { source: "contact"; contactId: string }
+  | {
+      source: "freetext";
+      name: string;
+      email?: string | null;
+      phone?: string | null;
+    }
+);
+
+// Batch insert. Used by the Add Member(s) modal which stages multiple
+// rows and commits them in one click. Same identity rules as single-add
+// (FK or free-text, mutually exclusive). Sort orders are assigned
+// consecutively from the current max, scoped per sub-team, so members
+// added in one batch land in click order.
+export async function addDealTeamMembers(input: {
+  dealId: string;
+  members: AddDealTeamMemberPayload[];
+}): Promise<{ count: number }> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+  if (input.members.length === 0) return { count: 0 };
+
+  // Compute the next sort_order per team once, then increment locally
+  // as we build the insert payload. One round-trip for the max query,
+  // one for the insert.
+  const teamsInBatch = Array.from(new Set(input.members.map((m) => m.team)));
+  const nextByTeam = new Map<DealTeam, number>();
+  for (const t of teamsInBatch) {
+    const tail = await db
+      .select({ next: sql<number>`coalesce(max(${dealTeamMembers.sortOrder}) + 1, 0)` })
+      .from(dealTeamMembers)
+      .where(
+        and(
+          eq(dealTeamMembers.dealId, input.dealId),
+          eq(dealTeamMembers.orgId, org.id),
+          eq(dealTeamMembers.team, t),
+        ),
+      );
+    nextByTeam.set(t, tail[0]?.next ?? 0);
+  }
+
+  const rows = input.members.map((m) => {
+    const sortOrder = nextByTeam.get(m.team)!;
+    nextByTeam.set(m.team, sortOrder + 1);
+    const identity =
+      m.source === "user"
+        ? { userId: m.userId, contactId: null, name: null, email: null, phone: null }
+        : m.source === "contact"
+          ? { userId: null, contactId: m.contactId, name: null, email: null, phone: null }
+          : {
+              userId: null,
+              contactId: null,
+              name: m.name.trim(),
+              email: m.email?.trim() || null,
+              phone: m.phone?.trim() || null,
+            };
+    return {
+      orgId: org.id,
+      dealId: input.dealId,
+      team: m.team,
+      roleLabel: m.roleLabel.trim(),
+      notes: m.notes?.trim() || null,
+      sortOrder,
+      ...identity,
+    };
+  });
+
+  await db.insert(dealTeamMembers).values(rows);
+  revalidatePath(`/deals/${input.dealId}`);
+  return { count: rows.length };
+}
+
+export async function addDealTeamMember(
+  input: AddDealTeamMemberInput,
+): Promise<{ memberId: string }> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  // Sort order = next slot at the end of the current sub-team. Lets the
+  // UI render team members in stable insertion order without forcing the
+  // caller to compute it.
+  const tail = await db
+    .select({ next: sql<number>`coalesce(max(${dealTeamMembers.sortOrder}) + 1, 0)` })
+    .from(dealTeamMembers)
+    .where(
+      and(
+        eq(dealTeamMembers.dealId, input.dealId),
+        eq(dealTeamMembers.orgId, org.id),
+        eq(dealTeamMembers.team, input.team),
+      ),
+    );
+  const nextSort = tail[0]?.next ?? 0;
+
+  // Identity branches: only one of (userId, contactId, free-text columns)
+  // is populated per row. CHECK constraint at the schema layer enforces
+  // this; we mirror the discipline here so reads stay clean.
+  const identity =
+    input.source === "user"
+      ? { userId: input.userId, contactId: null, name: null, email: null, phone: null }
+      : input.source === "contact"
+        ? { userId: null, contactId: input.contactId, name: null, email: null, phone: null }
+        : {
+            userId: null,
+            contactId: null,
+            name: input.name.trim(),
+            email: input.email?.trim() || null,
+            phone: input.phone?.trim() || null,
+          };
+
+  const [created] = await db
+    .insert(dealTeamMembers)
+    .values({
+      orgId: org.id,
+      dealId: input.dealId,
+      team: input.team,
+      roleLabel: input.roleLabel.trim(),
+      notes: input.notes?.trim() || null,
+      sortOrder: nextSort,
+      ...identity,
+    })
+    .returning();
+
+  revalidatePath(`/deals/${input.dealId}`);
+  return { memberId: created.id };
+}
+
+// Edit a team member's per-deal context (role, notes). For free-text
+// rows, also accepts updated identity fields. FK rows ignore the
+// identity fields entirely — to "change who" a row links to, remove
+// + re-add (cleaner audit story than mutating the link in place).
+export async function updateDealTeamMember(input: {
+  memberId: string;
+  dealId: string;
+  roleLabel: string;
+  notes?: string | null;
+  // Free-text rows only: identity overrides. Ignored when the row has
+  // a userId or contactId set.
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+}): Promise<void> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  // Look up the row first to know if it's free-text (so we know whether
+  // to apply the identity fields). One small extra query in exchange
+  // for not silently dropping identity edits on FK rows.
+  const [row] = await db
+    .select({
+      userId: dealTeamMembers.userId,
+      contactId: dealTeamMembers.contactId,
+    })
+    .from(dealTeamMembers)
+    .where(
+      and(
+        eq(dealTeamMembers.id, input.memberId),
+        eq(dealTeamMembers.orgId, org.id),
+      ),
+    )
+    .limit(1);
+  if (!row) throw new Error("Team member not found");
+
+  const isFreeText = !row.userId && !row.contactId;
+  const updates: Partial<typeof dealTeamMembers.$inferInsert> = {
+    roleLabel: input.roleLabel.trim(),
+    notes: input.notes?.trim() || null,
+  };
+  if (isFreeText && input.name !== undefined) {
+    updates.name = input.name.trim() || null;
+    updates.email = input.email?.trim() || null;
+    updates.phone = input.phone?.trim() || null;
+  }
+
+  await db
+    .update(dealTeamMembers)
+    .set(updates)
+    .where(
+      and(
+        eq(dealTeamMembers.id, input.memberId),
+        eq(dealTeamMembers.orgId, org.id),
+      ),
+    );
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
+export async function removeDealTeamMember(input: {
+  memberId: string;
+  dealId: string;
+}): Promise<void> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  await db
+    .delete(dealTeamMembers)
+    .where(
+      and(
+        eq(dealTeamMembers.id, input.memberId),
+        eq(dealTeamMembers.orgId, org.id),
+      ),
+    );
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
+// Recipients pulled from the Deal Team Roster, scoped to a single
+// sub-team and filtered to members with includeInEmails = true. Used
+// by the "Send Issues PDF", "Send Consultant Roster", and similar
+// Deal-Team-targeted send actions. Each recipient is shaped to fit the
+// EmailPreviewModal's EmailRecipient type so the modal can render
+// per-builder/per-team groupings without knowing about the team table.
+//
+// Identity resolution mirrors listDealTeam: user FK -> auth_user join,
+// contact FK -> contacts + builders join, else free-text columns.
+// Members without an email are kept in the result list but with
+// contactEmail = null; the modal filters them out at the recipient
+// step (and shows a "(N without email)" warning).
+//
+// `builderId` semantics for the team context: since these are deal-team
+// members, not buyer-side contacts, the groupBy-builder logic in the
+// preview modal would otherwise show each as their own group. Pass the
+// team's sub-team key (owner / broker / buyer) as the builderId so the
+// modal groups by sub-team instead. The display builderName is the
+// human label ("Broker Team", etc.).
+export type DealTeamRecipientGroup = "owner" | "broker" | "buyer";
+
+const DEAL_TEAM_GROUP_LABEL: Record<DealTeamRecipientGroup, string> = {
+  owner: "Owner Team",
+  broker: "Broker Team",
+  buyer: "Buyer Team",
+};
+
+export type DealTeamRecipient = {
+  contactId: string;
+  contactName: string;
+  contactEmail: string | null;
+  builderId: string;
+  builderName: string;
+};
+
+export async function getDealTeamRecipients(input: {
+  dealId: string;
+  // Sub-teams to pull from. Order in the array determines group
+  // ordering in the preview modal's per-builder paginator.
+  teams: DealTeamRecipientGroup[];
+}): Promise<DealTeamRecipient[]> {
+  const org = await getCurrentOrg();
+  if (!org || input.teams.length === 0) return [];
+
+  const rows = await db
+    .select({
+      id: dealTeamMembers.id,
+      team: dealTeamMembers.team,
+      userId: dealTeamMembers.userId,
+      contactId: dealTeamMembers.contactId,
+      freeName: dealTeamMembers.name,
+      freeEmail: dealTeamMembers.email,
+      userName: authUser.name,
+      userEmail: authUser.email,
+      contactFirst: contacts.firstName,
+      contactLast: contacts.lastName,
+      contactEmail: contacts.email,
+    })
+    .from(dealTeamMembers)
+    .leftJoin(users, eq(users.id, dealTeamMembers.userId))
+    .leftJoin(authUser, eq(authUser.id, users.authUserId))
+    .leftJoin(contacts, eq(contacts.id, dealTeamMembers.contactId))
+    .where(
+      and(
+        eq(dealTeamMembers.dealId, input.dealId),
+        eq(dealTeamMembers.orgId, org.id),
+        eq(dealTeamMembers.includeInEmails, true),
+        inArray(dealTeamMembers.team, input.teams),
+      ),
+    )
+    .orderBy(
+      dealTeamMembers.team,
+      dealTeamMembers.sortOrder,
+      dealTeamMembers.createdAt,
+    );
+
+  return rows.map((r) => {
+    let name = "(unknown)";
+    let email: string | null = null;
+    if (r.userId && (r.userName || r.userEmail)) {
+      name = r.userName || r.userEmail!;
+      email = r.userEmail;
+    } else if (r.contactId && (r.contactFirst || r.contactLast)) {
+      name = `${r.contactFirst ?? ""} ${r.contactLast ?? ""}`.trim();
+      email = r.contactEmail;
+    } else if (r.freeName) {
+      name = r.freeName;
+      email = r.freeEmail;
+    }
+    return {
+      contactId: r.id,
+      contactName: name,
+      contactEmail: email,
+      // Group all recipients of a given sub-team together so the
+      // preview paginator shows one "email" per sub-team (Broker Team,
+      // Owner Team, etc.) instead of one per person.
+      builderId: r.team,
+      builderName: DEAL_TEAM_GROUP_LABEL[r.team],
+    };
+  });
+}
+
+export async function setDealTeamMemberIncluded(input: {
+  memberId: string;
+  dealId: string;
+  included: boolean;
+}): Promise<void> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  await db
+    .update(dealTeamMembers)
+    .set({ includeInEmails: input.included })
+    .where(
+      and(
+        eq(dealTeamMembers.id, input.memberId),
+        eq(dealTeamMembers.orgId, org.id),
+      ),
+    );
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
+// Verifies that an item belongs to the active deal. Useful for any
+// action that takes an itemId from the client. Lightweight no-op if the
+// join holds.
 export async function assertItemOnDeal(itemId: string, dealId: string) {
   const [row] = await db
     .select({ id: checklistItems.id })

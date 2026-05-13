@@ -13,6 +13,7 @@ type TabKey =
   | "qa"
   | "issues"
   | "consultants"
+  | "team"
   | "proto-a"
   | "proto-b"
   | "proto-c"
@@ -24,6 +25,7 @@ const TAB_KEYS: ReadonlySet<TabKey> = new Set([
   "qa",
   "issues",
   "consultants",
+  "team",
   "proto-a",
   "proto-b",
   "proto-c",
@@ -41,6 +43,7 @@ type DealTabsProps = {
     qa: { approved: number; total: number };
     issuesOpen: number;
     consultants: number;
+    team: number;
   };
   children: Record<TabKey, ReactNode>;
 };
@@ -51,6 +54,7 @@ const TABS: Array<{ key: TabKey; label: string; group?: "main" | "proto" }> = [
   { key: "qa", label: "Q&A", group: "main" },
   { key: "issues", label: "Issues", group: "main" },
   { key: "consultants", label: "Consultants", group: "main" },
+  { key: "team", label: "Teams", group: "main" },
   { key: "proto-a", label: "A · Cards", group: "proto" },
   { key: "proto-b", label: "B · Pane", group: "proto" },
   { key: "proto-c", label: "C · Grouped", group: "proto" },
@@ -90,6 +94,8 @@ export function DealTabs({ counts, children }: DealTabsProps) {
         return `${counts.issuesOpen} open`;
       case "consultants":
         return String(counts.consultants);
+      case "team":
+        return String(counts.team);
       // Prototype tabs share the buyer count from contacts.
       case "proto-a":
       case "proto-b":

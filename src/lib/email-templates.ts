@@ -1,14 +1,15 @@
 // Email subject + body templates used by the in-app email composer.
 // Templates use {{var}} placeholders resolved by `interpolate()` below.
 //
-// Source for the OM-blast template: Chris's Marketing Process Checklist
-// xlsx (Phase 2 row, "Send out OM Blast"). Other templates from the same
-// sheet will land here as their corresponding Send buttons get wired up.
+// Source: Chris's Marketing Process Checklist xlsx. Each template's
+// origin is noted inline. Templates with no Excel source (e.g. send
+// consultant roster) carry a sensible default that Chris can edit
+// in-place at the preview step.
 //
-// Substitution is intentionally dumb (single regex) — no helpers, no
-// formatters. If a placeholder is missing from `vars`, it's left in the
-// output verbatim so the user notices in the preview rather than silently
-// shipping with "Hi {{firstName}}".
+// Substitution is intentionally dumb (single regex), no helpers, no
+// formatters. If a placeholder is missing from `vars`, it's left in
+// the output verbatim so the user notices in the preview rather than
+// silently shipping with "Hi {{firstName}}".
 
 export type EmailTemplate = {
   subject: string;
@@ -22,14 +23,124 @@ export function interpolate(template: string, vars: Record<string, string>): str
   });
 }
 
-// Sender name + signature are appended at render time, not embedded in
-// the template body, so a user named Sean signing for Chris doesn't have
-// to manually swap the closing line.
+// Common deal vars used across templates. Sender's first name is
+// resolved at compose time from the picked sender option, not baked
+// into vars at the call site, so a swap re-renders the signature.
+//
+// dealName, units, type, city: from the deal row.
+// senderName: first name of the picked sender.
+// dueDate: formatted date for offers-due reminders. Caller supplies.
+
+// Phase 2 - Send out OM Blast.
 export const OM_BLAST_TEMPLATE: EmailTemplate = {
-  subject: "Offering Memorandum — {{dealName}} ({{units}} {{type}}, {{city}})",
+  subject: "Offering Memorandum, {{dealName}} ({{units}} {{type}}, {{city}})",
   body: `Please find offering memorandum for {{dealName}} in {{city}}. The Project includes {{units}} {{type}}.
 
 Let's schedule a time to connect in the next week.
+
+Thanks,
+{{senderName}}`,
+};
+
+// Phase 2 - Request In-Person Meeting (priority/Green buyers).
+export const IN_PERSON_MEETING_TEMPLATE: EmailTemplate = {
+  subject: "In-person meeting, {{dealName}} ({{city}})",
+  body: `Please find offering memorandum for {{dealName}} in {{city}}. The Project includes {{units}} {{type}}.
+
+Is there a time we can come by your office (or ours) to discuss the Project and catch up?
+
+Thanks,
+{{senderName}}`,
+};
+
+// Phase 2 - Q&A File distribution.
+export const QA_FILE_TEMPLATE: EmailTemplate = {
+  subject: "Q&A File, {{dealName}}",
+  body: `Please find attached Q&A File that we hope will be helpful in analyzing the Project. Please reach out if you have any questions.
+
+Thanks,
+{{senderName}}`,
+};
+
+// Phase 2 - Share Market Study.
+export const MARKET_STUDY_TEMPLATE: EmailTemplate = {
+  subject: "Market Study, {{dealName}}",
+  body: `Please find attached market study that was prepared for the Project. We hope this is helpful in determining pricing, absorption, and segmentation against communities.
+
+Thanks,
+{{senderName}}`,
+};
+
+// Phase 2 - Email Notification of Offer Due Date (5 days before).
+export const OFFERS_DUE_NOTICE_TEMPLATE: EmailTemplate = {
+  subject: "Offers due {{dueDate}}, {{dealName}}",
+  body: `Offers are due in a week on {{dueDate}}. Please let us know if you have any concerns hitting this deadline.
+
+Let us know if you have any questions.
+
+Thanks,
+{{senderName}}`,
+};
+
+// Phase 2 - Day-of Reminder.
+export const OFFERS_DUE_DAY_OF_TEMPLATE: EmailTemplate = {
+  subject: "Reminder, offers due today, {{dealName}}",
+  body: `As a reminder, offers are due later today. Please let us know if you have any questions.
+
+Please fill out the attached underwriting sheet and send back with your offer.
+
+Thanks,
+{{senderName}}`,
+};
+
+// Phase 2 - Follow-up to non-responders. Excel template was incomplete
+// ("Custom Email: 5 pm day of offers …") so this is our default fill.
+export const OFFERS_FOLLOWUP_TEMPLATE: EmailTemplate = {
+  subject: "Following up, {{dealName}} offers",
+  body: `Following up on the offer for {{dealName}}. We haven't received an offer yet and wanted to check in before we wrap up the offer window.
+
+Let us know if you're still planning to submit, or if you've decided to pass.
+
+Thanks,
+{{senderName}}`,
+};
+
+// Phase 3 - Schedule Summary of Offer Review (to Owner Team, CC
+// Broker Team).
+export const SCHEDULE_SOO_REVIEW_TEMPLATE: EmailTemplate = {
+  subject: "Offer review for {{dealName}}",
+  body: `In anticipation of offers coming in on {{offersDueDate}}, we'd like to schedule a time to review on {{reviewDate}}. In the meantime, we will forward over offers as we receive them.
+
+Thanks,
+{{senderName}}`,
+};
+
+// Phase 4 - Share Due Diligence Material / Set Meeting.
+export const SHARE_DD_MATERIAL_TEMPLATE: EmailTemplate = {
+  subject: "Due Diligence package, {{dealName}}",
+  body: `Please find attached due diligence folder: {{ddFolderUrl}}.
+
+What time works for everyone to do a due diligence kickoff call over the next week?
+
+Thanks,
+{{senderName}}`,
+};
+
+// Phase 4 - Send Consultant Roster (no Excel template; sensible default).
+export const CONSULTANT_ROSTER_TEMPLATE: EmailTemplate = {
+  subject: "Consultant roster, {{dealName}}",
+  body: `Attached is the consultant roster for {{dealName}}. Let us know if you'd like introductions to anyone on the list.
+
+Thanks,
+{{senderName}}`,
+};
+
+// Phase 4 - Send Issues PDF before bi-weekly DD calls.
+export const ISSUES_REPORT_TEMPLATE: EmailTemplate = {
+  subject: "Issues tracker, {{dealName}}",
+  body: `Attached is the current issues tracker for {{dealName}}, ahead of our next call.
+
+Let us know if anything's missing or if any open items need to move ahead of schedule.
 
 Thanks,
 {{senderName}}`,

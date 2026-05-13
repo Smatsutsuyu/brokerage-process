@@ -17,6 +17,7 @@ export type CurrentUser = {
   disabledAt: Date | null;
   email: string;
   name: string;
+  phone: string | null;
   // Developer-mode flag — owners can self-toggle from /profile. When true,
   // additional dev-team UI (notification toggles, /admin pages) become
   // visible for this user. Notifications are sent based on this flag plus
@@ -44,6 +45,7 @@ async function _getCurrentUser(): Promise<CurrentUser | null> {
       authUserId: users.authUserId,
       role: users.role,
       disabledAt: users.disabledAt,
+      phone: users.phone,
       isDeveloper: users.isDeveloper,
       notifyOnNewFeedback: users.notifyOnNewFeedback,
       notifyOnNewComment: users.notifyOnNewComment,
@@ -72,5 +74,6 @@ async function _getCurrentUser(): Promise<CurrentUser | null> {
     notifyOnNewComment: row.notifyOnNewComment,
     email: row.email,
     name: row.name,
+    phone: row.phone,
   };
 }

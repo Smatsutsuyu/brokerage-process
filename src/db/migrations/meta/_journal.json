@@ -127,6 +127,27 @@
       "when": 1778700933605,
       "tag": "0017_lame_skullbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1778702454139,
+      "tag": "0018_whole_bucky",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1778705229029,
+      "tag": "0019_lowly_ares",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1778708302339,
+      "tag": "0020_marvelous_kat_farrell",
+      "breakpoints": true
     }
   ]
 }
