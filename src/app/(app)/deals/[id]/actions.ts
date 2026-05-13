@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -15,6 +15,7 @@ import {
   dealBuyers,
   dealContacts,
   deals,
+  documents,
   issues,
   qaItems,
   users,
@@ -1197,6 +1198,115 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
       senderName: senderFirst,
     },
   };
+}
+
+// All possible attachments for the OM-blast email — every uploaded file
+// AND every external link on the "Offering Memorandum" checklist row.
+// The composer modal shows these as a checklist so the user picks which
+// to actually attach (a deal can carry e.g. an OM PDF + an exhibits PDF +
+// a Dropbox folder link, and Chris may want any combination).
+//
+// `recommendedIds` flags the modal's default selection: latest file if
+// any files exist, else the first link. Single-attachment cases stay
+// one-click (the only option is pre-checked).
+export type OmAttachmentChoice =
+  | {
+      id: string;
+      kind: "file";
+      documentId: string;
+      filename: string;
+      mimeType: string | null;
+      sizeBytes: number | null;
+      version: number;
+    }
+  | { id: string; kind: "link"; url: string; label: string | null };
+
+export async function getOmAttachments(input: {
+  dealId: string;
+}): Promise<{ choices: OmAttachmentChoice[]; recommendedIds: string[] }> {
+  const org = await getCurrentOrg();
+  if (!org) return { choices: [], recommendedIds: [] };
+
+  // Find the OM checklist item on this deal. Match by name (case-
+  // insensitive) — same loose-match style as the OM-blast button so a
+  // slight rename doesn't silently lose the attachment.
+  const itemRows = await db
+    .select({ id: checklistItems.id, name: checklistItems.name })
+    .from(checklistItems)
+    .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
+    .where(
+      and(
+        eq(checklistCategories.dealId, input.dealId),
+        eq(checklistItems.orgId, org.id),
+      ),
+    );
+  const omItem = itemRows.find((r) => r.name.toLowerCase().includes("offering memorandum"));
+  if (!omItem) return { choices: [], recommendedIds: [] };
+
+  // All files on the OM row, newest first.
+  const docs = await db
+    .select({
+      id: documents.id,
+      name: documents.name,
+      mimeType: documents.mimeType,
+      sizeBytes: documents.sizeBytes,
+      version: documents.version,
+    })
+    .from(documents)
+    .where(
+      and(eq(documents.checklistItemId, omItem.id), eq(documents.orgId, org.id)),
+    )
+    .orderBy(desc(documents.version), desc(documents.uploadedAt));
+
+  // All external links on the OM row.
+  const links = await db
+    .select({
+      id: checklistItemLinks.id,
+      url: checklistItemLinks.url,
+      label: checklistItemLinks.label,
+    })
+    .from(checklistItemLinks)
+    .where(
+      and(
+        eq(checklistItemLinks.checklistItemId, omItem.id),
+        eq(checklistItemLinks.orgId, org.id),
+      ),
+    )
+    .orderBy(asc(checklistItemLinks.sortOrder), asc(checklistItemLinks.createdAt));
+
+  const choices: OmAttachmentChoice[] = [
+    ...docs.map(
+      (d): OmAttachmentChoice => ({
+        // Composite id so files and links can never collide in the
+        // selection Set on the client even if a UUID coincidence happened.
+        id: `file:${d.id}`,
+        kind: "file",
+        documentId: d.id,
+        filename: d.name,
+        mimeType: d.mimeType,
+        sizeBytes: d.sizeBytes,
+        version: d.version,
+      }),
+    ),
+    ...links.map(
+      (l): OmAttachmentChoice => ({
+        id: `link:${l.id}`,
+        kind: "link",
+        url: l.url,
+        label: l.label,
+      }),
+    ),
+  ];
+
+  // Default selection: prefer latest file. No file? First link. No
+  // anything? Empty (modal just hides the section).
+  let recommendedIds: string[] = [];
+  if (choices.length > 0) {
+    const firstFile = choices.find((c) => c.kind === "file");
+    recommendedIds = firstFile ? [firstFile.id] : [choices[0].id];
+  }
+
+  return { choices, recommendedIds };
 }
 
 // Verifies that an item belongs to the active deal — useful for any action

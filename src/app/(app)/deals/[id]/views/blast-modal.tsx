@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import {
   EmailPreviewModal,
+  type EmailAttachment,
   type EmailRecipient,
 } from "@/components/email/email-preview-modal";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ import { OM_BLAST_TEMPLATE } from "@/lib/email-templates";
 import { cn } from "@/lib/utils";
 
 import {
+  getOmAttachments,
   getOmBlastTemplateContext,
   previewBlastRecipients,
   type BlastPreviewRow,
@@ -88,6 +90,8 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
   const [isLoading, startLoading] = useTransition();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewVars, setPreviewVars] = useState<Record<string, string>>({});
+  const [attachmentChoices, setAttachmentChoices] = useState<EmailAttachment[]>([]);
+  const [defaultAttachmentIds, setDefaultAttachmentIds] = useState<string[]>([]);
   const [previewLoading, startPreviewLoading] = useTransition();
 
   // Recompute the preview whenever filters change OR the modal opens.
@@ -160,16 +164,22 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
   }, [recipients]);
 
   // Hand off to the preview modal: load the deal's template vars (deal
-  // name, city, units, type, sender first name) and open the second step.
-  // The second step closes both modals on send.
+  // name, city, units, type, sender first name) AND every OM attachment
+  // option in parallel, then open the second step. The second step
+  // closes both modals on send.
   function handleProceedToPreview() {
     startPreviewLoading(async () => {
       try {
-        const ctx = await getOmBlastTemplateContext({ dealId });
+        const [ctx, att] = await Promise.all([
+          getOmBlastTemplateContext({ dealId }),
+          getOmAttachments({ dealId }),
+        ]);
         setPreviewVars(ctx.vars);
+        setAttachmentChoices(att.choices);
+        setDefaultAttachmentIds(att.recommendedIds);
         setPreviewOpen(true);
       } catch (err) {
-        console.error("[blast] template context failed", err);
+        console.error("[blast] preview context load failed", err);
       }
     });
   }
@@ -351,12 +361,19 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
         recipients={previewRecipients}
         template={OM_BLAST_TEMPLATE}
         vars={previewVars}
+        attachmentChoices={attachmentChoices}
+        defaultSelectedAttachmentIds={defaultAttachmentIds}
         onSend={async (emails) => {
           // Mocked: real Resend wiring lands when the sender domain is
           // verified (landadvisors.com DNS pending). Close both modals so
           // the user lands back on the contacts/checklist they started from.
+          const atts = emails[0]?.attachments ?? [];
+          const attDesc =
+            atts.length === 0
+              ? ""
+              : ` with ${atts.length} attachment${atts.length === 1 ? "" : "s"}`;
           toast.success(
-            `Mock-sent ${emails.length} ${emails.length === 1 ? "email" : "emails"}`,
+            `Mock-sent ${emails.length} ${emails.length === 1 ? "email" : "emails"}${attDesc}`,
             {
               description: "Email infrastructure isn't wired yet — no real messages were sent.",
               duration: 5000,

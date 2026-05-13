@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Building2, ChevronLeft, ChevronRight, Loader2, Mail, Send } from "lucide-react";
+import {
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Loader2,
+  Mail,
+  Paperclip,
+  Send,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -29,6 +38,22 @@ export type EmailRecipient = {
   builderName: string;
 };
 
+// One possible attachment the user can pick from. "file" = a stored doc
+// we'll fetch from blob storage at send time. "link" = an external URL —
+// at send time we either link inline or attempt a fetch (host-dependent).
+// `id` is opaque to the modal; caller derives stable IDs so the checkbox
+// state survives across re-renders.
+export type EmailAttachment =
+  | {
+      id: string;
+      kind: "file";
+      documentId: string;
+      filename: string;
+      mimeType?: string | null;
+      sizeBytes?: number | null;
+    }
+  | { id: string; kind: "link"; url: string; label: string | null };
+
 type EmailPreviewModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -43,6 +68,15 @@ type EmailPreviewModalProps = {
   // Variables for {{placeholder}} substitution in subject and body.
   // Caller controls what's available (deal name, sender name, etc.).
   vars: Record<string, string>;
+  // Pool of attachments the user can pick from — every uploaded file +
+  // every link on the source checklist row, etc. Empty array (default)
+  // hides the attachment section entirely. Same selection applies to
+  // every per-builder email (what Chris wants for OM-blast — one OM
+  // bundle goes to everyone).
+  attachmentChoices?: EmailAttachment[];
+  // Pre-checked attachment ids on first open. Caller picks the default
+  // (e.g. latest file). User can toggle from there.
+  defaultSelectedAttachmentIds?: string[];
   // Called when the user clicks Send. The actual transport (Resend etc.)
   // is the caller's concern — this modal only owns the compose/preview UX.
   // For now every caller passes a no-op + toast since email infra isn't
@@ -57,7 +91,18 @@ export type ResolvedEmail = {
   to: { contactId: string; name: string; email: string }[];
   subject: string;
   body: string;
+  // Attachments the user picked from `attachmentChoices`. Same selection
+  // for every per-builder email — caller's responsibility to actually
+  // transmit them at send time.
+  attachments: EmailAttachment[];
 };
+
+function formatBytes(n: number | null | undefined): string | null {
+  if (n == null) return null;
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 // Group recipients by builder, drop those without an email since they
 // can't be sent to (caller's filter UI should also flag these but we
@@ -86,9 +131,12 @@ export function EmailPreviewModal({
   recipients,
   template,
   vars,
+  attachmentChoices,
+  defaultSelectedAttachmentIds,
   onSend,
 }: EmailPreviewModalProps) {
   const groups = useMemo(() => groupByBuilder(recipients), [recipients]);
+  const choices = attachmentChoices ?? [];
 
   // Subject/body are edited once and apply to every email (per Chris:
   // single template, multiple recipients). The paginator below changes
@@ -97,18 +145,38 @@ export function EmailPreviewModal({
   const [body, setBody] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const [sending, setSending] = useState(false);
+  // Selected attachment ids — Set so toggling stays O(1). Reset to the
+  // caller's defaults each time the modal opens.
+  const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
-  // Reset to the resolved template every time the modal opens (or the
-  // template/vars change). Without this, reopening the modal shows the
-  // user's stale edits from the previous session, which is confusing.
+  // Reset to the resolved template + default attachment selection every
+  // time the modal opens. Without this, reopening shows stale edits from
+  // the previous session, which is confusing.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) return;
     setSubject(interpolate(template.subject, vars));
     setBody(interpolate(template.body, vars));
     setActiveIdx(0);
-  }, [open, template.subject, template.body, vars]);
+    setSelectedAttachmentIds(new Set(defaultSelectedAttachmentIds ?? []));
+  }, [open, template.subject, template.body, vars, defaultSelectedAttachmentIds]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  function toggleAttachment(id: string) {
+    setSelectedAttachmentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const selectedAttachments = useMemo(
+    () => choices.filter((c) => selectedAttachmentIds.has(c.id)),
+    [choices, selectedAttachmentIds],
+  );
 
   const total = groups.length;
   const active = total > 0 ? groups[Math.min(activeIdx, total - 1)] : null;
@@ -132,6 +200,7 @@ export function EmailPreviewModal({
       })),
       subject,
       body,
+      attachments: selectedAttachments,
     }));
     setSending(true);
     try {
@@ -221,6 +290,88 @@ export function EmailPreviewModal({
                 ))}
               </div>
             </div>
+
+            {/* Attachments — same selection goes on every per-builder
+                email. Checklist of every available file/link on the
+                source row; user picks any subset. Defaults pre-checked
+                by the caller (latest file, or first link if no files). */}
+            {choices.length > 0 && (
+              <div className="grid gap-1.5">
+                <div className="flex items-baseline justify-between">
+                  <Label className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+                    Attachments
+                  </Label>
+                  <span className="text-[10px] tabular-nums text-gray-500">
+                    {selectedAttachmentIds.size} of {choices.length} selected
+                  </span>
+                </div>
+                <ul className="space-y-1 rounded-md border border-gray-200 bg-white p-1.5">
+                  {choices.map((c) => {
+                    const checked = selectedAttachmentIds.has(c.id);
+                    return (
+                      <li key={c.id}>
+                        <label
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-[12px] transition-colors",
+                            checked ? "bg-blue-50" : "hover:bg-gray-50",
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleAttachment(c.id)}
+                            className="h-3.5 w-3.5 rounded border-gray-300"
+                          />
+                          {c.kind === "file" ? (
+                            <>
+                              <Paperclip className="h-3 w-3 text-blue-700" />
+                              <span
+                                className={cn(
+                                  "font-medium",
+                                  checked ? "text-blue-900" : "text-gray-700",
+                                )}
+                              >
+                                {c.filename}
+                              </span>
+                              {formatBytes(c.sizeBytes) && (
+                                <span className="text-[10px] tabular-nums text-gray-500">
+                                  {formatBytes(c.sizeBytes)}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <Paperclip className="h-3 w-3 text-amber-700" />
+                              <span
+                                className={cn(
+                                  "font-medium",
+                                  checked ? "text-amber-900" : "text-gray-700",
+                                )}
+                              >
+                                {c.label ?? c.url}
+                              </span>
+                              <a
+                                href={c.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-amber-700/70 hover:text-amber-900"
+                                title="Open link in new tab"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                              <span className="ml-auto text-[10px] tracking-wider text-amber-700/70 uppercase">
+                                link · fetched at send
+                              </span>
+                            </>
+                          )}
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
 
             {/* Subject — single edit, applies to all */}
             <div className="grid gap-1.5">
