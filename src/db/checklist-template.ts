@@ -311,10 +311,10 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
     phase: "phase_3",
     categories: [
       {
-        name: "Items",
+        name: "Summary of Offers (SOO)",
         items: [
           {
-            name: "Schedule Meeting with Ownership",
+            name: "Schedule Summary of Offer Review",
             actions: [
               {
                 kind: "send-email",
@@ -326,7 +326,7 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
             ],
           },
           {
-            name: "Create Initial Summary (send out as received)",
+            name: "Initial Summary of Offers + LOIS",
             actions: [
               {
                 kind: "send-email",
@@ -338,11 +338,12 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
               },
             ],
           },
-          "Review Underwriting Sheets for clarification",
-          "Run LOI through AI → SOO Matrix",
-          "Run UW Sheets through AI → Revenue Charts & UW Summary",
+          "Review Underwriting Sheets for Clarification",
+          "Create SOO Matrix",
+          "Create UW Sheets",
+          "Create Revenue Charts",
           {
-            name: "PDF everything together",
+            name: "PDF Everything",
             actions: [
               {
                 kind: "generate-doc",
@@ -358,6 +359,9 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
           "Finalize B&F Group and Counter Terms",
           "Send out B&F",
           "Buyer Interviews",
+          "Create B&F Recommendation, Pro Con of each Offer",
+          "Select Buyer",
+          "Sign LOI",
         ],
       },
     ],

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "vercel-build": "drizzle-kit migrate && npm run checklist:reconcile && next build",
+    "vercel-build": "drizzle-kit migrate && npm run rename:apply && npm run checklist:reconcile && next build",
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write .",
@@ -20,7 +20,8 @@
     "db:seed": "tsx --env-file=.env.local src/db/seed.ts",
     "feedback:report": "tsx --env-file=.env.local src/scripts/feedback-report.ts",
     "feedback:update": "tsx --env-file=.env.local src/scripts/feedback-update.ts",
-    "checklist:reconcile": "tsx --env-file-if-exists=.env.local src/scripts/reconcile-checklists.ts"
+    "checklist:reconcile": "tsx --env-file-if-exists=.env.local src/scripts/reconcile-checklists.ts",
+    "rename:apply": "tsx --env-file-if-exists=.env.local src/scripts/apply-renames.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
