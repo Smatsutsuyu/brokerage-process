@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { authAccount, authSession, authUser, users } from "@/db/schema";
+import { authAccount, authSession, authUser, dealTeamMembers, users } from "@/db/schema";
 import { auth } from "@/lib/auth/auth";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
@@ -136,7 +136,15 @@ export async function removeMember(input: { userId: string }): Promise<void> {
   // Delete in transaction: membership row first (FK to authUser is
   // onDelete set null, so this would orphan), then the auth identity.
   // Cascades on auth_session + auth_account drop them automatically.
+  //
+  // Deal Team rows referencing this user need a hard detach first. The
+  // FK is onDelete set null, but `deal_team_members` has a CHECK that
+  // requires at least one of userId / contactId / name to be non-null —
+  // so a SET NULL on a user-only row would violate the constraint and
+  // abort the user delete. Drop those rows instead of trying to
+  // preserve them as orphaned free-text entries.
   await db.transaction(async (tx) => {
+    await tx.delete(dealTeamMembers).where(eq(dealTeamMembers.userId, input.userId));
     await tx.delete(users).where(eq(users.id, input.userId));
     if (target.authUserId) {
       await tx.delete(authAccount).where(eq(authAccount.userId, target.authUserId));
