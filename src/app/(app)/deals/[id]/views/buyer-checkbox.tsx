@@ -5,12 +5,17 @@ import { Check, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-import { setBuyerCalled, setBuyerOfferReceived, setBuyerOmSent } from "../actions";
+import {
+  setBuyerCalled,
+  setBuyerConfiSigned,
+  setBuyerOfferReceived,
+  setBuyerOmSent,
+} from "../actions";
 
 type BuyerCheckboxProps = {
   dealBuyerId: string;
   dealId: string;
-  field: "called" | "omSent" | "offerReceived";
+  field: "called" | "confiSigned" | "omSent" | "offerReceived";
   checked: boolean;
 };
 
@@ -21,6 +26,8 @@ export function BuyerCheckbox({ dealBuyerId, dealId, field, checked }: BuyerChec
     startTransition(async () => {
       if (field === "called") {
         await setBuyerCalled({ dealBuyerId, dealId, called: !checked });
+      } else if (field === "confiSigned") {
+        await setBuyerConfiSigned({ dealBuyerId, dealId, confiSigned: !checked });
       } else if (field === "omSent") {
         await setBuyerOmSent({ dealBuyerId, dealId, omSent: !checked });
       } else {

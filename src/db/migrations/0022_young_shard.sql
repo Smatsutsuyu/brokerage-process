@@ -1,0 +1,1 @@
+ALTER TABLE "deal_buyers" ADD COLUMN "confi_signed_at" timestamp with time zone;

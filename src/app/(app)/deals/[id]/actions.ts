@@ -260,6 +260,22 @@ export async function setBuyerOmSent(input: {
   revalidatePath(`/deals/${input.dealId}`);
 }
 
+export async function setBuyerConfiSigned(input: {
+  dealBuyerId: string;
+  dealId: string;
+  confiSigned: boolean;
+}) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  await db
+    .update(dealBuyers)
+    .set({ confiSignedAt: input.confiSigned ? new Date() : null })
+    .where(and(eq(dealBuyers.id, input.dealBuyerId), eq(dealBuyers.orgId, org.id)));
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
 export async function setBuyerOfferReceived(input: {
   dealBuyerId: string;
   dealId: string;

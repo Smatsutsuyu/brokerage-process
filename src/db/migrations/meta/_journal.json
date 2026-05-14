@@ -155,6 +155,13 @@
       "when": 1778717000446,
       "tag": "0021_pink_otto_octavius",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1778784249393,
+      "tag": "0022_young_shard",
+      "breakpoints": true
     }
   ]
 }

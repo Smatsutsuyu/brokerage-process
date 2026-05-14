@@ -413,6 +413,15 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
                           <BuyerCheckbox
                             dealBuyerId={g.dealBuyerId}
                             dealId={dealId}
+                            field="confiSigned"
+                            checked={g.confiSigned}
+                          />
+                          <span className="text-gray-600">Confi</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <BuyerCheckbox
+                            dealBuyerId={g.dealBuyerId}
+                            dealId={dealId}
                             field="omSent"
                             checked={g.omSent}
                           />

@@ -50,6 +50,7 @@ export type BuyerGroup =
       leadUserId: string | null;
       leadName: string | null;
       called: boolean;
+      confiSigned: boolean;
       omSent: boolean;
       offerReceived: boolean;
       comments: string | null;
@@ -100,6 +101,7 @@ export async function loadBuyers(dealId: string): Promise<BuyerData> {
       omSentAt: dealBuyers.omSentAt,
       offerReceivedAt: dealBuyers.offerReceivedAt,
       calledAt: dealBuyers.calledAt,
+      confiSignedAt: dealBuyers.confiSignedAt,
       comments: dealBuyers.comments,
       leadUserId: dealBuyers.leadUserId,
       leadName: authUser.name,
@@ -153,6 +155,7 @@ export async function loadBuyers(dealId: string): Promise<BuyerData> {
           leadUserId: r.leadUserId,
           leadName: r.leadName,
           called: r.calledAt !== null,
+          confiSigned: r.confiSignedAt !== null,
           omSent: r.omSentAt !== null,
           offerReceived: r.offerReceivedAt !== null,
           comments: r.comments,

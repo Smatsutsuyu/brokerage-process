@@ -29,6 +29,11 @@ export const dealBuyers = pgTable(
     // users at query time. Default empty.
     ccUserIds: uuid("cc_user_ids").array().notNull().default([]),
     calledAt: timestamp("called_at", { withTimezone: true }),
+    // Set when this builder has signed the Confidentiality Agreement for
+    // the deal. Tracking-only at the moment (no workflow gate); reference
+    // it later when filtering blasts that should only go to Confi-signed
+    // recipients.
+    confiSignedAt: timestamp("confi_signed_at", { withTimezone: true }),
     omSentAt: timestamp("om_sent_at", { withTimezone: true }),
     // Set when this builder has submitted their offer. Used by the
     // Phase 2 "Follow up Missing Offers" blast to filter out builders
