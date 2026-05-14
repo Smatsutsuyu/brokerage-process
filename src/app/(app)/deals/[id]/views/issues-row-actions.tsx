@@ -1,18 +1,19 @@
 "use client";
 
-import { FileText, Send } from "lucide-react";
+import { Send } from "lucide-react";
 
 import { ISSUES_REPORT_TEMPLATE } from "@/lib/email-templates";
-import { cn } from "@/lib/utils";
 
 import { DealTeamSendButton } from "./deal-team-send-button";
+import { IssuesReportPdfButton } from "./issues-report-pdf-button";
 
 type IssuesRowActionsProps = {
   dealId: string;
 };
 
 // Pair of actions on the Phase 4 "Issues Tracking Sheet" row:
-//   1. Generate PDF -> downloads the on-demand issues report
+//   1. Generate PDF -> downloads the on-demand issues report (shared
+//      component; same destination as the Issues tab toolbar button).
 //   2. Send to Deal Team -> opens the email composer with the PDF
 //      pre-attached and Deal Team recipients (owner + broker, plus
 //      buyer once one's been selected) pre-populated.
@@ -24,18 +25,7 @@ export function IssuesRowActions({ dealId }: IssuesRowActionsProps) {
 
   return (
     <>
-      <a
-        href={pdfUrl}
-        target="_blank"
-        rel="noopener"
-        title="Generate and download the issues report PDF"
-        className={cn(
-          "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-700",
-        )}
-      >
-        <FileText className="h-3 w-3" />
-        Generate PDF
-      </a>
+      <IssuesReportPdfButton dealId={dealId} variant="compact" />
       <DealTeamSendButton
         dealId={dealId}
         label="Send to Deal Team"

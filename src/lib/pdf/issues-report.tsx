@@ -1,35 +1,43 @@
+import { readFileSync } from "fs";
 import { join } from "path";
 
 import {
   Document,
   Font,
+  Image,
   Page,
   StyleSheet,
   Text,
   View,
 } from "@react-pdf/renderer";
 
-// Same Open Sans family the Marketing Report uses, registered idempotently
-// in case both modules load.
+// Same Metropolis family the Marketing Report uses, registered
+// idempotently in case both modules load.
 Font.register({
-  family: "Open Sans",
+  family: "Metropolis",
   fonts: [
-    { src: join(process.cwd(), "src/lib/pdf/fonts/OpenSans-Regular.ttf") },
+    { src: join(process.cwd(), "src/lib/pdf/fonts/Metropolis-Regular.ttf") },
     {
-      src: join(process.cwd(), "src/lib/pdf/fonts/OpenSans-Bold.ttf"),
+      src: join(process.cwd(), "src/lib/pdf/fonts/Metropolis-Bold.ttf"),
       fontWeight: "bold",
     },
   ],
 });
 
-// React-PDF doc for the per-deal Issues Report. Phase 4 due-diligence
-// rhythm sends this ahead of each bi-weekly DD call so the deal team
-// sees what's outstanding at a glance.
-//
-// Layout: navy banner with deal name + date, summary line (X open /
-// Y in progress / Z resolved), then a table of issues grouped by
-// status. Mirrors the Marketing Report's typography + Land Advisors
-// footer to feel like one family of documents.
+Font.registerHyphenationCallback((word) => [word]);
+
+let LAO_LOGO_DATA_URI: string | null = null;
+try {
+  const buf = readFileSync(join(process.cwd(), "src/lib/pdf/assets/lao-logo.jpg"));
+  LAO_LOGO_DATA_URI = `data:image/jpeg;base64,${buf.toString("base64")}`;
+} catch {
+  // Text fallback in the footer if the file isn't present.
+}
+
+// Per-deal Issues Report. Phase 4 due-diligence rhythm sends this ahead
+// of each bi-weekly DD call so the deal team sees what's outstanding at
+// a glance. Mirrors the Marketing Report's title block + footer logo
+// treatment so the docs read as one Land Advisors family.
 
 export type IssueStatus = "open" | "in_progress" | "resolved";
 export type IssuePriority = "low" | "medium" | "high" | "urgent";
@@ -40,7 +48,7 @@ export type IssuesReportRow = {
   status: IssueStatus;
   priority: IssuePriority;
   assignedName: string | null;
-  identifiedDate: string; // pre-formatted
+  identifiedDate: string;
 };
 
 export type IssuesReportProps = {
@@ -49,13 +57,24 @@ export type IssuesReportProps = {
   rows: IssuesReportRow[];
 };
 
+const COLORS = {
+  ink: "#111827",
+  textPrimary: "#1f2937",
+  textSecondary: "#6b7280",
+  border: "#e5e7eb",
+  rowAlt: "#f3f4f6",
+  open: "#b91c1c",
+  inProgress: "#b45309",
+  resolved: "#15803d",
+};
+
 const STATUS_META: Record<
   IssueStatus,
   { label: string; color: string; order: number }
 > = {
-  open: { label: "Open", color: "#b91c1c", order: 0 },
-  in_progress: { label: "In progress", color: "#b45309", order: 1 },
-  resolved: { label: "Resolved", color: "#15803d", order: 2 },
+  open: { label: "Open", color: COLORS.open, order: 0 },
+  in_progress: { label: "In progress", color: COLORS.inProgress, order: 1 },
+  resolved: { label: "Resolved", color: COLORS.resolved, order: 2 },
 };
 
 const PRIORITY_META: Record<
@@ -68,81 +87,94 @@ const PRIORITY_META: Record<
   low: { label: "Low", bg: "#f3f4f6", fg: "#4b5563" },
 };
 
+const MARGIN = 36;
+const FOOTER_RESERVE = 70;
+
 const styles = StyleSheet.create({
   page: {
-    fontFamily: "Open Sans",
-    fontSize: 9,
-    paddingTop: 36,
-    paddingBottom: 48,
-    paddingHorizontal: 36,
-    color: "#1f2937",
-  },
-  banner: {
-    backgroundColor: "#0c1d3a",
-    color: "#ffffff",
-    padding: 16,
-    marginBottom: 12,
-  },
-  bannerKicker: {
-    fontSize: 9,
-    opacity: 0.8,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-  },
-  bannerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginTop: 4,
-  },
-  bannerSubtitle: {
+    paddingTop: MARGIN,
+    paddingBottom: MARGIN + FOOTER_RESERVE,
+    paddingHorizontal: MARGIN,
+    fontFamily: "Metropolis",
     fontSize: 10,
-    opacity: 0.8,
-    marginTop: 4,
+    color: COLORS.textPrimary,
+  },
+  titleBlock: {
+    paddingBottom: 24,
+  },
+  dealTitle: {
+    fontSize: 24,
+    fontFamily: "Metropolis",
+    fontWeight: "bold",
+    color: COLORS.ink,
+    marginBottom: 4,
+  },
+  reportLabel: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    fontFamily: "Metropolis",
+    letterSpacing: 1,
   },
   summary: {
     flexDirection: "row",
     gap: 12,
-    marginBottom: 14,
+    marginBottom: 18,
   },
   summaryStat: {
     flex: 1,
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     backgroundColor: "#f9fafb",
     borderLeftWidth: 3,
     borderLeftStyle: "solid",
   },
-  summaryNum: { fontSize: 18, fontWeight: "bold" },
+  summaryNum: {
+    fontSize: 20,
+    fontFamily: "Metropolis",
+    fontWeight: "bold",
+    color: COLORS.ink,
+  },
   summaryLabel: {
     fontSize: 8,
-    color: "#6b7280",
+    color: COLORS.textSecondary,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    marginTop: 2,
   },
   groupHeader: {
-    marginTop: 12,
+    marginTop: 14,
     marginBottom: 6,
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: "#e5e7eb",
-    fontSize: 11,
+    paddingBottom: 6,
+    borderBottomWidth: 1.5,
+    borderBottomColor: COLORS.ink,
+    fontSize: 10,
+    fontFamily: "Metropolis",
     fontWeight: "bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   row: {
     flexDirection: "row",
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
-    borderBottomColor: "#f3f4f6",
+    borderBottomColor: COLORS.border,
   },
   colPriority: { width: 60, paddingRight: 6 },
   colTitle: { flex: 2, paddingRight: 6 },
-  colAssigned: { width: 90, paddingRight: 6 },
+  colAssigned: { width: 110, paddingRight: 6 },
   colDate: { width: 70, textAlign: "right" },
-  title: { fontWeight: "bold", fontSize: 10 },
-  description: { color: "#4b5563", marginTop: 2 },
+  title: {
+    fontFamily: "Metropolis",
+    fontWeight: "bold",
+    fontSize: 10,
+    color: COLORS.ink,
+  },
+  description: {
+    color: COLORS.textPrimary,
+    fontSize: 9,
+    marginTop: 2,
+    lineHeight: 1.4,
+  },
   priorityChip: {
     fontSize: 7,
     paddingVertical: 2,
@@ -150,27 +182,37 @@ const styles = StyleSheet.create({
     textAlign: "center",
     textTransform: "uppercase",
     letterSpacing: 0.5,
+    fontFamily: "Metropolis",
     fontWeight: "bold",
   },
-  small: { fontSize: 8, color: "#6b7280" },
-  footer: {
-    position: "absolute",
-    bottom: 24,
-    left: 36,
-    right: 36,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    fontSize: 8,
-    color: "#6b7280",
-  },
-  footerBrand: { fontWeight: "bold", color: "#1f2937" },
+  small: { fontSize: 9, color: COLORS.textSecondary },
   empty: {
     marginTop: 24,
     padding: 24,
     backgroundColor: "#f9fafb",
     textAlign: "center",
-    color: "#6b7280",
+    color: COLORS.textSecondary,
     fontSize: 10,
+  },
+  footer: {
+    position: "absolute",
+    bottom: MARGIN,
+    left: MARGIN,
+    right: MARGIN,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  footerLogo: { width: 108 },
+  footerLogoFallback: {
+    fontFamily: "Metropolis",
+    fontWeight: "bold",
+    color: COLORS.ink,
+    fontSize: 12,
+  },
+  footerMeta: {
+    fontSize: 9,
+    color: COLORS.textSecondary,
   },
 });
 
@@ -198,10 +240,9 @@ export function IssuesReportDoc({
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
-        <View style={styles.banner}>
-          <Text style={styles.bannerKicker}>Issues Tracker</Text>
-          <Text style={styles.bannerTitle}>{dealName}</Text>
-          <Text style={styles.bannerSubtitle}>{dateLabel}</Text>
+        <View style={styles.titleBlock}>
+          <Text style={styles.dealTitle}>{dealName}</Text>
+          <Text style={styles.reportLabel}>ISSUES REPORT · {dateLabel}</Text>
         </View>
 
         <View style={styles.summary}>
@@ -232,9 +273,9 @@ export function IssuesReportDoc({
             const list = grouped[status];
             if (list.length === 0) return null;
             return (
-              <View key={status} wrap={false}>
+              <View key={status}>
                 <Text style={[styles.groupHeader, { color: STATUS_META[status].color }]}>
-                  {STATUS_META[status].label} ({list.length})
+                  {STATUS_META[status].label.toUpperCase()} ({list.length})
                 </Text>
                 {list.map((r, i) => {
                   const p = PRIORITY_META[r.priority];
@@ -273,11 +314,14 @@ export function IssuesReportDoc({
         )}
 
         <View style={styles.footer} fixed>
-          <View>
-            <Text style={styles.footerBrand}>Land Advisors Organization</Text>
-            <Text>100 Spectrum Center Drive Suite 1400, Irvine CA 92618</Text>
-          </View>
+          {LAO_LOGO_DATA_URI ? (
+            // eslint-disable-next-line jsx-a11y/alt-text
+            <Image src={LAO_LOGO_DATA_URI} style={styles.footerLogo} />
+          ) : (
+            <Text style={styles.footerLogoFallback}>Land Advisors</Text>
+          )}
           <Text
+            style={styles.footerMeta}
             render={({ pageNumber, totalPages }) =>
               `${pageNumber} / ${totalPages}`
             }

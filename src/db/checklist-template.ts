@@ -184,19 +184,10 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
               },
             ],
           },
-          {
-            name: "Marketing Report",
-            actions: [
-              {
-                kind: "generate-doc",
-                label: "Generate PDF",
-                feature: "Marketing Report PDF",
-                description:
-                  "Renders the buyer list grouped by Green / Yellow / Red interest tier as a branded PDF.",
-                phase: "phase_2",
-              },
-            ],
-          },
+          // Marketing Report row's "Marketing Report" PDF download is
+          // real, wired in phase-section.tsx via isMarketingReportItem.
+          // Same component as the Contacts tab toolbar button.
+          "Marketing Report",
           "Create Marketing Dropbox Folder",
           "Create Full Due Diligence Dropbox Folder",
           { name: "Fly Aerials", optional: true },
@@ -235,115 +226,27 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
         items: [
           // Confidentiality Agreement is not in Excel v2 but Chris
           // explicitly asked for it earlier (2026-05-07). Real workflow
-          // step. Email-out placeholder until the CA send pipeline lands.
-          {
-            name: "Confidentiality Agreement",
-            actions: [
-              {
-                kind: "send-email",
-                label: "Email to marketing list",
-                feature: "Confidentiality Agreement distribution",
-                description:
-                  "Sends the uploaded CA to all buyers on this deal using a templated email. Default body: \"We'd like to share some information on a proposed [X unit] [Type] deal in [City]. We'd like to keep information confidential and are sharing the proposed confidentiality agreement. Please review and let us know if this form works and we will send it out for signatures.\" Editable per send.",
-                phase: "phase_2",
-              },
-            ],
-          },
+          // step. "Send CA" button wired in phase-section via isCaItem.
+          "Confidentiality Agreement",
           // OM Blast row's "Send OM blast" button is real, wired via
           // isOmBlastItem() in phase-section.tsx.
           "Send out OM Blast",
-          {
-            name: "Request In-Person Meeting with Top (Green) Buyers",
-            actions: [
-              {
-                kind: "send-email",
-                label: "Email Green buyers",
-                feature: "In-person meeting request",
-                description:
-                  "Drafts a templated meeting-request email to all Green-tier buyers on this deal.",
-                phase: "phase_2",
-              },
-            ],
-          },
-          // Q&A File: consolidated to a single row per Excel. Has both
-          // the Generate PDF action (renders approved Q&A items) and
-          // the Send email action.
-          {
-            name: "Q&A File",
-            actions: [
-              {
-                kind: "generate-doc",
-                label: "Generate Q&A PDF",
-                feature: "Q&A File PDF",
-                description:
-                  "Renders all approved Q&A items as a Land Advisors-branded PDF ready to distribute.",
-                phase: "phase_2",
-              },
-              {
-                kind: "send-email",
-                label: "Send to buyers",
-                feature: "Q&A distribution email",
-                description: "Emails the approved Q&A PDF to all buyers on this deal via Resend.",
-                phase: "phase_2",
-              },
-            ],
-          },
-          {
-            name: "Share Market Study",
-            optional: true,
-            actions: [
-              {
-                kind: "send-email",
-                label: "Send to buyers",
-                feature: "Market Study distribution",
-                description:
-                  "Emails the uploaded Market Study to all buyers on this deal via Resend.",
-                phase: "phase_2",
-              },
-            ],
-          },
+          // Send to Green wired in phase-section via isInPersonMeetingItem.
+          "Request In-Person Meeting with Top (Green) Buyers",
+          // Q&A File: "Generate PDF" + "Send Q&A" both real now, wired
+          // in phase-section via isQaFileItem.
+          "Q&A File",
+          // Send Market Study wired in phase-section via isShareMarketStudyItem.
+          { name: "Share Market Study", optional: true },
           // New per Excel v2: Share Marketing Due Diligence Folder.
           // Excel says "will put in OM" so this is essentially a
           // checkbox + link affordance (Dropbox folder URL).
           "Share Marketing Due Diligence Folder",
-          {
-            name: "Email Notification of Offer Due Date - 1 week before",
-            actions: [
-              {
-                kind: "schedule-reminder",
-                label: "Schedule reminders",
-                feature: "Offers-due reminder schedule",
-                description:
-                  "Schedules templated reminder emails: X days before offer deadline, day-of, and day-after follow-up to Green/Yellow buyers without offers.",
-                phase: "phase_2",
-              },
-            ],
-          },
-          {
-            name: "Day-of Reminder",
-            actions: [
-              {
-                kind: "send-email",
-                label: "Send now",
-                feature: "Day-of offers-due reminder",
-                description: "Sends the day-of offers-due reminder to all buyers on this deal.",
-                phase: "phase_2",
-              },
-            ],
-          },
-          {
-            name: "Follow up Missing Offers",
-            actions: [
-              {
-                kind: "send-email",
-                label: "Send follow-up",
-                feature: "Follow-up email to non-responders",
-                description:
-                  "Drafts a templated follow-up to Green/Yellow buyers who have OM Sent but no offer received yet.",
-                phase: "phase_2",
-              },
-            ],
-          },
+          // 1-week notice / Day-of / Follow-up Missing Offers all wired
+          // in phase-section via the corresponding row matchers.
+          "Email Notification of Offer Due Date - 1 week before",
+          "Day-of Reminder",
+          "Follow up Missing Offers",
         ],
       },
     ],
@@ -354,18 +257,8 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
       {
         name: "Summary of Offers (SOO)",
         items: [
-          {
-            name: "Schedule Summary of Offer Review",
-            actions: [
-              {
-                kind: "send-email",
-                label: "Send invite",
-                feature: "Ownership meeting invite",
-                description: "Drafts a meeting-invite email to the Owner Team for this deal.",
-                phase: "phase_2",
-              },
-            ],
-          },
+          // Send invite wired in phase-section via isScheduleSooReviewItem.
+          "Schedule Summary of Offer Review",
           {
             name: "Initial Summary of Offers + LOIS",
             actions: [

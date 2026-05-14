@@ -30,6 +30,11 @@ export const dealBuyers = pgTable(
     ccUserIds: uuid("cc_user_ids").array().notNull().default([]),
     calledAt: timestamp("called_at", { withTimezone: true }),
     omSentAt: timestamp("om_sent_at", { withTimezone: true }),
+    // Set when this builder has submitted their offer. Used by the
+    // Phase 2 "Follow up Missing Offers" blast to filter out builders
+    // who already responded; surfaced as a checkbox on the buyer card
+    // alongside Called / OM toggles.
+    offerReceivedAt: timestamp("offer_received_at", { withTimezone: true }),
     comments: text("comments"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })

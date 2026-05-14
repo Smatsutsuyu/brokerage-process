@@ -24,10 +24,26 @@ import {
   isItemDateField,
   type ItemActionKind,
 } from "@/db/checklist-template";
+import { BuyerBlastButton } from "./buyer-blast-button";
 import { ConsultantRosterRowActions } from "./consultant-roster-row-actions";
+import { DealTeamSendButton } from "./deal-team-send-button";
 import { IssuesRowActions } from "./issues-row-actions";
+import { MarketingReportPdfButton } from "./marketing-report-pdf-button";
 import { OmBlastButton } from "./om-blast-button";
+import { QaFilePdfButton } from "./qa-file-pdf-button";
 import { ShareDdMaterialRowActions } from "./share-dd-material-row-actions";
+
+import {
+  CA_DISTRIBUTION_TEMPLATE,
+  IN_PERSON_MEETING_TEMPLATE,
+  MARKET_STUDY_TEMPLATE,
+  OFFERS_DUE_DAY_OF_TEMPLATE,
+  OFFERS_DUE_NOTICE_TEMPLATE,
+  OFFERS_FOLLOWUP_TEMPLATE,
+  QA_FILE_TEMPLATE,
+  SCHEDULE_SOO_REVIEW_TEMPLATE,
+} from "@/lib/email-templates";
+import { Send } from "lucide-react";
 import { PsaAttorneyInline, type PsaAttorneyState } from "./psa-attorney";
 
 // Lowercased substring match — flexible to wording tweaks ("Determine PSA
@@ -62,6 +78,47 @@ function isConsultantRosterItem(name: string): boolean {
 // in Phase 4. Excel says: email the deal team with DD links.
 function isShareDdMaterialItem(name: string): boolean {
   return name.toLowerCase().includes("due diligence material");
+}
+
+// Loose-match for the Phase 1 "Marketing Report" row. Same PDF route
+// as the toolbar button on the Contacts tab.
+function isMarketingReportItem(name: string): boolean {
+  return name.trim().toLowerCase() === "marketing report";
+}
+
+// Phase 2 send-email row matchers. Substring + a unique stem per row
+// so renames like "Q&A File" -> "Q & A File" still match without a
+// rename in apply-renames.
+function isCaItem(name: string): boolean {
+  return name.toLowerCase().includes("confidentiality agreement");
+}
+function isInPersonMeetingItem(name: string): boolean {
+  const n = name.toLowerCase();
+  return n.includes("in-person") || n.includes("in person");
+}
+function isQaFileItem(name: string): boolean {
+  const n = name.trim().toLowerCase();
+  // Match "Q&A File" specifically; avoid matching "Coordinate a Q&A
+  // File" (already deleted) or other Q&A mentions.
+  return n === "q&a file";
+}
+function isShareMarketStudyItem(name: string): boolean {
+  return name.toLowerCase().includes("share market study");
+}
+function isOffersDueNoticeItem(name: string): boolean {
+  const n = name.toLowerCase();
+  return n.includes("offer due date") || n.includes("offers due");
+}
+function isDayOfReminderItem(name: string): boolean {
+  return name.toLowerCase().includes("day-of") || name.toLowerCase().includes("day of");
+}
+function isFollowUpMissingOffersItem(name: string): boolean {
+  return name.toLowerCase().includes("follow up missing");
+}
+// Phase 3 Schedule Summary of Offer Review row -> DealTeamSendButton
+// to Owner + Broker teams.
+function isScheduleSooReviewItem(name: string): boolean {
+  return name.toLowerCase().includes("schedule summary of offer review");
 }
 
 const KIND_ICON: Record<ItemActionKind, typeof FileText> = {
@@ -307,6 +364,111 @@ export function PhaseSection({
                                 to the deal team. */}
                             {isShareDdMaterialItem(item.name) && (
                               <ShareDdMaterialRowActions dealId={dealId} />
+                            )}
+                            {/* Phase 1 Marketing Report row: download
+                                the per-builder Marketing Report PDF.
+                                Same shared component as the Contacts
+                                tab toolbar button. */}
+                            {isMarketingReportItem(item.name) && (
+                              <MarketingReportPdfButton
+                                dealId={dealId}
+                                variant="compact"
+                              />
+                            )}
+                            {/* Phase 2 buyer-targeted sends. Each
+                                wraps the configurable BlastModal with
+                                its own template + tier defaults +
+                                attachment source. */}
+                            {isCaItem(item.name) && (
+                              <BuyerBlastButton
+                                dealId={dealId}
+                                label="Send CA"
+                                modalTitle="Confidentiality Agreement"
+                                title="Filter buyers and email the CA + cover note. CA is the broadest first-touch, so all tiers are picked by default."
+                                template={CA_DISTRIBUTION_TEMPLATE}
+                                defaultTiers={["green", "yellow", "red", "not_selected"]}
+                                attachmentSourceItemId={item.id}
+                              />
+                            )}
+                            {isInPersonMeetingItem(item.name) && (
+                              <BuyerBlastButton
+                                dealId={dealId}
+                                label="Send to Green"
+                                modalTitle="In-person meeting request"
+                                title="Drafts a meeting-request email; defaults to Green-tier buyers only."
+                                template={IN_PERSON_MEETING_TEMPLATE}
+                                defaultTiers={["green"]}
+                              />
+                            )}
+                            {isQaFileItem(item.name) && (
+                              <>
+                                <QaFilePdfButton dealId={dealId} variant="compact" />
+                                <BuyerBlastButton
+                                  dealId={dealId}
+                                  label="Send Q&A"
+                                  modalTitle="Q&A File distribution"
+                                  title="Filter buyers and send the Q&A file (attached from this row)."
+                                  template={QA_FILE_TEMPLATE}
+                                  defaultTiers={["green", "yellow"]}
+                                  attachmentSourceItemId={item.id}
+                                />
+                              </>
+                            )}
+                            {isShareMarketStudyItem(item.name) && (
+                              <BuyerBlastButton
+                                dealId={dealId}
+                                label="Send Market Study"
+                                modalTitle="Market Study distribution"
+                                title="Email the Market Study (attached from this row) to green/yellow buyers."
+                                template={MARKET_STUDY_TEMPLATE}
+                                defaultTiers={["green", "yellow"]}
+                                attachmentSourceItemId={item.id}
+                              />
+                            )}
+                            {isOffersDueNoticeItem(item.name) && (
+                              <BuyerBlastButton
+                                dealId={dealId}
+                                label="Send 1-week notice"
+                                modalTitle="Offers due (1-week notice)"
+                                title="Send the 1-week offers-due notice. The {{dueDate}} placeholder in the body needs to be filled in at preview time until the date source is wired up."
+                                template={OFFERS_DUE_NOTICE_TEMPLATE}
+                                defaultTiers={["green", "yellow"]}
+                              />
+                            )}
+                            {isDayOfReminderItem(item.name) && (
+                              <BuyerBlastButton
+                                dealId={dealId}
+                                label="Send day-of"
+                                modalTitle="Day-of reminder"
+                                title="Send the day-of offers-due reminder."
+                                template={OFFERS_DUE_DAY_OF_TEMPLATE}
+                                defaultTiers={["green", "yellow"]}
+                              />
+                            )}
+                            {isFollowUpMissingOffersItem(item.name) && (
+                              <BuyerBlastButton
+                                dealId={dealId}
+                                label="Send follow-up"
+                                modalTitle="Follow-up to non-responders"
+                                title="Filter to green/yellow buyers who haven't submitted an offer yet (Offer flag unchecked on the contacts card)."
+                                template={OFFERS_FOLLOWUP_TEMPLATE}
+                                defaultTiers={["green", "yellow"]}
+                                excludeOfferReceived
+                              />
+                            )}
+                            {/* Phase 3 Schedule SOO Review -> Deal Team
+                                send (Owner + Broker per Excel). */}
+                            {isScheduleSooReviewItem(item.name) && (
+                              <DealTeamSendButton
+                                dealId={dealId}
+                                label="Send invite"
+                                title="Email the Owner Team (CC Broker) to schedule the SOO review."
+                                icon={Send}
+                                modalTitle="Schedule SOO Review"
+                                template={SCHEDULE_SOO_REVIEW_TEMPLATE}
+                                teams={["owner", "broker"]}
+                                attachments={[]}
+                              />
                             )}
                             {itemActions.map((a) => (
                               <PlannedAction

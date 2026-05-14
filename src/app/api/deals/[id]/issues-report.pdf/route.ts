@@ -87,11 +87,12 @@ export async function GET(
     }),
   );
 
-  const slug = deal.name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  const filename = `${slug || "issues-report"}-${new Date().toISOString().slice(0, 10)}.pdf`;
+  // Filename pattern: "Deal Name - Issues Report.pdf". Strip only
+  // characters illegal in Windows / cross-platform filenames so the deal
+  // name reads naturally in the user's downloads. Matches the Marketing
+  // Report convention.
+  const safeName = deal.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, "").trim();
+  const filename = safeName ? `${safeName} - Issues Report.pdf` : "Issues Report.pdf";
 
   const headers = new Headers();
   headers.set("Content-Type", "application/pdf");

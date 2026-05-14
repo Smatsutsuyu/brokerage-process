@@ -51,6 +51,7 @@ export type BuyerGroup =
       leadName: string | null;
       called: boolean;
       omSent: boolean;
+      offerReceived: boolean;
       comments: string | null;
       contacts: ContactRow[];
     }
@@ -97,6 +98,7 @@ export async function loadBuyers(dealId: string): Promise<BuyerData> {
       dealBuyerId: dealBuyers.id,
       tier: dealBuyers.tier,
       omSentAt: dealBuyers.omSentAt,
+      offerReceivedAt: dealBuyers.offerReceivedAt,
       calledAt: dealBuyers.calledAt,
       comments: dealBuyers.comments,
       leadUserId: dealBuyers.leadUserId,
@@ -152,6 +154,7 @@ export async function loadBuyers(dealId: string): Promise<BuyerData> {
           leadName: r.leadName,
           called: r.calledAt !== null,
           omSent: r.omSentAt !== null,
+          offerReceived: r.offerReceivedAt !== null,
           comments: r.comments,
           contacts: [],
         };

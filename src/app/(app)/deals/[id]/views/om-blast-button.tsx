@@ -5,7 +5,9 @@ import { Mail } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-import { getLeadsOnDeal } from "../actions";
+import { OM_BLAST_TEMPLATE } from "@/lib/email-templates";
+
+import { getLeadsOnDeal, getOmItemId } from "../actions";
 import { AttachmentSourceLine } from "./attachment-source-line";
 import { BlastModal } from "./blast-modal";
 import type { LeadOption } from "./lead-picker";
@@ -19,6 +21,8 @@ type OmBlastButtonProps = {
   // Item ID of the "Offering Memorandum" row — the source of the file we
   // attach to the blast. When provided, hovering the button draws a faint
   // line back to that row so the user can see where the file comes from.
+  // When omitted (e.g. the contacts-tab toolbar doesn't have it on
+  // hand), the button looks it up itself on first open via getOmItemId.
   attachmentSourceItemId?: string | null;
 };
 
@@ -33,6 +37,9 @@ export function OmBlastButton({
 }: OmBlastButtonProps) {
   const [open, setOpen] = useState(false);
   const [leadOptions, setLeadOptions] = useState<LeadOption[] | null>(null);
+  const [resolvedItemId, setResolvedItemId] = useState<string | null | undefined>(
+    attachmentSourceItemId ?? undefined,
+  );
   const [hovered, setHovered] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [, startLoad] = useTransition();
@@ -50,10 +57,28 @@ export function OmBlastButton({
     });
   }, [open, leadOptions, dealId]);
 
+  // Lazy OM-item-id lookup for callers that don't have it on hand
+  // (contacts tab toolbar). Only runs once on first open if the prop
+  // wasn't passed; resolves to null when the deal has no OM row.
+  useEffect(() => {
+    if (!open || resolvedItemId !== undefined) return;
+    startLoad(async () => {
+      try {
+        const id = await getOmItemId({ dealId });
+        setResolvedItemId(id);
+      } catch (err) {
+        console.error("[om-blast] OM item id lookup failed", err);
+        setResolvedItemId(null);
+      }
+    });
+  }, [open, resolvedItemId, dealId]);
+
+  const effectiveItemId = resolvedItemId ?? null;
+
   // Hide the connector while the modal is open — distracting once the
   // user has committed to the action. Same when the source item id isn't
-  // known (e.g., this deal has no OM row).
-  const showConnector = hovered && !open && Boolean(attachmentSourceItemId);
+  // known (e.g., this deal has no OM row, or the lookup hasn't resolved).
+  const showConnector = hovered && !open && Boolean(effectiveItemId);
 
   return (
     <>
@@ -66,7 +91,7 @@ export function OmBlastButton({
         onFocus={() => setHovered(true)}
         onBlur={() => setHovered(false)}
         title={
-          attachmentSourceItemId
+          effectiveItemId
             ? "Filter contacts by tier and assignment, preview the email, then send. Attaches the file from the Offering Memorandum task."
             : "Filter contacts by tier and assignment, preview the email, then send"
         }
@@ -80,10 +105,10 @@ export function OmBlastButton({
         Send OM blast
       </button>
 
-      {showConnector && attachmentSourceItemId && (
+      {showConnector && effectiveItemId && (
         <AttachmentSourceLine
           fromRef={buttonRef}
-          toElementId={`checklist-item-${attachmentSourceItemId}`}
+          toElementId={`checklist-item-${effectiveItemId}`}
         />
       )}
 
@@ -96,6 +121,10 @@ export function OmBlastButton({
           onOpenChange={setOpen}
           dealId={dealId}
           leadOptions={leadOptions}
+          template={OM_BLAST_TEMPLATE}
+          title="OM blast"
+          defaultTiers={["green", "yellow"]}
+          attachmentSourceItemId={effectiveItemId}
         />
       )}
     </>

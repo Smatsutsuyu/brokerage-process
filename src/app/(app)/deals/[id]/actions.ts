@@ -260,6 +260,22 @@ export async function setBuyerOmSent(input: {
   revalidatePath(`/deals/${input.dealId}`);
 }
 
+export async function setBuyerOfferReceived(input: {
+  dealBuyerId: string;
+  dealId: string;
+  offerReceived: boolean;
+}) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  await db
+    .update(dealBuyers)
+    .set({ offerReceivedAt: input.offerReceived ? new Date() : null })
+    .where(and(eq(dealBuyers.id, input.dealBuyerId), eq(dealBuyers.orgId, org.id)));
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
 export async function setBuyerLead(input: {
   dealBuyerId: string;
   dealId: string;
@@ -1125,6 +1141,10 @@ export async function previewBlastRecipients(input: {
   tiers: ("green" | "yellow" | "red" | "not_selected")[];
   // null = no assignee filter (any builder, regardless of lead).
   assigneeUserId: string | null;
+  // Filter out builders whose offer_received_at is set. Used by the
+  // "Follow up Missing Offers" send so we don't bug builders who have
+  // already responded.
+  excludeOfferReceived?: boolean;
 }): Promise<BlastPreviewRow[]> {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
@@ -1167,6 +1187,9 @@ export async function previewBlastRecipients(input: {
         inArray(dealBuyers.tier, input.tiers),
         input.assigneeUserId
           ? eq(dealBuyers.leadUserId, input.assigneeUserId)
+          : undefined,
+        input.excludeOfferReceived
+          ? sql`${dealBuyers.offerReceivedAt} IS NULL`
           : undefined,
       ),
     )
@@ -1330,6 +1353,97 @@ export type OmAttachmentChoice =
       version: number;
     }
   | { id: string; kind: "link"; url: string; label: string | null };
+
+// Generic version of the attachment loader. Given an explicit checklist
+// item ID, returns its files + links shaped for the email composer's
+// attachment picker. Used by every blast button (OM, Q&A, Market
+// Study, etc.) that pulls attachments from a specific checklist row.
+export async function getAttachmentsForItem(input: {
+  itemId: string;
+}): Promise<{ choices: OmAttachmentChoice[]; recommendedIds: string[] }> {
+  const org = await getCurrentOrg();
+  if (!org) return { choices: [], recommendedIds: [] };
+
+  const docs = await db
+    .select({
+      id: documents.id,
+      name: documents.name,
+      mimeType: documents.mimeType,
+      sizeBytes: documents.sizeBytes,
+      version: documents.version,
+    })
+    .from(documents)
+    .where(and(eq(documents.checklistItemId, input.itemId), eq(documents.orgId, org.id)))
+    .orderBy(desc(documents.version), desc(documents.uploadedAt));
+
+  const links = await db
+    .select({
+      id: checklistItemLinks.id,
+      url: checklistItemLinks.url,
+      label: checklistItemLinks.label,
+    })
+    .from(checklistItemLinks)
+    .where(
+      and(
+        eq(checklistItemLinks.checklistItemId, input.itemId),
+        eq(checklistItemLinks.orgId, org.id),
+      ),
+    )
+    .orderBy(asc(checklistItemLinks.sortOrder), asc(checklistItemLinks.createdAt));
+
+  const choices: OmAttachmentChoice[] = [
+    ...docs.map(
+      (d): OmAttachmentChoice => ({
+        id: `file:${d.id}`,
+        kind: "file",
+        documentId: d.id,
+        filename: d.name,
+        mimeType: d.mimeType,
+        sizeBytes: d.sizeBytes,
+        version: d.version,
+      }),
+    ),
+    ...links.map(
+      (l): OmAttachmentChoice => ({
+        id: `link:${l.id}`,
+        kind: "link",
+        url: l.url,
+        label: l.label,
+      }),
+    ),
+  ];
+
+  let recommendedIds: string[] = [];
+  if (choices.length > 0) {
+    const firstFile = choices.find((c) => c.kind === "file");
+    recommendedIds = firstFile ? [firstFile.id] : [choices[0].id];
+  }
+  return { choices, recommendedIds };
+}
+
+// Returns the checklist item id for the deal's "Offering Memorandum"
+// row, or null if missing. Used by callers (OmBlastButton on the
+// contacts tab toolbar) that don't already have the id on hand.
+export async function getOmItemId(input: {
+  dealId: string;
+}): Promise<string | null> {
+  const org = await getCurrentOrg();
+  if (!org) return null;
+  const itemRows = await db
+    .select({ id: checklistItems.id, name: checklistItems.name })
+    .from(checklistItems)
+    .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
+    .where(
+      and(
+        eq(checklistCategories.dealId, input.dealId),
+        eq(checklistItems.orgId, org.id),
+      ),
+    );
+  return (
+    itemRows.find((r) => r.name.toLowerCase().includes("offering memorandum"))?.id ??
+    null
+  );
+}
 
 export async function getOmAttachments(input: {
   dealId: string;

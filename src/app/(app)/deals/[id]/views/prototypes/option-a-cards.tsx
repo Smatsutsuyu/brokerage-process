@@ -28,10 +28,11 @@ import { cn } from "@/lib/utils";
 
 import { removeContactFromDeal } from "../../actions";
 import { AddContactModal, type EditingContact } from "../add-contact-modal";
-import { BlastModal } from "../blast-modal";
 import { BuyerCheckbox } from "../buyer-checkbox";
 import { BuyerCommentsEditor } from "../buyer-comments-editor";
 import { LeadPicker, type LeadOption } from "../lead-picker";
+import { MarketingReportPdfButton } from "../marketing-report-pdf-button";
+import { OmBlastButton } from "../om-blast-button";
 import { ReceivesCommunicationToggle } from "../receives-communication-toggle";
 import {
   PickExistingContactModal,
@@ -134,7 +135,6 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
   }, [groups]);
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [pickExistingOpen, setPickExistingOpen] = useState(false);
-  const [blastOpen, setBlastOpen] = useState(false);
   const [addContactFor, setAddContactFor] = useState<{ id: string; name: string } | null>(null);
   const [editing, setEditing] = useState<EditingContact | null>(null);
   const [, startDelete] = useTransition();
@@ -178,22 +178,6 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
     () => new Set(groups.flatMap((g) => g.contacts.map((c) => c.id))),
     [groups],
   );
-
-  // Lead options for the OM-blast filter — only people actually leading a
-  // builder on this deal. Avoids the dropdown listing every org member
-  // (coordinators, analysts) who never lead a buyer relationship.
-  const dealLeadOptions = useMemo(() => {
-    const seen = new Set<string>();
-    const out: LeadOption[] = [];
-    for (const g of groups) {
-      if (g.kind !== "builder") continue;
-      if (!g.leadUserId || !g.leadName || seen.has(g.leadUserId)) continue;
-      seen.add(g.leadUserId);
-      out.push({ id: g.leadUserId, name: g.leadName });
-    }
-    out.sort((a, b) => a.name.localeCompare(b.name));
-    return out;
-  }, [groups]);
 
   function toggleExpanded(id: string) {
     setExpanded((prev) => {
@@ -265,30 +249,8 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
         </DropdownMenu>
 
         <div className="ml-auto flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              // Same destination as the deal-menu Generate Marketing
-              // Report item — duplicated here because the data is
-              // derived from this tab and the natural place to find
-              // "give me the PDF of this" is right next to the data.
-              window.open(`/api/deals/${dealId}/marketing-report.pdf`, "_blank");
-            }}
-            title="Download the per-builder Marketing Report PDF for this deal"
-          >
-            <FileText className="h-3.5 w-3.5" />
-            Marketing Report
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setBlastOpen(true)}
-            title="Filter contacts by tier and assignment, preview the recipient list (sending lands in Phase 2)"
-          >
-            <Mail className="h-3.5 w-3.5" />
-            Send OM blast
-          </Button>
+          <MarketingReportPdfButton dealId={dealId} />
+          <OmBlastButton dealId={dealId} compact={false} />
           <PlannedAction
             label="Send follow-up"
             icon={Mail}
@@ -326,13 +288,6 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
         dealBuilders={builderOptions}
         contacts={orgContacts}
         excludeContactIds={onDealContactIds}
-      />
-
-      <BlastModal
-        open={blastOpen}
-        onOpenChange={setBlastOpen}
-        dealId={dealId}
-        leadOptions={dealLeadOptions}
       />
 
       <AddContactModal
@@ -462,6 +417,15 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
                             checked={g.omSent}
                           />
                           <span className="text-gray-600">OM</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <BuyerCheckbox
+                            dealBuyerId={g.dealBuyerId}
+                            dealId={dealId}
+                            field="offerReceived"
+                            checked={g.offerReceived}
+                          />
+                          <span className="text-gray-600">Offer</span>
                         </div>
                       </div>
                     </>

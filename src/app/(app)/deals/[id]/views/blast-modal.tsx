@@ -29,12 +29,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { OM_BLAST_TEMPLATE } from "@/lib/email-templates";
+import { type EmailTemplate } from "@/lib/email-templates";
 import { cn } from "@/lib/utils";
 
 import {
+  getAttachmentsForItem,
   getCcSelectionsForBuilders,
-  getOmAttachments,
   getOmBlastTemplateContext,
   getOrgCcOptions,
   previewBlastRecipients,
@@ -78,18 +78,48 @@ type BlastModalProps = {
   onOpenChange: (open: boolean) => void;
   dealId: string;
   leadOptions: LeadOption[];
+  // The email template applied to every per-builder email. Caller
+  // configures this per send: OM_BLAST_TEMPLATE, QA_FILE_TEMPLATE, etc.
+  template: EmailTemplate;
+  // Title shown in the modal header (Step 1) AND the preview modal
+  // header (Step 2). Step 1 prefixes with "Send", Step 2 doesn't.
+  title: string;
+  // Default tier selection. OM and most others default to ["green",
+  // "yellow"]; In-Person Meeting defaults to ["green"] only;
+  // Confidentiality Agreement defaults to all tiers.
+  defaultTiers: Tier[];
+  // Optional checklist item to pull attachments from. When set,
+  // attachments are loaded via getAttachmentsForItem on Step 2 open.
+  // Pass the OM Phase 1 item id for OM blast; the row's own item id
+  // for Q&A / Market Study where files live on the row itself.
+  attachmentSourceItemId?: string | null;
+  // Filter recipients to exclude builders whose offer_received_at is
+  // set. Used by the "Follow up Missing Offers" send.
+  excludeOfferReceived?: boolean;
 };
 
-// OM-blast composer. Filter UI on top, live recipient preview below, "Send"
-// button at the bottom. Sending isn't wired up yet (Phase 2 work, gated on
-// Resend domain verification for landadvisors.com) — clicking shows a
-// planned-action toast. The preview piece is the load-bearing part: it
-// lets Chris verify the filter logic against real contacts before we ship
-// the actual send.
-export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastModalProps) {
-  // Default: include green + yellow (the typical OM-blast audience).
+// Generic two-step blast composer. Step 1: tier filter + lead-assignee
+// filter + live recipient preview. Step 2: per-builder email preview
+// with sender / CC / attachment pickers. Mock-sends via toast pending
+// the Resend domain verification.
+//
+// Originally OM-specific; now configurable so every Phase 2 send to
+// buyers (CA, Q&A, Market Study, reminders, follow-ups, etc.) can
+// reuse the same UX. Per-row wrappers (OmBlastButton, etc.) supply
+// the template + tier defaults + attachment source.
+export function BlastModal({
+  open,
+  onOpenChange,
+  dealId,
+  leadOptions,
+  template,
+  title,
+  defaultTiers,
+  attachmentSourceItemId,
+  excludeOfferReceived,
+}: BlastModalProps) {
   const [selectedTiers, setSelectedTiers] = useState<Set<Tier>>(
-    () => new Set(["green", "yellow"]),
+    () => new Set(defaultTiers),
   );
   const [assigneeChoice, setAssigneeChoice] = useState<string>(ANY_ASSIGNEE);
   const [recipients, setRecipients] = useState<BlastPreviewRow[]>([]);
@@ -121,6 +151,7 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
           dealId,
           tiers,
           assigneeUserId: assigneeChoice === ANY_ASSIGNEE ? null : assigneeChoice,
+          excludeOfferReceived,
         });
         setRecipients(rows);
       } catch (err) {
@@ -128,7 +159,7 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
         setRecipients([]);
       }
     });
-  }, [open, dealId, selectedTiers, assigneeChoice]);
+  }, [open, dealId, selectedTiers, assigneeChoice, excludeOfferReceived]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   function toggleTier(t: Tier) {
@@ -186,7 +217,12 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
       try {
         const [ctx, att, ccOpts, ccSelections] = await Promise.all([
           getOmBlastTemplateContext({ dealId }),
-          getOmAttachments({ dealId }),
+          // Optional attachment source. When the caller didn't provide
+          // one, skip the load and pass empty arrays to the modal so
+          // the attachments section is hidden.
+          attachmentSourceItemId
+            ? getAttachmentsForItem({ itemId: attachmentSourceItemId })
+            : Promise.resolve({ choices: [], recommendedIds: [] }),
           getOrgCcOptions(),
           builderIds.length > 0
             ? getCcSelectionsForBuilders({ dealId, builderIds })
@@ -226,7 +262,7 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Send OM blast</DialogTitle>
+          <DialogTitle>Send {title}</DialogTitle>
           <DialogDescription>
             Filter by tier and (optionally) lead assignee. Contacts marked
             &ldquo;does not receive communication&rdquo; are excluded automatically.
@@ -379,9 +415,9 @@ export function BlastModal({ open, onOpenChange, dealId, leadOptions }: BlastMod
       <EmailPreviewModal
         open={previewOpen}
         onOpenChange={setPreviewOpen}
-        title="OM blast"
+        title={title}
         recipients={previewRecipients}
-        template={OM_BLAST_TEMPLATE}
+        template={template}
         vars={previewVars}
         attachmentChoices={attachmentChoices}
         defaultSelectedAttachmentIds={defaultAttachmentIds}

@@ -31,6 +31,20 @@ export function interpolate(template: string, vars: Record<string, string>): str
 // senderName: first name of the picked sender.
 // dueDate: formatted date for offers-due reminders. Caller supplies.
 
+// Phase 2 - Confidentiality Agreement distribution. Sent before the OM
+// blast to lay groundwork. Body lifted from the existing planned-action
+// description Chris wrote earlier; tier audience picked at send time
+// since CA is the broadest first-touch.
+export const CA_DISTRIBUTION_TEMPLATE: EmailTemplate = {
+  subject: "Confidentiality Agreement, {{dealName}} ({{units}} {{type}}, {{city}})",
+  body: `We'd like to share some information on a proposed {{units}} {{type}} deal in {{city}}. We'd like to keep information confidential and are sharing the proposed confidentiality agreement.
+
+Please review and let us know if this form works and we will send it out for signatures.
+
+Thanks,
+{{senderName}}`,
+};
+
 // Phase 2 - Send out OM Blast.
 export const OM_BLAST_TEMPLATE: EmailTemplate = {
   subject: "Offering Memorandum, {{dealName}} ({{units}} {{type}}, {{city}})",

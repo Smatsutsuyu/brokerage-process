@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckCircle2, FileText, Loader2, Mail, Plus } from "lucide-react";
+import { CheckCircle2, Loader2, Mail, Plus } from "lucide-react";
 
 import { PlannedAction } from "@/components/planned-action";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { addQaItem, approveAllQaItems } from "../actions";
 
 import { QaEntry } from "./qa-entry";
+import { QaFilePdfButton } from "./qa-file-pdf-button";
 
 export type QaRow = {
   id: string;
@@ -81,25 +82,12 @@ export function QaList({ dealId, items }: QaListProps) {
             )}
             Approve all
           </Button>
+          <QaFilePdfButton dealId={dealId} />
           <PlannedAction
-            label="Generate PDF"
-            icon={FileText}
-            feature="Q&A File PDF"
-            description="Renders all approved Q&A items as a Land Advisors-branded PDF ready for distribution."
-            phase="phase_2"
-          />
-          <PlannedAction
-            label="Distribute to buyers"
+            label="Send Q&A"
             icon={Mail}
-            feature="Q&A distribution email"
-            description="Emails the approved Q&A PDF to all buyers on this deal via Resend, with sent-status tracking per recipient."
-            phase="phase_2"
-          />
-          <PlannedAction
-            label="Email selected buyers"
-            icon={Mail}
-            feature="Targeted Q&A email"
-            description="Send the Q&A PDF to a custom subset of buyers (filter by tier, lead, etc.)."
+            feature="Q&A distribution shortcut"
+            description="Tab-level shortcut to the Phase 2 'Send Q&A' tier-filtered blast. Currently lives on the Q&A File checklist row; will be mirrored here next."
             phase="phase_2"
           />
         </div>
