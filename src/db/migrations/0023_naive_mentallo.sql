@@ -1,0 +1,3 @@
+ALTER TABLE "feedback_items" ADD COLUMN "updated_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
+ALTER TABLE "feedback_items" ADD COLUMN "last_updated_by" uuid;--> statement-breakpoint
+ALTER TABLE "feedback_items" ADD CONSTRAINT "feedback_items_last_updated_by_users_id_fk" FOREIGN KEY ("last_updated_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;

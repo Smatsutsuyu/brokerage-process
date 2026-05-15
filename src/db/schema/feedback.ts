@@ -25,6 +25,20 @@ export const feedbackItems = pgTable("feedback_items", {
   response: text("response"),
   status: feedbackStatusEnum("status").notNull().default("new"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Stamped on every server-side write to the parent row (status changes,
+  // future fields like priority). Comment additions/edits live on the
+  // feedback_comments table and don't bump this — the admin UI's
+  // "lastActivityAt" derives the latest-of from both sources for sorting.
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+  // Who triggered the most recent parent-row write. Null for items that
+  // haven't been touched since creation. Set null on user delete so the
+  // historical record survives.
+  lastUpdatedBy: uuid("last_updated_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   actionedAt: timestamp("actioned_at", { withTimezone: true }),
 });

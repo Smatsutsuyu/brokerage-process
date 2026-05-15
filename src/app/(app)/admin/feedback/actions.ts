@@ -29,7 +29,7 @@ export async function setFeedbackStatus(input: {
   feedbackId: string;
   status: FeedbackStatus;
 }): Promise<void> {
-  const { org } = await assertOwner();
+  const { me, org } = await assertOwner();
 
   // Set timestamps idempotently. reviewedAt fires on the first transition
   // out of "new"; actionedAt fires on the transition into "actioned" and is
@@ -45,7 +45,8 @@ export async function setFeedbackStatus(input: {
     status: FeedbackStatus;
     reviewedAt?: Date | null;
     actionedAt?: Date | null;
-  } = { status: input.status };
+    lastUpdatedBy: string;
+  } = { status: input.status, lastUpdatedBy: me.id };
 
   if (input.status === "new") {
     update.reviewedAt = null;

@@ -52,9 +52,20 @@ export type FeedbackRow = {
   status: FeedbackStatus;
   comment: string;
   userEmail: string | null;
+  // Display name of the original submitter (joined from auth_user). Null
+  // when the user has been removed; userEmail is preserved as a fallback.
+  creatorName: string | null;
   createdAt: string;
+  updatedAt: string;
   reviewedAt: string | null;
   actionedAt: string | null;
+  // Who triggered the most recent parent-row write (status change, etc.).
+  // Both null when the item hasn't been touched since creation.
+  lastUpdatedByName: string | null;
+  lastUpdatedByEmail: string | null;
+  // True iff feedback_items.last_updated_by IS NOT NULL — distinguishes
+  // "never touched" from "touched by a now-deleted user."
+  hasBeenUpdated: boolean;
   comments: CommentRow[];
   attachments: AttachmentRow[];
 };
@@ -459,8 +470,22 @@ function FeedbackRowView({ item, expanded, onToggle, currentUserId }: FeedbackRo
               <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-gray-500">
                 <span>
                   <span className="font-semibold text-gray-700">From:</span>{" "}
-                  {item.userEmail ?? "(unknown)"}
+                  {item.creatorName ?? item.userEmail ?? "(unknown)"}
+                  {item.creatorName && item.userEmail && (
+                    <span className="text-gray-400"> ({item.userEmail})</span>
+                  )}
                 </span>
+                {item.hasBeenUpdated && (
+                  <span>
+                    <span className="font-semibold text-gray-700">Last updated by:</span>{" "}
+                    {item.lastUpdatedByName ??
+                      item.lastUpdatedByEmail ??
+                      "(removed user)"}{" "}
+                    <span className="text-gray-400">
+                      ({new Date(item.updatedAt).toLocaleString()})
+                    </span>
+                  </span>
+                )}
                 <span>
                   <span className="font-semibold text-gray-700">Page:</span>{" "}
                   <Link

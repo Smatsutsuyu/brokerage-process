@@ -1,8 +1,15 @@
 import { redirect } from "next/navigation";
 import { asc, desc, eq, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "@/db";
-import { feedbackAttachments, feedbackComments, feedbackItems } from "@/db/schema";
+import {
+  authUser,
+  feedbackAttachments,
+  feedbackComments,
+  feedbackItems,
+  users,
+} from "@/db/schema";
 import { Sidebar } from "@/components/layout/sidebar";
 import type { CommentRow } from "@/components/feedback/comment-thread";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
@@ -25,6 +32,14 @@ export default async function FeedbackAdminPage() {
   const org = await getCurrentOrg();
   if (!org) redirect("/sign-in");
 
+  // Two aliased joins to authUser — one for the original submitter, one
+  // for whoever last touched the parent row. Drizzle can't reuse a single
+  // alias across two FK paths so we explicitly alias both sides.
+  const creatorUsers = alias(users, "creator_users");
+  const creatorAuth = alias(authUser, "creator_auth");
+  const updaterUsers = alias(users, "updater_users");
+  const updaterAuth = alias(authUser, "updater_auth");
+
   const rows = await db
     .select({
       id: feedbackItems.id,
@@ -35,11 +50,20 @@ export default async function FeedbackAdminPage() {
       status: feedbackItems.status,
       comment: feedbackItems.comment,
       userEmail: feedbackItems.userEmail,
+      creatorName: creatorAuth.name,
       createdAt: feedbackItems.createdAt,
+      updatedAt: feedbackItems.updatedAt,
       reviewedAt: feedbackItems.reviewedAt,
       actionedAt: feedbackItems.actionedAt,
+      lastUpdatedById: feedbackItems.lastUpdatedBy,
+      lastUpdatedByName: updaterAuth.name,
+      lastUpdatedByEmail: updaterAuth.email,
     })
     .from(feedbackItems)
+    .leftJoin(creatorUsers, eq(creatorUsers.id, feedbackItems.userId))
+    .leftJoin(creatorAuth, eq(creatorAuth.id, creatorUsers.authUserId))
+    .leftJoin(updaterUsers, eq(updaterUsers.id, feedbackItems.lastUpdatedBy))
+    .leftJoin(updaterAuth, eq(updaterAuth.id, updaterUsers.authUserId))
     .where(eq(feedbackItems.orgId, org.id))
     .orderBy(desc(feedbackItems.createdAt));
 
@@ -114,9 +138,16 @@ export default async function FeedbackAdminPage() {
     status: r.status,
     comment: r.comment,
     userEmail: r.userEmail,
+    creatorName: r.creatorName,
     createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
     reviewedAt: r.reviewedAt?.toISOString() ?? null,
     actionedAt: r.actionedAt?.toISOString() ?? null,
+    lastUpdatedByName: r.lastUpdatedByName,
+    lastUpdatedByEmail: r.lastUpdatedByEmail,
+    // Untouched items have lastUpdatedBy = null even though updatedAt is
+    // populated (default now() at insert). Treat as "never updated."
+    hasBeenUpdated: r.lastUpdatedById !== null,
     comments: commentsByFeedback[r.id] ?? [],
     attachments: attachmentsByFeedback[r.id] ?? [],
   }));
