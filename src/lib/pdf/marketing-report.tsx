@@ -94,11 +94,12 @@ const FOOTER_RESERVE = 60;
 // Manual row chunking gives each Page its own thead instead of relying on
 // React-PDF's `fixed` prop, which renders the header on top of body
 // content on continuation pages and leaves a "blank row" where the row
-// underneath was clipped. Sizes are conservative for typical 1–2 line
-// comments; very long comments could overflow a chunk, in which case
-// rebalance these numbers downward.
-const ROWS_PER_FIRST_PAGE = 12;
-const ROWS_PER_PAGE = 16;
+// underneath was clipped. Sized for typical 1-line comments (~38pt row)
+// against the available content height (~578pt on page 1 after title +
+// header overhead, ~653pt on subsequent pages). If a deal has many
+// 3-plus-line comments, rebalance these numbers downward.
+const ROWS_PER_FIRST_PAGE = 15;
+const ROWS_PER_PAGE = 18;
 
 function chunkRows<T>(rows: T[]): T[][] {
   if (rows.length === 0) return [[]];
