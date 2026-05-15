@@ -21,7 +21,7 @@ export function IssuesReportPdfButton({
   variant = "default",
 }: IssuesReportPdfButtonProps) {
   const href = `/api/deals/${dealId}/issues-report.pdf`;
-  const title = "Download the per-deal Issues Report PDF";
+  const title = "Open the per-deal Issues Report PDF in a new tab";
 
   if (variant === "compact") {
     return (

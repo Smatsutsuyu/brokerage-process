@@ -21,7 +21,7 @@ export function QaFilePdfButton({
   variant = "default",
 }: QaFilePdfButtonProps) {
   const href = `/api/deals/${dealId}/qa-file.pdf`;
-  const title = "Download the per-deal Q&A File PDF (approved items only)";
+  const title = "Open the per-deal Q&A File PDF in a new tab (approved items only)";
 
   if (variant === "compact") {
     return (

@@ -22,7 +22,7 @@ export function MarketingReportPdfButton({
   variant = "default",
 }: MarketingReportPdfButtonProps) {
   const href = `/api/deals/${dealId}/marketing-report.pdf`;
-  const title = "Download the per-builder Marketing Report PDF for this deal";
+  const title = "Open the per-builder Marketing Report PDF in a new tab";
 
   if (variant === "compact") {
     return (

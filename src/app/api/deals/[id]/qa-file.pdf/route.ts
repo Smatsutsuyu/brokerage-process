@@ -79,7 +79,9 @@ export async function GET(
 
   const headers = new Headers();
   headers.set("Content-Type", "application/pdf");
-  headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+  // `inline` so the browser previews the PDF in the new tab the trigger
+  // button opens, instead of forcing a download.
+  headers.set("Content-Disposition", `inline; filename="${filename}"`);
   headers.set("Cache-Control", "private, no-store");
   return new Response(buffer as unknown as BodyInit, { status: 200, headers });
 }

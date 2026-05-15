@@ -108,7 +108,10 @@ export async function GET(
 
   const headers = new Headers();
   headers.set("Content-Type", "application/pdf");
-  headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+  // `inline` so the browser previews the PDF in the new tab the trigger
+  // button opens, instead of forcing a download. The user can still save
+  // from the inline viewer if they want a copy on disk.
+  headers.set("Content-Disposition", `inline; filename="${filename}"`);
   headers.set("Cache-Control", "private, no-store");
   // Cast: Buffer is a Uint8Array subclass at runtime, but TS's Web Response
   // BodyInit signature in this Next.js version doesn't accept it directly.
