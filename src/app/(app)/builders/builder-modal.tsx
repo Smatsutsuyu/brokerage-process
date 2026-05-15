@@ -89,12 +89,20 @@ export function BuilderModal({ open, onOpenChange, editing }: BuilderModalProps)
             builderId: editing.builderId,
             data: { name, classification, notes },
           });
+          onOpenChange(false);
         } else {
-          await createBuilder({ name, classification, notes });
+          const result = await createBuilder({ name, classification, notes });
+          if (!result.ok) {
+            setError(result.error);
+            return;
+          }
+          onOpenChange(false);
         }
-        onOpenChange(false);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not save builder.");
+      } catch {
+        // Unexpected failure (network/DB) — Next strips the real message
+        // in prod so use a generic fallback. Validation errors are handled
+        // above via the Result return.
+        setError("Could not save builder. Please try again.");
       }
     });
   }

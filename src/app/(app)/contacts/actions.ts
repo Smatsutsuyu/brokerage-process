@@ -6,6 +6,7 @@ import { and, eq, ilike } from "drizzle-orm";
 import { db } from "@/db";
 import { builders, contacts } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
+import { findBuilderByName } from "@/lib/builders";
 import { formatPhone } from "@/lib/phone";
 
 // Contacts surface in two places: /contacts (the directory) and the
@@ -145,11 +146,7 @@ export async function findOrCreateBuilder(
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Builder name is required");
 
-  const [existing] = await db
-    .select({ id: builders.id })
-    .from(builders)
-    .where(and(eq(builders.orgId, org.id), ilike(builders.name, trimmed)))
-    .limit(1);
+  const existing = await findBuilderByName(db, org.id, trimmed);
   if (existing) return { builderId: existing.id, created: false };
 
   const [created] = await db

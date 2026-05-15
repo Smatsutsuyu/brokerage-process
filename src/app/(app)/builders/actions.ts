@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { builders, dealBuyers } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
+import { findBuilderByName } from "@/lib/builders";
 
 export type Classification = "private" | "public" | "developer";
 
@@ -24,12 +25,32 @@ function revalidateBuilderSurfaces() {
   revalidatePath("/deals/[id]", "page");
 }
 
-export async function createBuilder(input: BuilderInput): Promise<string> {
+export type CreateBuilderResult =
+  | { ok: true; builderId: string }
+  | { ok: false; error: string };
+
+// Returns a Result object instead of throwing for expected validation
+// failures (empty name, duplicate name). Next.js strips Server Action
+// throw messages in production, so a thrown Error reaches the client as
+// the generic "Server Components render" message — useless for surfacing
+// a name-conflict to the user. Unexpected failures (DB down, etc.) still
+// throw and trigger the framework's generic error handler.
+export async function createBuilder(input: BuilderInput): Promise<CreateBuilderResult> {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
 
   const name = input.name.trim();
-  if (!name) throw new Error("Builder name is required");
+  if (!name) return { ok: false, error: "Builder name is required." };
+
+  // Block create when a builder by this name already exists in the org
+  // (case-insensitive, whitespace-tolerant). The /builders form is an
+  // explicit "add new" action — silently linking to an existing record
+  // would be confusing, so we surface a clear message and let the user
+  // either rename or cancel.
+  const existing = await findBuilderByName(db, org.id, name);
+  if (existing) {
+    return { ok: false, error: `A builder named "${existing.name}" already exists in this org.` };
+  }
 
   const [created] = await db
     .insert(builders)
@@ -42,7 +63,7 @@ export async function createBuilder(input: BuilderInput): Promise<string> {
     .returning();
 
   revalidateBuilderSurfaces();
-  return created.id;
+  return { ok: true, builderId: created.id };
 }
 
 export async function updateBuilder(input: {

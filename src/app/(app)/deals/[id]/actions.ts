@@ -23,6 +23,7 @@ import {
 } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { findBuilderByName } from "@/lib/builders";
 import { formatPhone } from "@/lib/phone";
 
 export async function toggleChecklistItem(input: {
@@ -397,23 +398,43 @@ export async function addContact(input: AddContactInput) {
     let builderId: string | null = input.builderId ?? null;
 
     // Caller wants a brand-new builder created + attached to this deal.
+    // If a builder by this name already exists in the org, reuse it —
+    // the user typed a duplicate name from a stale memory of the picker,
+    // not because they actually wanted a new row. Then attach to deal
+    // idempotently (the dupe builder may already be on this deal).
     if (input.newBuilderName?.trim()) {
       const name = input.newBuilderName.trim();
-      const [builder] = await tx
-        .insert(builders)
-        .values({
+      const existing = await findBuilderByName(tx, org.id, name);
+      let resolvedBuilderId: string;
+      if (existing) {
+        resolvedBuilderId = existing.id;
+      } else {
+        const [builder] = await tx
+          .insert(builders)
+          .values({
+            orgId: org.id,
+            name,
+            classification: input.newBuilderClassification ?? "private",
+          })
+          .returning();
+        resolvedBuilderId = builder.id;
+      }
+      const [existingLink] = await tx
+        .select({ id: dealBuyers.id })
+        .from(dealBuyers)
+        .where(
+          and(eq(dealBuyers.dealId, input.dealId), eq(dealBuyers.builderId, resolvedBuilderId)),
+        )
+        .limit(1);
+      if (!existingLink) {
+        await tx.insert(dealBuyers).values({
           orgId: org.id,
-          name,
-          classification: input.newBuilderClassification ?? "private",
-        })
-        .returning();
-      await tx.insert(dealBuyers).values({
-        orgId: org.id,
-        dealId: input.dealId,
-        builderId: builder.id,
-        tier: "not_selected",
-      });
-      builderId = builder.id;
+          dealId: input.dealId,
+          builderId: resolvedBuilderId,
+          tier: "not_selected",
+        });
+      }
+      builderId = resolvedBuilderId;
     } else if (builderId) {
       // Existing builder must belong to this org. We no longer require it
       // to be already on the deal — if it isn't, attach it now (idempotent
@@ -830,27 +851,49 @@ export async function addBuilderToDeal(input: {
   // Single transaction so we don't end up with an orphan builder if the
   // deal_buyer insert fails.
   const result = await db.transaction(async (tx) => {
-    const [builder] = await tx
-      .insert(builders)
-      .values({
-        orgId: org.id,
-        name,
-        classification: input.classification,
-        notes: input.notes?.trim() || null,
-      })
-      .returning();
+    // Find-or-create on the builder so we don't double-insert a builder
+    // that already exists in the org under the same (normalized) name.
+    // Then attach to the deal idempotently — the reused builder might
+    // already be on this deal.
+    const existing = await findBuilderByName(tx, org.id, name);
+    let builderId: string;
+    if (existing) {
+      builderId = existing.id;
+    } else {
+      const [builder] = await tx
+        .insert(builders)
+        .values({
+          orgId: org.id,
+          name,
+          classification: input.classification,
+          notes: input.notes?.trim() || null,
+        })
+        .returning();
+      builderId = builder.id;
+    }
 
-    const [dealBuyer] = await tx
-      .insert(dealBuyers)
-      .values({
-        orgId: org.id,
-        dealId: input.dealId,
-        builderId: builder.id,
-        tier: input.tier ?? "not_selected",
-      })
-      .returning();
+    const [existingLink] = await tx
+      .select({ id: dealBuyers.id })
+      .from(dealBuyers)
+      .where(and(eq(dealBuyers.dealId, input.dealId), eq(dealBuyers.builderId, builderId)))
+      .limit(1);
+    let dealBuyerId: string;
+    if (existingLink) {
+      dealBuyerId = existingLink.id;
+    } else {
+      const [dealBuyer] = await tx
+        .insert(dealBuyers)
+        .values({
+          orgId: org.id,
+          dealId: input.dealId,
+          builderId,
+          tier: input.tier ?? "not_selected",
+        })
+        .returning();
+      dealBuyerId = dealBuyer.id;
+    }
 
-    return { builderId: builder.id, dealBuyerId: dealBuyer.id };
+    return { builderId, dealBuyerId };
   });
 
   revalidatePath(`/deals/${input.dealId}`);
@@ -972,16 +1015,22 @@ export async function bulkAddContactsToDeal(input: {
     let standaloneBuilderId: string | null = null;
     if (input.standaloneTarget) {
       if (input.standaloneTarget.type === "new") {
-        const [b] = await tx
-          .insert(builders)
-          .values({
-            orgId: org.id,
-            name: input.standaloneTarget.name.trim(),
-            classification: input.standaloneTarget.classification,
-          })
-          .returning();
-        standaloneBuilderId = b.id;
-        buildersCreated++;
+        const name = input.standaloneTarget.name.trim();
+        const existing = await findBuilderByName(tx, org.id, name);
+        if (existing) {
+          standaloneBuilderId = existing.id;
+        } else {
+          const [b] = await tx
+            .insert(builders)
+            .values({
+              orgId: org.id,
+              name,
+              classification: input.standaloneTarget.classification,
+            })
+            .returning();
+          standaloneBuilderId = b.id;
+          buildersCreated++;
+        }
       } else {
         const [b] = await tx
           .select({ id: builders.id })

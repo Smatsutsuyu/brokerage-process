@@ -1,22 +1,35 @@
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 import { builderClassificationEnum } from "./enums";
 import { organizations } from "./organizations";
 
-export const builders = pgTable("builders", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id")
-    .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  classification: builderClassificationEnum("classification").notNull(),
-  notes: text("notes"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-});
+export const builders = pgTable(
+  "builders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    classification: builderClassificationEnum("classification").notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    // Prevent case-insensitive / whitespace-different duplicate builder
+    // names within an org. App-level guards (createBuilder, the addContact
+    // newBuilderName flow, and the deal-page "create new buyer" actions)
+    // do a find-or-create on the same normalized key so the user gets a
+    // useful path rather than a constraint violation, but the index is
+    // the ultimate enforcement.
+    uniqueIndex("builders_org_name_unique").on(t.orgId, sql`lower(trim(${t.name}))`),
+  ],
+);
 
 export const contacts = pgTable("contacts", {
   id: uuid("id").primaryKey().defaultRandom(),

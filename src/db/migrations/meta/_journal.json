@@ -169,6 +169,13 @@
       "when": 1778880634101,
       "tag": "0023_naive_mentallo",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1778885671184,
+      "tag": "0024_powerful_frightful_four",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "builders_org_name_unique" ON "builders" USING btree ("org_id",lower(trim("name")));
