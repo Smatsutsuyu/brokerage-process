@@ -20,15 +20,20 @@ export function QaFilePdfButton({
   dealId,
   variant = "default",
 }: QaFilePdfButtonProps) {
-  const href = `/api/deals/${dealId}/qa-file.pdf`;
+  const baseHref = `/api/deals/${dealId}/qa-file.pdf`;
   const title = "Open the per-deal Q&A File PDF in a new tab (approved items only)";
+
+  // Cache-bust per click: some browsers serve a cached PDF for new-tab
+  // navigations even when the response is Cache-Control: no-store.
+  function openFresh() {
+    window.open(`${baseHref}?t=${Date.now()}`, "_blank");
+  }
 
   if (variant === "compact") {
     return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener"
+      <button
+        type="button"
+        onClick={openFresh}
         title={title}
         className={cn(
           "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-700",
@@ -36,17 +41,12 @@ export function QaFilePdfButton({
       >
         <FileText className="h-3 w-3" />
         Generate PDF
-      </a>
+      </button>
     );
   }
 
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={() => window.open(href, "_blank")}
-      title={title}
-    >
+    <Button size="sm" variant="outline" onClick={openFresh} title={title}>
       <FileText className="h-3.5 w-3.5" />
       Q&amp;A File
     </Button>
