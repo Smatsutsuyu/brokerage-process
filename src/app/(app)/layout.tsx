@@ -8,7 +8,12 @@ export default function AppLayout({ children }: Readonly<{ children: React.React
   return (
     <ConfirmProvider>
       <FeedbackShell>
-        <div className="flex h-screen flex-col">
+        {/* h-dvh (dynamic viewport height) instead of h-screen (100vh) so
+            the layout shrinks when Android/iOS browser chrome or system
+            nav bars cover the bottom of the viewport. h-screen extends
+            past the visible area on tablets, hiding the sidebar's
+            bottom-pinned UserLink under the system nav. */}
+        <div className="flex h-dvh flex-col">
           <FeedbackZone section="priority-ribbon" align="inside">
             <PriorityRibbon />
           </FeedbackZone>
