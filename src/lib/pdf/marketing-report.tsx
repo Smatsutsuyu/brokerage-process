@@ -91,6 +91,25 @@ const BOTTOM_MARGIN = 22; // ~0.3"
 // tall — leave room for the legend if it wraps.
 const FOOTER_RESERVE = 60;
 
+// Manual row chunking gives each Page its own thead instead of relying on
+// React-PDF's `fixed` prop, which renders the header on top of body
+// content on continuation pages and leaves a "blank row" where the row
+// underneath was clipped. Sizes are conservative for typical 1–2 line
+// comments; very long comments could overflow a chunk, in which case
+// rebalance these numbers downward.
+const ROWS_PER_FIRST_PAGE = 12;
+const ROWS_PER_PAGE = 16;
+
+function chunkRows<T>(rows: T[]): T[][] {
+  if (rows.length === 0) return [[]];
+  if (rows.length <= ROWS_PER_FIRST_PAGE) return [rows];
+  const out: T[][] = [rows.slice(0, ROWS_PER_FIRST_PAGE)];
+  for (let i = ROWS_PER_FIRST_PAGE; i < rows.length; i += ROWS_PER_PAGE) {
+    out.push(rows.slice(i, i + ROWS_PER_PAGE));
+  }
+  return out;
+}
+
 const styles = StyleSheet.create({
   page: {
     paddingTop: MARGIN,
@@ -136,12 +155,14 @@ const styles = StyleSheet.create({
   theadSpacer: {
     width: 4,
   },
-  // Mirrors rowContent's paddingLeft so the inner column starts at the same
-  // x as the body's cellBuilder text.
+  // Mirrors rowContent's paddingLeft + paddingRight so the inner columns
+  // line up exactly with the body cells (left) and stop short of the right
+  // edge by the same gutter (right).
   theadInner: {
     flex: 1,
     flexDirection: "row",
     paddingLeft: 10,
+    paddingRight: 10,
   },
   thBuilder: {
     width: "30%",
@@ -179,6 +200,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     paddingLeft: 10,
+    // Right-side gutter so comment text doesn't run all the way to the
+    // edge of the row (mirrored on theadInner so columns align).
+    paddingRight: 10,
     // Vertically center comment text within the row (per Chris's request
     // — single-line comments were sitting at the top before).
     alignItems: "center",
@@ -255,71 +279,106 @@ export function MarketingReportDoc(props: MarketingReportProps) {
     return a.builderName.localeCompare(b.builderName);
   });
 
+  const pageChunks = chunkRows(sortedRows);
+
   return (
     <Document>
-      <Page size="LETTER" style={styles.page}>
-        {/* Title — text-only header, top-left */}
-        <View style={styles.titleBlock}>
-          <Text style={styles.dealTitle}>{dealName}</Text>
-          <Text style={styles.reportLabel}>MARKETING REPORT · {dateLabel}</Text>
-        </View>
+      {pageChunks.map((pageRows, pageIdx) => {
+        const isFirstPage = pageIdx === 0;
+        // Global row index for continuous alternating-row colors across
+        // pages (so the zebra stripe doesn't reset on each page break).
+        const startIdx = isFirstPage
+          ? 0
+          : ROWS_PER_FIRST_PAGE + (pageIdx - 1) * ROWS_PER_PAGE;
+        return (
+          <Page key={pageIdx} size="LETTER" style={styles.page}>
+            {isFirstPage && (
+              <View style={styles.titleBlock}>
+                <Text style={styles.dealTitle}>{dealName}</Text>
+                <Text style={styles.reportLabel}>MARKETING REPORT · {dateLabel}</Text>
+              </View>
+            )}
 
-        {/* Builder × Comments table. Header is fixed so it repeats on
-            continuation pages. The header layout mirrors the body row's
-            tier-bar + paddingLeft structure so columns align exactly. */}
-        <View>
-          <View style={styles.thead} fixed>
-            <View style={styles.theadSpacer} />
-            <View style={styles.theadInner}>
-              <Text style={styles.thBuilder}>BUILDER</Text>
-              <Text style={styles.thComments}>COMMENTS</Text>
-            </View>
-          </View>
-          {sortedRows.map((r, i) => {
-            const isAlt = i % 2 === 1;
-            return (
-              <View key={`${r.builderName}-${i}`} style={[styles.row, isAlt ? styles.rowAlt : {}]}>
-                <View style={[styles.tierBar, { backgroundColor: TIER_BAR_COLOR[r.tier] }]} />
-                <View style={styles.rowContent}>
-                  <Text style={styles.cellBuilder}>{r.builderName}</Text>
-                  <Text style={styles.cellComments}>{r.comments || "—"}</Text>
+            {/* Builder × Comments table. Header is rendered on every
+                page (each Page component owns its own copy) so we don't
+                need React-PDF's `fixed` prop, which on continuation
+                pages clips the row underneath the header. */}
+            <View>
+              <View style={styles.thead}>
+                <View style={styles.theadSpacer} />
+                <View style={styles.theadInner}>
+                  <Text style={styles.thBuilder}>BUILDER</Text>
+                  <Text style={styles.thComments}>COMMENTS</Text>
                 </View>
               </View>
-            );
-          })}
-          {sortedRows.length === 0 && (
-            <View style={styles.row}>
-              <Text style={[styles.cellComments, { fontStyle: "italic", color: COLORS.textSecondary }]}>
-                No buyers on this deal yet.
-              </Text>
+              {pageRows.map((r, i) => {
+                const globalIdx = startIdx + i;
+                const isAlt = globalIdx % 2 === 1;
+                return (
+                  <View
+                    key={`${r.builderName}-${globalIdx}`}
+                    style={[styles.row, isAlt ? styles.rowAlt : {}]}
+                  >
+                    <View
+                      style={[
+                        styles.tierBar,
+                        { backgroundColor: TIER_BAR_COLOR[r.tier] },
+                      ]}
+                    />
+                    <View style={styles.rowContent}>
+                      <Text style={styles.cellBuilder}>{r.builderName}</Text>
+                      <Text style={styles.cellComments}>{r.comments || "—"}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+              {sortedRows.length === 0 && isFirstPage && (
+                <View style={styles.row}>
+                  <Text
+                    style={[
+                      styles.cellComments,
+                      { fontStyle: "italic", color: COLORS.textSecondary },
+                    ]}
+                  >
+                    No buyers on this deal yet.
+                  </Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
 
-        {/* Footer — LAO logo (1.5" wide) + tier legend */}
-        <View style={styles.footer} fixed>
-          {LAO_LOGO_DATA_URI ? (
-            // eslint-disable-next-line jsx-a11y/alt-text
-            <Image src={LAO_LOGO_DATA_URI} style={styles.footerLogo} />
-          ) : (
-            <Text style={styles.footerLogoFallback}>Land Advisors</Text>
-          )}
-          <View style={styles.footerLegend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendSwatch, { backgroundColor: COLORS.green }]} />
-              <Text>Interest</Text>
+            {/* Footer — LAO logo (2" wide) + tier legend. One per Page;
+                no `fixed` needed since each Page renders its own. */}
+            <View style={styles.footer}>
+              {LAO_LOGO_DATA_URI ? (
+                // eslint-disable-next-line jsx-a11y/alt-text
+                <Image src={LAO_LOGO_DATA_URI} style={styles.footerLogo} />
+              ) : (
+                <Text style={styles.footerLogoFallback}>Land Advisors</Text>
+              )}
+              <View style={styles.footerLegend}>
+                <View style={styles.legendItem}>
+                  <View
+                    style={[styles.legendSwatch, { backgroundColor: COLORS.green }]}
+                  />
+                  <Text>Interest</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View
+                    style={[styles.legendSwatch, { backgroundColor: COLORS.yellow }]}
+                  />
+                  <Text>Evaluating</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View
+                    style={[styles.legendSwatch, { backgroundColor: COLORS.red }]}
+                  />
+                  <Text>Passed</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendSwatch, { backgroundColor: COLORS.yellow }]} />
-              <Text>Evaluating</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendSwatch, { backgroundColor: COLORS.red }]} />
-              <Text>Passed</Text>
-            </View>
-          </View>
-        </View>
-      </Page>
+          </Page>
+        );
+      })}
     </Document>
   );
 }
