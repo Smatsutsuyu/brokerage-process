@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
   },
   qaItem: {
     paddingVertical: 10,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0.5,
     borderBottomStyle: "solid",
     borderBottomColor: COLORS.border,
   },
