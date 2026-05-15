@@ -83,15 +83,18 @@ const TIER_BAR_COLOR: Record<MarketingReportTier, string> = {
 
 // 0.5" = 36 points (PDF user-space unit is 1/72 inch).
 const MARGIN = 36;
-// Footer occupies the logo height + breathing room above the bottom margin.
-// Logo is 1.5" wide; LAO logo aspect is roughly 4:1, so ~27pt tall — round
-// up to leave room for the legend's two-line height in case it wraps.
-const FOOTER_RESERVE = 70;
+// Tighter bottom margin than the rest (Chris's request) to keep the
+// footer logo visually anchored close to the page edge.
+const BOTTOM_MARGIN = 22; // ~0.3"
+// Footer occupies the logo height + breathing room above the bottom
+// margin. Logo is 2" wide; LAO logo aspect is roughly 3.6:1, so ~40pt
+// tall — leave room for the legend if it wraps.
+const FOOTER_RESERVE = 60;
 
 const styles = StyleSheet.create({
   page: {
     paddingTop: MARGIN,
-    paddingBottom: MARGIN + FOOTER_RESERVE,
+    paddingBottom: BOTTOM_MARGIN + FOOTER_RESERVE,
     paddingHorizontal: MARGIN,
     fontFamily: "Metropolis",
     fontSize: 10,
@@ -115,21 +118,39 @@ const styles = StyleSheet.create({
     fontFamily: "Metropolis",
     letterSpacing: 1,
   },
+  // Header row mirrors the body-row structure (tier-bar spacer + paddingLeft
+  // wrapper + same column widths) so BUILDER lines up with cellBuilder text
+  // and COMMENTS lines up with cellComments text exactly. White background
+  // so when this fixes/repeats on continuation pages it covers any body
+  // content that flows underneath.
   thead: {
     flexDirection: "row",
     borderBottomWidth: 1.5,
     borderBottomColor: COLORS.ink,
     paddingBottom: 6,
     marginBottom: 4,
+    backgroundColor: "white",
+  },
+  // Phantom column matching the tier bar's width so the header columns sit
+  // at the same x as the body cells.
+  theadSpacer: {
+    width: 4,
+  },
+  // Mirrors rowContent's paddingLeft so the inner column starts at the same
+  // x as the body's cellBuilder text.
+  theadInner: {
+    flex: 1,
+    flexDirection: "row",
+    paddingLeft: 10,
   },
   thBuilder: {
     width: "30%",
+    paddingRight: 18,
     fontSize: 9,
     fontFamily: "Metropolis",
     fontWeight: "bold",
     color: COLORS.ink,
     letterSpacing: 1,
-    paddingLeft: 14, // Aligns with row content (after the tier-color bar).
   },
   thComments: {
     flex: 1,
@@ -164,7 +185,10 @@ const styles = StyleSheet.create({
   },
   cellBuilder: {
     width: "30%",
-    paddingRight: 10,
+    // Generous right padding creates visual breathing room between the
+    // builder name and the comments text; mirrored on the header's
+    // thBuilder so the columns line up.
+    paddingRight: 18,
     fontSize: 11,
     fontFamily: "Metropolis",
     fontWeight: "bold",
@@ -179,16 +203,16 @@ const styles = StyleSheet.create({
   // Footer pinned to the bottom margin and repeated on every page.
   footer: {
     position: "absolute",
-    bottom: MARGIN,
+    bottom: BOTTOM_MARGIN,
     left: MARGIN,
     right: MARGIN,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  // 1.5" wide = 108pt. Height auto-scales by aspect ratio.
+  // 2" wide = 144pt. Height auto-scales by aspect ratio.
   footerLogo: {
-    width: 108,
+    width: 144,
   },
   footerLogoFallback: {
     fontFamily: "Metropolis",
@@ -240,11 +264,16 @@ export function MarketingReportDoc(props: MarketingReportProps) {
           <Text style={styles.reportLabel}>MARKETING REPORT · {dateLabel}</Text>
         </View>
 
-        {/* Builder × Comments table */}
+        {/* Builder × Comments table. Header is fixed so it repeats on
+            continuation pages. The header layout mirrors the body row's
+            tier-bar + paddingLeft structure so columns align exactly. */}
         <View>
-          <View style={styles.thead}>
-            <Text style={styles.thBuilder}>BUILDER</Text>
-            <Text style={styles.thComments}>COMMENTS</Text>
+          <View style={styles.thead} fixed>
+            <View style={styles.theadSpacer} />
+            <View style={styles.theadInner}>
+              <Text style={styles.thBuilder}>BUILDER</Text>
+              <Text style={styles.thComments}>COMMENTS</Text>
+            </View>
           </View>
           {sortedRows.map((r, i) => {
             const isAlt = i % 2 === 1;
