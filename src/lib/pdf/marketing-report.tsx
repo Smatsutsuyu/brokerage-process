@@ -91,39 +91,30 @@ const BOTTOM_MARGIN = 22; // ~0.3"
 // tall — leave room for the legend if it wraps.
 const FOOTER_RESERVE = 60;
 
-// Manual row chunking gives each Page its own thead instead of relying on
-// React-PDF's `fixed` prop, which renders the header on top of body
-// content on continuation pages and leaves a "blank row" where the row
-// underneath was clipped. Sized for typical 1-line comments (~38pt row)
-// against the available content height (~578pt on page 1 after title +
-// header overhead, ~653pt on subsequent pages). If a deal has many
-// 3-plus-line comments, rebalance these numbers downward.
-const ROWS_PER_FIRST_PAGE = 15;
-const ROWS_PER_PAGE = 18;
-
-function chunkRows<T>(rows: T[]): T[][] {
-  if (rows.length === 0) return [[]];
-  if (rows.length <= ROWS_PER_FIRST_PAGE) return [rows];
-  const out: T[][] = [rows.slice(0, ROWS_PER_FIRST_PAGE)];
-  for (let i = ROWS_PER_FIRST_PAGE; i < rows.length; i += ROWS_PER_PAGE) {
-    out.push(rows.slice(i, i + ROWS_PER_PAGE));
-  }
-  return out;
-}
+// Combined title + thead occupies the top of every page via a single
+// `fixed` element (canonical react-pdf pattern for repeating headers).
+// HEADER_ZONE_H is reserved as paddingTop so body content never overlaps
+// with the fixed header, and the gap below it matches the original
+// MARKETING REPORT-to-table breathing room.
+const HEADER_ZONE_H = 85;
+const HEADER_BODY_GAP = 10;
 
 const styles = StyleSheet.create({
   page: {
-    paddingTop: MARGIN,
+    // Top padding reserves room for the fixed header zone (title + thead)
+    // on every page, plus a small gap before body rows start. Body content
+    // flows from this offset, never overlapping the fixed header.
+    paddingTop: MARGIN + HEADER_ZONE_H + HEADER_BODY_GAP,
     paddingBottom: BOTTOM_MARGIN + FOOTER_RESERVE,
     paddingHorizontal: MARGIN,
     fontFamily: "Metropolis",
     fontSize: 10,
     color: COLORS.textPrimary,
   },
-  // Title block — text-only header, top-left aligned. Generous bottom
-  // padding before the table so MARKETING REPORT label has air around it.
+  // Title block — text-only header. Spacing inside the fixed header zone
+  // between the title text and the column-header strip.
   titleBlock: {
-    paddingBottom: 36,
+    paddingBottom: 18,
   },
   dealTitle: {
     fontSize: 24,
@@ -280,106 +271,98 @@ export function MarketingReportDoc(props: MarketingReportProps) {
     return a.builderName.localeCompare(b.builderName);
   });
 
-  const pageChunks = chunkRows(sortedRows);
-
   return (
     <Document>
-      {pageChunks.map((pageRows, pageIdx) => {
-        const isFirstPage = pageIdx === 0;
-        // Global row index for continuous alternating-row colors across
-        // pages (so the zebra stripe doesn't reset on each page break).
-        const startIdx = isFirstPage
-          ? 0
-          : ROWS_PER_FIRST_PAGE + (pageIdx - 1) * ROWS_PER_PAGE;
-        return (
-          <Page key={pageIdx} size="LETTER" style={styles.page}>
-            {isFirstPage && (
-              <View style={styles.titleBlock}>
-                <Text style={styles.dealTitle}>{dealName}</Text>
-                <Text style={styles.reportLabel}>MARKETING REPORT · {dateLabel}</Text>
-              </View>
-            )}
-
-            {/* Builder × Comments table. Header is rendered on every
-                page (each Page component owns its own copy) so we don't
-                need React-PDF's `fixed` prop, which on continuation
-                pages clips the row underneath the header. */}
-            <View>
-              <View style={styles.thead}>
-                <View style={styles.theadSpacer} />
-                <View style={styles.theadInner}>
-                  <Text style={styles.thBuilder}>BUILDER</Text>
-                  <Text style={styles.thComments}>COMMENTS</Text>
-                </View>
-              </View>
-              {pageRows.map((r, i) => {
-                const globalIdx = startIdx + i;
-                const isAlt = globalIdx % 2 === 1;
-                return (
-                  <View
-                    key={`${r.builderName}-${globalIdx}`}
-                    style={[styles.row, isAlt ? styles.rowAlt : {}]}
-                  >
-                    <View
-                      style={[
-                        styles.tierBar,
-                        { backgroundColor: TIER_BAR_COLOR[r.tier] },
-                      ]}
-                    />
-                    <View style={styles.rowContent}>
-                      <Text style={styles.cellBuilder}>{r.builderName}</Text>
-                      <Text style={styles.cellComments}>{r.comments || "—"}</Text>
-                    </View>
-                  </View>
-                );
-              })}
-              {sortedRows.length === 0 && isFirstPage && (
-                <View style={styles.row}>
-                  <Text
-                    style={[
-                      styles.cellComments,
-                      { fontStyle: "italic", color: COLORS.textSecondary },
-                    ]}
-                  >
-                    No buyers on this deal yet.
-                  </Text>
-                </View>
-              )}
+      <Page size="LETTER" style={styles.page}>
+        {/* Combined header (title + column headers) — fixed-positioned at
+            top of every page. Repeats automatically on continuation
+            pages. Body content flows from the page's paddingTop, which
+            is sized to clear this header zone. */}
+        <View
+          fixed
+          style={{
+            position: "absolute",
+            top: MARGIN,
+            left: MARGIN,
+            right: MARGIN,
+          }}
+        >
+          <View style={styles.titleBlock}>
+            <Text style={styles.dealTitle}>{dealName}</Text>
+            <Text style={styles.reportLabel}>MARKETING REPORT · {dateLabel}</Text>
+          </View>
+          <View style={styles.thead}>
+            <View style={styles.theadSpacer} />
+            <View style={styles.theadInner}>
+              <Text style={styles.thBuilder}>BUILDER</Text>
+              <Text style={styles.thComments}>COMMENTS</Text>
             </View>
+          </View>
+        </View>
 
-            {/* Footer — LAO logo (2" wide) + tier legend. One per Page;
-                no `fixed` needed since each Page renders its own. */}
-            <View style={styles.footer}>
-              {LAO_LOGO_DATA_URI ? (
-                // eslint-disable-next-line jsx-a11y/alt-text
-                <Image src={LAO_LOGO_DATA_URI} style={styles.footerLogo} />
-              ) : (
-                <Text style={styles.footerLogoFallback}>Land Advisors</Text>
-              )}
-              <View style={styles.footerLegend}>
-                <View style={styles.legendItem}>
-                  <View
-                    style={[styles.legendSwatch, { backgroundColor: COLORS.green }]}
-                  />
-                  <Text>Interest</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View
-                    style={[styles.legendSwatch, { backgroundColor: COLORS.yellow }]}
-                  />
-                  <Text>Evaluating</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View
-                    style={[styles.legendSwatch, { backgroundColor: COLORS.red }]}
-                  />
-                  <Text>Passed</Text>
+        {/* Body rows flow naturally; React-PDF wraps them across pages
+            as needed. Each new page picks up the fixed header above and
+            the fixed footer below automatically. */}
+        <View>
+          {sortedRows.map((r, i) => {
+            const isAlt = i % 2 === 1;
+            return (
+              <View
+                key={`${r.builderName}-${i}`}
+                style={[styles.row, isAlt ? styles.rowAlt : {}]}
+                wrap={false}
+              >
+                <View
+                  style={[
+                    styles.tierBar,
+                    { backgroundColor: TIER_BAR_COLOR[r.tier] },
+                  ]}
+                />
+                <View style={styles.rowContent}>
+                  <Text style={styles.cellBuilder}>{r.builderName}</Text>
+                  <Text style={styles.cellComments}>{r.comments || "—"}</Text>
                 </View>
               </View>
+            );
+          })}
+          {sortedRows.length === 0 && (
+            <View style={styles.row}>
+              <Text
+                style={[
+                  styles.cellComments,
+                  { fontStyle: "italic", color: COLORS.textSecondary },
+                ]}
+              >
+                No buyers on this deal yet.
+              </Text>
             </View>
-          </Page>
-        );
-      })}
+          )}
+        </View>
+
+        {/* Footer — fixed so it lands at the bottom of every page. */}
+        <View style={styles.footer} fixed>
+          {LAO_LOGO_DATA_URI ? (
+            // eslint-disable-next-line jsx-a11y/alt-text
+            <Image src={LAO_LOGO_DATA_URI} style={styles.footerLogo} />
+          ) : (
+            <Text style={styles.footerLogoFallback}>Land Advisors</Text>
+          )}
+          <View style={styles.footerLegend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendSwatch, { backgroundColor: COLORS.green }]} />
+              <Text>Interest</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendSwatch, { backgroundColor: COLORS.yellow }]} />
+              <Text>Evaluating</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendSwatch, { backgroundColor: COLORS.red }]} />
+              <Text>Passed</Text>
+            </View>
+          </View>
+        </View>
+      </Page>
     </Document>
   );
 }
