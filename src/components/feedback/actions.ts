@@ -55,6 +55,7 @@ export async function submitFeedback(input: SubmitFeedbackInput): Promise<{
   // notifyFeedbackCreated so a notification failure can't break submission.
   await notifyFeedbackCreated({
     orgId: org.id,
+    authorUserId: user?.id,
     props: {
       submitterEmail: user?.email ?? null,
       section: input.section.slice(0, 200),
@@ -169,12 +170,14 @@ export async function addFeedbackComment(input: { feedbackId: string; body: stri
     body: trimmed,
   });
 
-  // Notify all developer-mode owners with the new-comment channel enabled.
-  // Excludes the comment's own author (so a developer commenting on
-  // something doesn't email themselves). The notify helper handles the
-  // recipient query + the channel/preference filtering.
+  // Notify two groups (deduped, excluding the commenter themselves):
+  //   1. The feedback creator (if they have notifyOnReplyToMine on)
+  //   2. Owners who've previously commented on this thread (if they have
+  //      notifyOnNewComment on)
+  // The notify helper handles the recipient query + preference filtering.
   await notifyFeedbackComment({
     orgId: org.id,
+    feedbackId: input.feedbackId,
     authorUserId: me.id,
     props: {
       authorEmail: me.email,

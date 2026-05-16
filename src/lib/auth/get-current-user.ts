@@ -18,13 +18,13 @@ export type CurrentUser = {
   email: string;
   name: string;
   phone: string | null;
-  // Developer-mode flag — owners can self-toggle from /profile. When true,
-  // additional dev-team UI (notification toggles, /admin pages) become
-  // visible for this user. Notifications are sent based on this flag plus
-  // the per-channel preferences below.
-  isDeveloper: boolean;
+  // Per-channel feedback notification preferences (owner-only — toggles
+  // only render when role === "owner" on /profile, and recipient queries
+  // also filter by role).
   notifyOnNewFeedback: boolean;
   notifyOnNewComment: boolean;
+  notifyOnReplyToMine: boolean;
+  notifyOnStatusChangeToMine: boolean;
 };
 
 // Wrapped in React's cache() so multiple callers within a single request
@@ -46,9 +46,10 @@ async function _getCurrentUser(): Promise<CurrentUser | null> {
       role: users.role,
       disabledAt: users.disabledAt,
       phone: users.phone,
-      isDeveloper: users.isDeveloper,
       notifyOnNewFeedback: users.notifyOnNewFeedback,
       notifyOnNewComment: users.notifyOnNewComment,
+      notifyOnReplyToMine: users.notifyOnReplyToMine,
+      notifyOnStatusChangeToMine: users.notifyOnStatusChangeToMine,
       email: authUser.email,
       name: authUser.name,
     })
@@ -69,9 +70,10 @@ async function _getCurrentUser(): Promise<CurrentUser | null> {
     authUserId: row.authUserId,
     role: row.role,
     disabledAt: row.disabledAt,
-    isDeveloper: row.isDeveloper,
     notifyOnNewFeedback: row.notifyOnNewFeedback,
     notifyOnNewComment: row.notifyOnNewComment,
+    notifyOnReplyToMine: row.notifyOnReplyToMine,
+    notifyOnStatusChangeToMine: row.notifyOnStatusChangeToMine,
     email: row.email,
     name: row.name,
     phone: row.phone,

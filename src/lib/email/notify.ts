@@ -3,7 +3,7 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { authUser, users } from "@/db/schema";
+import { authUser, feedbackComments, feedbackItems, users } from "@/db/schema";
 
 import { sendEmail } from "./send";
 import {
@@ -14,29 +14,32 @@ import {
   FeedbackCreatedEmail,
   type FeedbackCreatedProps,
 } from "./templates/feedback-created";
+import {
+  FeedbackStatusChangeEmail,
+  type FeedbackStatusChangeProps,
+} from "./templates/feedback-status-change";
 import { env } from "@/lib/env";
 
-// Convenience wrappers around sendEmail for the dev-team notification flow.
-// Recipient list is computed dynamically from the users table — anyone with
-// role=owner + isDeveloper=true + the relevant per-channel flag enabled
-// gets notified. Empty recipient list → no-op.
+// Per-channel notification dispatch. All four channels are owner-only
+// (the /profile toggles only render for owners and these queries also
+// filter by role for defense in depth). Errors are swallowed so a failed
+// notification never breaks the user-facing action that triggered it.
 //
-// Errors are swallowed (logged, not thrown). A failed notification email
-// must never break the user-facing action that triggered it (e.g. submitting
-// feedback should always succeed even if the notification can't go out).
+// Channels:
+//   notifyOnNewFeedback            — subscribe to the feed (any submission)
+//   notifyOnNewComment             — replies on threads I've commented on
+//   notifyOnReplyToMine            — replies on feedback I created
+//   notifyOnStatusChangeToMine     — status changes on feedback I created
 
 type RecipientFilter = {
   orgId: string;
-  channel: "newFeedback" | "newComment";
-  // Authenticated-user-id to exclude from the recipient list (used so a
-  // commenter doesn't notify themselves about their own comment). Optional.
+  // Authenticated-user-id to exclude from the recipient list (so an actor
+  // doesn't notify themselves about their own action).
   excludeUserId?: string;
 };
 
-async function getDeveloperRecipients(filter: RecipientFilter): Promise<string[]> {
-  const channelColumn =
-    filter.channel === "newFeedback" ? users.notifyOnNewFeedback : users.notifyOnNewComment;
-
+// Owners who've subscribed to the firehose feed.
+async function recipientsForNewFeedback(filter: RecipientFilter): Promise<string[]> {
   const rows = await db
     .select({ userId: users.id, email: authUser.email })
     .from(users)
@@ -45,29 +48,98 @@ async function getDeveloperRecipients(filter: RecipientFilter): Promise<string[]
       and(
         eq(users.orgId, filter.orgId),
         eq(users.role, "owner"),
-        eq(users.isDeveloper, true),
-        eq(channelColumn, true),
-        // Soft-disabled users shouldn't get email either.
-        // (disabledAt IS NULL would be ideal but Drizzle's isNull import is
-        // an extra dance — checking against an impossible value via a
-        // separate filter would be uglier. Skipping for now; disabled
-        // owners are vanishingly rare in this org.)
+        eq(users.notifyOnNewFeedback, true),
       ),
     );
-
   return rows
     .filter((r) => !filter.excludeUserId || r.userId !== filter.excludeUserId)
     .map((r) => r.email);
 }
 
+// For comment notifications: union of (creator of this feedback with
+// notifyOnReplyToMine = true) and (owners who've commented on this thread
+// with notifyOnNewComment = true). Deduped by user id.
+async function recipientsForComment(input: {
+  orgId: string;
+  feedbackId: string;
+  excludeUserId?: string;
+}): Promise<string[]> {
+  // Creator branch: pull the feedback's userId, join through to authUser,
+  // include only if creator is an owner with notifyOnReplyToMine = true
+  // and not the actor.
+  const creatorRows = await db
+    .select({ userId: users.id, email: authUser.email })
+    .from(feedbackItems)
+    .innerJoin(users, eq(users.id, feedbackItems.userId))
+    .innerJoin(authUser, eq(users.authUserId, authUser.id))
+    .where(
+      and(
+        eq(feedbackItems.id, input.feedbackId),
+        eq(feedbackItems.orgId, input.orgId),
+        eq(users.role, "owner"),
+        eq(users.notifyOnReplyToMine, true),
+      ),
+    );
+
+  // Participant branch: owners who've previously commented on this thread
+  // and have notifyOnNewComment = true.
+  const participantRows = await db
+    .select({ userId: users.id, email: authUser.email })
+    .from(feedbackComments)
+    .innerJoin(users, eq(users.id, feedbackComments.userId))
+    .innerJoin(authUser, eq(users.authUserId, authUser.id))
+    .where(
+      and(
+        eq(feedbackComments.feedbackId, input.feedbackId),
+        eq(users.orgId, input.orgId),
+        eq(users.role, "owner"),
+        eq(users.notifyOnNewComment, true),
+      ),
+    );
+
+  const byUserId = new Map<string, string>();
+  for (const r of [...creatorRows, ...participantRows]) {
+    if (input.excludeUserId && r.userId === input.excludeUserId) continue;
+    byUserId.set(r.userId, r.email);
+  }
+  return Array.from(byUserId.values());
+}
+
+// Status-change notifications go only to the feedback creator (if owner
+// + opted in + not the actor).
+async function recipientsForStatusChange(input: {
+  orgId: string;
+  feedbackId: string;
+  excludeUserId?: string;
+}): Promise<string[]> {
+  const rows = await db
+    .select({ userId: users.id, email: authUser.email })
+    .from(feedbackItems)
+    .innerJoin(users, eq(users.id, feedbackItems.userId))
+    .innerJoin(authUser, eq(users.authUserId, authUser.id))
+    .where(
+      and(
+        eq(feedbackItems.id, input.feedbackId),
+        eq(feedbackItems.orgId, input.orgId),
+        eq(users.role, "owner"),
+        eq(users.notifyOnStatusChangeToMine, true),
+      ),
+    );
+  return rows
+    .filter((r) => !input.excludeUserId || r.userId !== input.excludeUserId)
+    .map((r) => r.email);
+}
+
 export async function notifyFeedbackCreated(input: {
   orgId: string;
+  // Submitter — excluded from the recipient list (no self-notification).
+  authorUserId?: string;
   props: Omit<FeedbackCreatedProps, "appUrl">;
 }): Promise<void> {
   try {
-    const recipients = await getDeveloperRecipients({
+    const recipients = await recipientsForNewFeedback({
       orgId: input.orgId,
-      channel: "newFeedback",
+      excludeUserId: input.authorUserId,
     });
     if (recipients.length === 0) return;
     await sendEmail({
@@ -83,15 +155,16 @@ export async function notifyFeedbackCreated(input: {
 
 export async function notifyFeedbackComment(input: {
   orgId: string;
+  feedbackId: string;
   // The user who posted the comment, so they don't get notified about
-  // their own reply.
+  // their own reply (excluded from both creator and participant branches).
   authorUserId: string;
   props: Omit<FeedbackCommentProps, "appUrl">;
 }): Promise<void> {
   try {
-    const recipients = await getDeveloperRecipients({
+    const recipients = await recipientsForComment({
       orgId: input.orgId,
-      channel: "newComment",
+      feedbackId: input.feedbackId,
       excludeUserId: input.authorUserId,
     });
     if (recipients.length === 0) return;
@@ -103,5 +176,33 @@ export async function notifyFeedbackComment(input: {
     });
   } catch (err) {
     console.error("[notify:feedback-comment] failed to send", err);
+  }
+}
+
+export async function notifyFeedbackStatusChange(input: {
+  orgId: string;
+  feedbackId: string;
+  // The user who changed the status (excluded — no self-notification).
+  actorUserId: string;
+  props: Omit<FeedbackStatusChangeProps, "appUrl">;
+}): Promise<void> {
+  try {
+    const recipients = await recipientsForStatusChange({
+      orgId: input.orgId,
+      feedbackId: input.feedbackId,
+      excludeUserId: input.actorUserId,
+    });
+    if (recipients.length === 0) return;
+    await sendEmail({
+      to: recipients,
+      subject: `[Lakebridge feedback] Status changed on ${input.props.feedbackSection}`,
+      react: FeedbackStatusChangeEmail({
+        ...input.props,
+        appUrl: env.NEXT_PUBLIC_APP_URL,
+      }),
+      tags: [{ name: "type", value: "feedback-status-change" }],
+    });
+  } catch (err) {
+    console.error("[notify:feedback-status-change] failed to send", err);
   }
 }

@@ -8,6 +8,7 @@ import { feedbackComments, feedbackItems } from "@/db/schema";
 import { env } from "@/lib/env";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { notifyFeedbackStatusChange } from "@/lib/email/notify";
 import { sendEmail } from "@/lib/email/send";
 import {
   FeedbackSummaryEmail,
@@ -37,9 +38,19 @@ export async function setFeedbackStatus(input: {
   // first). Going BACK to "new" clears both — useful if the owner wants to
   // re-open an item.
   const now = new Date();
+  // Pull the row before updating so we know (a) the previous status (to
+  // skip notify when no actual change happens) and (b) the email fields
+  // we need to render the status-change notification.
   const existing = await db.query.feedbackItems.findFirst({
     where: and(eq(feedbackItems.id, input.feedbackId), eq(feedbackItems.orgId, org.id)),
-    columns: { reviewedAt: true, actionedAt: true },
+    columns: {
+      status: true,
+      reviewedAt: true,
+      actionedAt: true,
+      section: true,
+      pagePath: true,
+      comment: true,
+    },
   });
   const update: {
     status: FeedbackStatus;
@@ -70,6 +81,24 @@ export async function setFeedbackStatus(input: {
     .update(feedbackItems)
     .set(update)
     .where(and(eq(feedbackItems.id, input.feedbackId), eq(feedbackItems.orgId, org.id)));
+
+  // Notify the original submitter (if they have notifyOnStatusChangeToMine
+  // enabled and aren't the actor) — but only when status actually changed.
+  if (existing && existing.status !== input.status) {
+    await notifyFeedbackStatusChange({
+      orgId: org.id,
+      feedbackId: input.feedbackId,
+      actorUserId: me.id,
+      props: {
+        actorEmail: me.email,
+        feedbackSection: existing.section,
+        feedbackBody: existing.comment,
+        feedbackPagePath: existing.pagePath,
+        fromStatus: existing.status,
+        toStatus: input.status,
+      },
+    });
+  }
 
   revalidatePath("/admin/feedback");
 }

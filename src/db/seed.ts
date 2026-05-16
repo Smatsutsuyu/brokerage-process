@@ -77,9 +77,11 @@ async function main() {
         orgId: org.id,
         authUserId: seanAuth.user.id,
         role: "owner",
-        // Sean's the dev — mark him so notifications route to him by
-        // default after a fresh seed. Chris stays as a non-dev owner.
-        isDeveloper: true,
+        // Sean opts into the firehose by default so a fresh seed routes
+        // every new feedback submission to him. Chris keeps the defaults
+        // (firehose off, reply-to-mine + status-change-to-mine on).
+        notifyOnNewFeedback: true,
+        notifyOnNewComment: true,
       },
     ])
     .returning();

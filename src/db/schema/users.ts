@@ -24,17 +24,24 @@ export const users = pgTable("users", {
   // Owner can disable a member without deleting them; disabled users can't
   // sign in (getCurrentUser returns null for them).
   disabledAt: timestamp("disabled_at", { withTimezone: true }),
-  // Developer-mode flag. When true, this user receives dev-team
-  // notifications (new feedback, comments). Self-toggleable from /profile
-  // and only meaningful for owners — non-owners with the flag set are
-  // ignored by the notification query. Defaults false so new accounts
-  // never get notification spam without opting in.
-  isDeveloper: boolean("is_developer").notNull().default(false),
-  // Per-channel notification preferences. Default true so enabling
-  // developer mode immediately turns the firehose on; user can mute either
-  // channel from /profile. Only consulted when isDeveloper = true.
-  notifyOnNewFeedback: boolean("notify_on_new_feedback").notNull().default(true),
-  notifyOnNewComment: boolean("notify_on_new_comment").notNull().default(true),
+  // Per-channel feedback notification preferences. All four are
+  // owner-only (the /profile section is gated on role === "owner" and the
+  // recipient queries in lib/email/notify.ts filter by role too).
+  //
+  // notifyOnNewFeedback: "subscribe to the feed" — pinged on any new
+  //   feedback submission. Off by default (opt-in firehose).
+  // notifyOnNewComment: pinged on new comments on threads I've previously
+  //   participated in (commented on). Off by default (opt-in).
+  // notifyOnReplyToMine: pinged on replies to feedback I created.
+  //   On by default — common case for the submitter.
+  // notifyOnStatusChangeToMine: pinged on status changes to feedback I
+  //   created. On by default — common case for the submitter.
+  notifyOnNewFeedback: boolean("notify_on_new_feedback").notNull().default(false),
+  notifyOnNewComment: boolean("notify_on_new_comment").notNull().default(false),
+  notifyOnReplyToMine: boolean("notify_on_reply_to_mine").notNull().default(true),
+  notifyOnStatusChangeToMine: boolean("notify_on_status_change_to_mine")
+    .notNull()
+    .default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

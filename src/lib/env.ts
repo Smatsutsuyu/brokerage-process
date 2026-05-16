@@ -10,7 +10,7 @@ export const env = createEnv({
     // sendEmail becomes a no-op and we log instead of sending. Lets dev
     // boot without a Resend account; lets prod stay quiet during the brief
     // window between domain-add and DNS verification. Recipients for
-    // dev-team notifications come from the users table (isDeveloper +
+    // feedback notifications come from the users table (owner role +
     // per-channel preferences), not env.
     RESEND_API_KEY: z.string().min(1).optional(),
     EMAIL_FROM: z.string().email().optional(),

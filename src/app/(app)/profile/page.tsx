@@ -4,7 +4,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 
 import { ChangePasswordForm } from "./change-password-form";
-import { DeveloperSettings } from "./developer-settings";
+import { FeedbackNotifications } from "./feedback-notifications";
 import { ProfileForm } from "./profile-form";
 import { SignOutButton } from "./sign-out-button";
 
@@ -86,10 +86,11 @@ export default async function ProfilePage() {
           </section>
 
           {me.role === "owner" && (
-            <DeveloperSettings
-              initialIsDeveloper={me.isDeveloper}
+            <FeedbackNotifications
               initialNotifyOnNewFeedback={me.notifyOnNewFeedback}
               initialNotifyOnNewComment={me.notifyOnNewComment}
+              initialNotifyOnReplyToMine={me.notifyOnReplyToMine}
+              initialNotifyOnStatusChangeToMine={me.notifyOnStatusChangeToMine}
             />
           )}
 

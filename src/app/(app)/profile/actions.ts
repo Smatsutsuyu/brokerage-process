@@ -32,22 +32,14 @@ export async function updateMyProfile(input: {
   revalidatePath("/", "layout");
 }
 
-// Self-toggle for the developer-mode flag. Owner-only — non-owners with
-// the flag set are ignored by the notification query anyway, but we gate
-// the toggle in UI + here so the flag stays semantically meaningful.
-export async function setMyDeveloperMode(enabled: boolean): Promise<void> {
-  const me = await getCurrentUser();
-  if (!me) throw new Error("Not signed in");
-  if (me.role !== "owner") throw new Error("Owner-only");
-
-  await db.update(users).set({ isDeveloper: enabled }).where(eq(users.id, me.id));
-  revalidatePath("/profile");
-}
-
-// Per-channel notification preference. Only meaningful when isDeveloper
-// is true; we still allow toggling it when false so the user can pre-set
-// preferences before flipping developer mode on.
-export type NotificationChannel = "newFeedback" | "newComment";
+// Per-channel feedback notification preference. Owner-only — non-owners
+// have no UI surface for this and the recipient query in notify.ts also
+// filters by role.
+export type NotificationChannel =
+  | "newFeedback"
+  | "newComment"
+  | "replyToMine"
+  | "statusChangeToMine";
 
 export async function setMyNotificationPreference(input: {
   channel: NotificationChannel;
@@ -55,11 +47,16 @@ export async function setMyNotificationPreference(input: {
 }): Promise<void> {
   const me = await getCurrentUser();
   if (!me) throw new Error("Not signed in");
+  if (me.role !== "owner") throw new Error("Owner-only");
 
   const update =
     input.channel === "newFeedback"
       ? { notifyOnNewFeedback: input.enabled }
-      : { notifyOnNewComment: input.enabled };
+      : input.channel === "newComment"
+        ? { notifyOnNewComment: input.enabled }
+        : input.channel === "replyToMine"
+          ? { notifyOnReplyToMine: input.enabled }
+          : { notifyOnStatusChangeToMine: input.enabled };
 
   await db.update(users).set(update).where(eq(users.id, me.id));
   revalidatePath("/profile");
