@@ -5,6 +5,15 @@ type LogoProps = {
   variant?: "full" | "icon";
 };
 
+// The full LAO logo (mountain icon + "Land Advisors / Organization"
+// wordmark) lives in public/ as a single image so it renders identically
+// in the sidebar, sign-in page, and anywhere else we surface it. Native
+// aspect ratio is roughly 3.6:1; we lock the height and let width auto.
+//
+// The "icon" variant falls back to a simple layered-mountain SVG since we
+// don't currently have a square mark of the LAO logo. Used in compact
+// contexts (collapsed nav, small chips) where the full wordmark wouldn't
+// read at the available size.
 export function LandAdvisorsLogo({ className, variant = "full" }: LogoProps) {
   if (variant === "icon") {
     return (
@@ -20,17 +29,12 @@ export function LandAdvisorsLogo({ className, variant = "full" }: LogoProps) {
   }
 
   return (
-    <div className={cn("flex items-center gap-3", className)}>
-      <div className="bg-brand-ink flex h-9 w-9 items-center justify-center rounded">
-        <LayeredMountainIcon className="h-5 w-5 text-white" />
-      </div>
-      <div className="leading-tight">
-        <div className="text-base font-bold tracking-wide">Land Advisors</div>
-        <div className="text-muted-foreground text-[9px] font-semibold tracking-[0.2em] uppercase">
-          Organization
-        </div>
-      </div>
-    </div>
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src="/lao-logo.jpg"
+      alt="Land Advisors Organization"
+      className={cn("h-9 w-auto", className)}
+    />
   );
 }
 
