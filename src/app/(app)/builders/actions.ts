@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { builders, dealBuyers } from "@/db/schema";
+import { builders, contacts, dealBuyers, dealContacts, deals } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { findBuilderByName } from "@/lib/builders";
 
@@ -92,25 +92,54 @@ export async function deleteBuilder(builderId: string): Promise<void> {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
 
-  // Block deletion if the builder is on any deal — explicit choice (option A
-  // from the design discussion). Forces the user to remove from each deal
-  // first, which surfaces the impact rather than silently destroying buyer
-  // history. Contacts at this builder will orphan (FK is set null), which
-  // is fine — the human record stays even if the company affiliation goes.
-  const [onDeal] = await db
-    .select({ id: dealBuyers.id })
+  // A builder is visibly "on a deal" when at least one of its contacts is
+  // attached to that deal via deal_contacts. We block deletion in that
+  // case so the user sees the impact rather than silently destroying it.
+  //
+  // The deal_buyers row can also exist with zero attached contacts (the
+  // builder card disappears from the cards UI but the row sticks around
+  // to retain tier/lead/etc. if a contact is re-added). Those orphan
+  // rows are hidden from the user and would block deletion with no
+  // visible cause — we sweep them in the same transaction as the
+  // builder delete.
+  const buyerRows = await db
+    .select({
+      dealBuyerId: dealBuyers.id,
+      dealId: dealBuyers.dealId,
+      dealName: deals.name,
+      contactCount: sql<number>`(
+        SELECT count(*)::int FROM ${dealContacts} dc
+        INNER JOIN ${contacts} c ON c.id = dc.contact_id
+        WHERE dc.deal_id = ${dealBuyers.dealId}
+          AND c.builder_id = ${dealBuyers.builderId}
+      )`,
+    })
     .from(dealBuyers)
-    .where(and(eq(dealBuyers.builderId, builderId), eq(dealBuyers.orgId, org.id)))
-    .limit(1);
-  if (onDeal) {
+    .innerJoin(deals, eq(deals.id, dealBuyers.dealId))
+    .where(and(eq(dealBuyers.builderId, builderId), eq(dealBuyers.orgId, org.id)));
+
+  const dealsWithContacts = buyerRows.filter((r) => Number(r.contactCount) > 0);
+  if (dealsWithContacts.length > 0) {
+    const names = dealsWithContacts.map((r) => r.dealName).join(", ");
     throw new Error(
-      "Builder is on one or more deals. Remove from those deals before deleting.",
+      `Builder is on ${dealsWithContacts.length} deal${
+        dealsWithContacts.length === 1 ? "" : "s"
+      } with attached contacts: ${names}. Remove from those deals before deleting.`,
     );
   }
 
-  await db
-    .delete(builders)
-    .where(and(eq(builders.id, builderId), eq(builders.orgId, org.id)));
+  // No visible attachments. Sweep any orphan deal_buyers rows (zero
+  // contacts on that deal) before dropping the builder so the FK doesn't
+  // complain.
+  const orphanIds = buyerRows.map((r) => r.dealBuyerId);
+  await db.transaction(async (tx) => {
+    if (orphanIds.length > 0) {
+      await tx.delete(dealBuyers).where(inArray(dealBuyers.id, orphanIds));
+    }
+    await tx
+      .delete(builders)
+      .where(and(eq(builders.id, builderId), eq(builders.orgId, org.id)));
+  });
 
   revalidateBuilderSurfaces();
 }
