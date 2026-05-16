@@ -14,3 +14,4 @@ export * from "./documents";
 export * from "./audit-log";
 export * from "./feedback";
 export * from "./auth";
+export * from "./user-deal-orders";

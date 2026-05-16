@@ -1,11 +1,17 @@
 import Link from "next/link";
-import { Building2, Contact, MessageSquare, Users } from "lucide-react";
+import { Building2, ChevronDown, ChevronUp, Contact, MessageSquare, Users } from "lucide-react";
 
 import { db } from "@/db";
-import { deals, checklistItems, checklistCategories } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import {
+  deals,
+  checklistItems,
+  checklistCategories,
+  userDealOrders,
+} from "@/db/schema";
+import { and, eq, sql } from "drizzle-orm";
 import { LandAdvisorsLogo } from "@/components/brand/logo";
 import { NewDealButton } from "@/components/layout/new-deal-button";
+import { moveDealDown, moveDealUp } from "@/components/layout/reorder-actions";
 import { SidebarNavLink } from "@/components/layout/sidebar-nav-link";
 import { UserLink } from "@/components/layout/user-link";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
@@ -33,28 +39,43 @@ export async function Sidebar({ activeDealId }: SidebarProps) {
 
   // Per-deal aggregates: total/done plus per-phase incomplete counts so we
   // can derive the "current phase" (lowest phase with any unchecked item).
-  const dealRows = org
-    ? await db
-        .select({
-          id: deals.id,
-          name: deals.name,
-          city: deals.city,
-          state: deals.state,
-          priority: deals.priority,
-          totalItems: sql<number>`count(${checklistItems.id})::int`,
-          doneItems: sql<number>`count(${checklistItems.id}) filter (where ${checklistItems.completed} = true)::int`,
-          phase1Remaining: sql<number>`count(${checklistItems.id}) filter (where ${checklistCategories.phase} = 'phase_1' and ${checklistItems.completed} = false and ${checklistItems.optional} = false)::int`,
-          phase2Remaining: sql<number>`count(${checklistItems.id}) filter (where ${checklistCategories.phase} = 'phase_2' and ${checklistItems.completed} = false and ${checklistItems.optional} = false)::int`,
-          phase3Remaining: sql<number>`count(${checklistItems.id}) filter (where ${checklistCategories.phase} = 'phase_3' and ${checklistItems.completed} = false and ${checklistItems.optional} = false)::int`,
-          phase4Remaining: sql<number>`count(${checklistItems.id}) filter (where ${checklistCategories.phase} = 'phase_4' and ${checklistItems.completed} = false and ${checklistItems.optional} = false)::int`,
-        })
-        .from(deals)
-        .leftJoin(checklistCategories, eq(checklistCategories.dealId, deals.id))
-        .leftJoin(checklistItems, eq(checklistItems.categoryId, checklistCategories.id))
-        .where(eq(deals.orgId, org.id))
-        .groupBy(deals.id)
-        .orderBy(deals.name)
-    : [];
+  // LEFT JOIN to user_deal_orders pulls each deal's user-specific sort
+  // position; unordered deals fall to the bottom alphabetically via the
+  // big-int fallback in COALESCE.
+  const dealRows =
+    org && me
+      ? await db
+          .select({
+            id: deals.id,
+            name: deals.name,
+            city: deals.city,
+            state: deals.state,
+            priority: deals.priority,
+            sortOrder:
+              sql<number>`coalesce(${userDealOrders.sortOrder}, 2147483647)`.as(
+                "sort_order_effective",
+              ),
+            totalItems: sql<number>`count(${checklistItems.id})::int`,
+            doneItems: sql<number>`count(${checklistItems.id}) filter (where ${checklistItems.completed} = true)::int`,
+            phase1Remaining: sql<number>`count(${checklistItems.id}) filter (where ${checklistCategories.phase} = 'phase_1' and ${checklistItems.completed} = false and ${checklistItems.optional} = false)::int`,
+            phase2Remaining: sql<number>`count(${checklistItems.id}) filter (where ${checklistCategories.phase} = 'phase_2' and ${checklistItems.completed} = false and ${checklistItems.optional} = false)::int`,
+            phase3Remaining: sql<number>`count(${checklistItems.id}) filter (where ${checklistCategories.phase} = 'phase_3' and ${checklistItems.completed} = false and ${checklistItems.optional} = false)::int`,
+            phase4Remaining: sql<number>`count(${checklistItems.id}) filter (where ${checklistCategories.phase} = 'phase_4' and ${checklistItems.completed} = false and ${checklistItems.optional} = false)::int`,
+          })
+          .from(deals)
+          .leftJoin(checklistCategories, eq(checklistCategories.dealId, deals.id))
+          .leftJoin(checklistItems, eq(checklistItems.categoryId, checklistCategories.id))
+          .leftJoin(
+            userDealOrders,
+            and(
+              eq(userDealOrders.dealId, deals.id),
+              eq(userDealOrders.userId, me.id),
+            ),
+          )
+          .where(eq(deals.orgId, org.id))
+          .groupBy(deals.id, userDealOrders.sortOrder)
+          .orderBy(sql`sort_order_effective`, deals.name)
+      : [];
 
   function inferPhase(d: (typeof dealRows)[number]): Phase | "complete" {
     if (Number(d.phase1Remaining) > 0) return "phase_1";
@@ -81,54 +102,87 @@ export async function Sidebar({ activeDealId }: SidebarProps) {
             No deals yet. Run <code>npm run db:seed</code> to add sample data.
           </div>
         ) : (
-          dealRows.map((deal) => {
+          dealRows.map((deal, idx) => {
             const isActive = deal.id === activeDealId;
             const total = Number(deal.totalItems ?? 0);
             const done = Number(deal.doneItems ?? 0);
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
             const phaseChip = total > 0 ? PHASE_CHIP[inferPhase(deal)] : null;
+            const canMoveUp = idx > 0;
+            const canMoveDown = idx < dealRows.length - 1;
+            // Bound server actions to this deal's id; the rendered <form>
+            // posts with no body and the action receives the bound arg.
+            const moveUpBound = moveDealUp.bind(null, deal.id);
+            const moveDownBound = moveDealDown.bind(null, deal.id);
             return (
-              <Link
+              <div
                 key={deal.id}
-                href={`/deals/${deal.id}`}
                 className={cn(
-                  "mb-1 block rounded-lg border border-transparent px-3.5 py-3 transition-colors",
+                  "group relative mb-1 rounded-lg border border-transparent transition-colors",
                   isActive ? "border-brand-blue bg-blue-50" : "hover:bg-gray-100",
                 )}
               >
-                <div className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-gray-900">
-                  {deal.priority === "high" && (
-                    <span className="text-brand-accent text-xs">★</span>
-                  )}
-                  <span className="truncate">{deal.name}</span>
-                  {phaseChip && (
-                    <span
-                      className={cn(
-                        "ml-auto flex-shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase",
-                        phaseChip.cls,
-                      )}
-                    >
-                      {phaseChip.label}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-gray-400">
-                  <span className="truncate">
-                    {[deal.city, deal.state].filter(Boolean).join(", ") || "—"}
-                  </span>
-                  <span className="ml-auto flex items-center gap-1.5">
-                    <span className="h-1 w-12 overflow-hidden rounded-full bg-gray-200">
+                <Link href={`/deals/${deal.id}`} className="block px-3.5 py-3">
+                  <div className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-gray-900">
+                    {deal.priority === "high" && (
+                      <span className="text-brand-accent text-xs">★</span>
+                    )}
+                    <span className="truncate">{deal.name}</span>
+                    {phaseChip && (
                       <span
-                        className="bg-brand-blue block h-full"
-                        style={{ width: `${pct}%` }}
-                      />
+                        className={cn(
+                          "ml-auto flex-shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase",
+                          phaseChip.cls,
+                        )}
+                      >
+                        {phaseChip.label}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                    <span className="truncate">
+                      {[deal.city, deal.state].filter(Boolean).join(", ") || "—"}
                     </span>
-                    <span className="font-medium tabular-nums">
-                      {done}/{total}
+                    <span className="ml-auto flex items-center gap-1.5">
+                      <span className="h-1 w-12 overflow-hidden rounded-full bg-gray-200">
+                        <span
+                          className="bg-brand-blue block h-full"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </span>
+                      <span className="font-medium tabular-nums">
+                        {done}/{total}
+                      </span>
                     </span>
-                  </span>
+                  </div>
+                </Link>
+                {/* Reorder controls: only visible on hover so they don't
+                    compete with the deal info at rest. Sit absolutely
+                    over the right edge; small gap from the phase chip
+                    above. */}
+                <div className="pointer-events-none absolute top-1 right-1 hidden flex-col gap-0.5 group-hover:flex">
+                  <form action={moveUpBound}>
+                    <button
+                      type="submit"
+                      disabled={!canMoveUp}
+                      aria-label={`Move ${deal.name} up`}
+                      className="pointer-events-auto flex h-4 w-4 items-center justify-center rounded bg-white/90 text-gray-500 shadow-sm hover:text-gray-900 disabled:opacity-30 disabled:hover:text-gray-500"
+                    >
+                      <ChevronUp className="h-3 w-3" />
+                    </button>
+                  </form>
+                  <form action={moveDownBound}>
+                    <button
+                      type="submit"
+                      disabled={!canMoveDown}
+                      aria-label={`Move ${deal.name} down`}
+                      className="pointer-events-auto flex h-4 w-4 items-center justify-center rounded bg-white/90 text-gray-500 shadow-sm hover:text-gray-900 disabled:opacity-30 disabled:hover:text-gray-500"
+                    >
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </form>
                 </div>
-              </Link>
+              </div>
             );
           })
         )}
