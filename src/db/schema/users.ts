@@ -33,15 +33,15 @@ export const users = pgTable("users", {
   // notifyOnNewComment: pinged on new comments on threads I've previously
   //   participated in (commented on). Off by default (opt-in).
   // notifyOnReplyToMine: pinged on replies to feedback I created.
-  //   On by default — common case for the submitter.
+  //   Off by default — opt in from /profile.
   // notifyOnStatusChangeToMine: pinged on status changes to feedback I
-  //   created. On by default — common case for the submitter.
+  //   created. Off by default — opt in from /profile.
   notifyOnNewFeedback: boolean("notify_on_new_feedback").notNull().default(false),
   notifyOnNewComment: boolean("notify_on_new_comment").notNull().default(false),
-  notifyOnReplyToMine: boolean("notify_on_reply_to_mine").notNull().default(true),
+  notifyOnReplyToMine: boolean("notify_on_reply_to_mine").notNull().default(false),
   notifyOnStatusChangeToMine: boolean("notify_on_status_change_to_mine")
     .notNull()
-    .default(true),
+    .default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
