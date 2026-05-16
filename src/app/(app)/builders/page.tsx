@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { builders, contacts, dealBuyers, deals } from "@/db/schema";
+import { builders, contacts, dealBuyers, dealContacts, deals } from "@/db/schema";
 import { Sidebar } from "@/components/layout/sidebar";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
@@ -49,6 +49,11 @@ export default async function BuildersPage() {
     .where(eq(contacts.orgId, org.id))
     .orderBy(asc(contacts.lastName), asc(contacts.firstName));
 
+  // Only count a builder as "on a deal" when it has at least one contact
+  // attached on that deal. The EXISTS filter mirrors the orphan-filter
+  // pattern used by the Marketing Report PDF — a dealBuyers row without
+  // attached contacts is invisible bookkeeping (tier/lead retention) and
+  // shouldn't surface in the directory's "on N deals" count.
   const dealRows = await db
     .select({
       builderId: dealBuyers.builderId,
@@ -57,7 +62,18 @@ export default async function BuildersPage() {
     })
     .from(dealBuyers)
     .innerJoin(deals, eq(deals.id, dealBuyers.dealId))
-    .where(eq(dealBuyers.orgId, org.id))
+    .where(
+      and(
+        eq(dealBuyers.orgId, org.id),
+        sql`EXISTS (
+          SELECT 1
+          FROM ${dealContacts} dc
+          INNER JOIN ${contacts} c ON c.id = dc.contact_id
+          WHERE dc.deal_id = ${dealBuyers.dealId}
+            AND c.builder_id = ${dealBuyers.builderId}
+        )`,
+      ),
+    )
     .orderBy(asc(deals.name));
 
   const contactsByBuilder = new Map<
