@@ -112,7 +112,14 @@ function isOpen(status: FeedbackStatus): boolean {
   return status === "new" || status === "reviewed" || status === "actioned";
 }
 
-type SortColumn = "created" | "activity" | "severity" | "section" | "status";
+type SortColumn =
+  | "created"
+  | "activity"
+  | "severity"
+  | "section"
+  | "status"
+  | "creator"
+  | "updater";
 type SortDirection = "asc" | "desc";
 
 // Most recent activity on a feedback item: latest comment (created or edited),
@@ -216,6 +223,18 @@ export function FeedbackList({ items, currentUserId }: FeedbackListProps) {
           return a.section.localeCompare(b.section);
         case "status":
           return STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+        case "creator":
+          return (a.creatorName ?? a.userEmail ?? "").localeCompare(
+            b.creatorName ?? b.userEmail ?? "",
+          );
+        case "updater":
+          // Untouched items sort below touched ones; within each group, by name.
+          if (a.hasBeenUpdated !== b.hasBeenUpdated) {
+            return a.hasBeenUpdated ? -1 : 1;
+          }
+          return (a.lastUpdatedByName ?? a.lastUpdatedByEmail ?? "").localeCompare(
+            b.lastUpdatedByName ?? b.lastUpdatedByEmail ?? "",
+          );
       }
     });
     if (sortDir === "desc") sorted.reverse();
@@ -301,6 +320,14 @@ export function FeedbackList({ items, currentUserId }: FeedbackListProps) {
                   Submitted
                 </SortHeader>
                 <SortHeader
+                  column="creator"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                >
+                  Created by
+                </SortHeader>
+                <SortHeader
                   column="activity"
                   sortBy={sortBy}
                   sortDir={sortDir}
@@ -308,6 +335,14 @@ export function FeedbackList({ items, currentUserId }: FeedbackListProps) {
                   className="text-right"
                 >
                   Last activity
+                </SortHeader>
+                <SortHeader
+                  column="updater"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                >
+                  Updated by
                 </SortHeader>
               </tr>
             </thead>
@@ -452,6 +487,11 @@ function FeedbackRowView({ item, expanded, onToggle, currentUserId }: FeedbackRo
         <td className="px-4 py-2.5 text-right text-xs whitespace-nowrap text-gray-500">
           <span title={new Date(item.createdAt).toLocaleString()}>{relTime(item.createdAt)}</span>
         </td>
+        <td className="px-4 py-2.5 text-xs whitespace-nowrap text-gray-600">
+          <span title={item.userEmail ?? undefined}>
+            {item.creatorName ?? item.userEmail ?? "—"}
+          </span>
+        </td>
         <td className="px-4 py-2.5 text-right text-xs whitespace-nowrap text-gray-500">
           {(() => {
             const activity = lastActivityAt(item);
@@ -460,11 +500,22 @@ function FeedbackRowView({ item, expanded, onToggle, currentUserId }: FeedbackRo
             );
           })()}
         </td>
+        <td className="px-4 py-2.5 text-xs whitespace-nowrap text-gray-600">
+          {item.hasBeenUpdated ? (
+            <span
+              title={`${item.lastUpdatedByEmail ?? ""} • ${new Date(item.updatedAt).toLocaleString()}`}
+            >
+              {item.lastUpdatedByName ?? item.lastUpdatedByEmail ?? "(removed)"}
+            </span>
+          ) : (
+            <span className="text-gray-300">—</span>
+          )}
+        </td>
       </tr>
 
       {expanded && (
         <tr className="border-b border-gray-100 bg-gray-50/50">
-          <td colSpan={7} className="px-4 py-4 pl-12">
+          <td colSpan={9} className="px-4 py-4 pl-12">
             <div className="space-y-4">
               {/* Metadata */}
               <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-gray-500">
