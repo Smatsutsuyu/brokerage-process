@@ -87,8 +87,8 @@ export async function Sidebar({ activeDealId }: SidebarProps) {
 
   return (
     <aside className="flex h-full min-h-0 w-[260px] flex-shrink-0 flex-col border-r border-gray-200 bg-white">
-      <div className="border-b border-gray-200 p-5">
-        <LandAdvisorsLogo />
+      <div className="border-b border-gray-200 p-4">
+        <LandAdvisorsLogo className="h-auto w-full" />
       </div>
 
       <div className="border-b border-gray-200 p-5">
