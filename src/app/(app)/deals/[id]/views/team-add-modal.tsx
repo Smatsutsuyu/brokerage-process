@@ -410,7 +410,11 @@ function StagingRowCard({ row, team, onUpdate, onRemove }: StagingRowCardProps) 
         </span>
       ) : (
         <Select
-          value={row.roleLabel ?? undefined}
+          // Pass `null` (Base UI's "no selection" sentinel) instead of
+          // `undefined` so the Select is controlled from the first
+          // render. Switching from undefined to a string later triggers
+          // Base UI's "uncontrolled to controlled" warning.
+          value={row.roleLabel ?? null}
           onValueChange={(v) => v && onUpdate({ roleLabel: v })}
         >
           <SelectTrigger
