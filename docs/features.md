@@ -1,6 +1,6 @@
 # Features
 
-The Land Advisors Portal is a multi-user deal management platform for Lakebridge Capital and Land Advisors brokers. It tracks each land brokerage deal through a four-phase lifecycle, manages the buyer contacts on each deal, generates Land-Advisors-branded PDFs (Marketing Report, Q&A File, Issues Report), and sends templated email blasts through Resend.
+The Land Advisors Portal is a multi-user deal management platform for Lakebridge Capital and Land Advisors brokers. It tracks each land brokerage deal through a four-phase lifecycle, manages the buyer contacts on each deal, generates Land-Advisors-branded PDFs (Marketing Report, Q&A File, Due Diligence Tracking), and sends templated email blasts through Resend.
 
 What this app does not do: no in-app notifications (alerts go to your email inbox), no Outlook or calendar integration, no AI drafting, parsing, or summarizing. Document generation is templated and deterministic. AI features are deferred to a future engagement.
 
@@ -80,11 +80,11 @@ Once items are approved, Generate PDF renders them into a Land-Advisors-branded 
 
 ### Issues
 
-A living issues tracker for due diligence. Add an issue with a title, description, priority (low / medium / high / urgent), assignee, status (open / in-progress / resolved), and identified/resolved dates. The tab badge shows the open count. Click Generate PDF to download an Issues Report for your DD calls.
+A living issues tracker for due diligence. Add an issue with a title, description, priority (low / medium / high / urgent), assignee, status (open / in-progress / resolved), and identified/resolved dates. The tab badge shows the open count. Click Generate PDF to open the Due Diligence Tracking report (combined milestone dates + issues + deal team + consultants) for your DD calls.
 
 ### Consultants
 
-Per-deal consultant roster covering 11 roles (Landscape Architect, Civil Engineer, Soils Engineer, Cost to Complete, HOA, Dry Utility, Phase 1, Land Use, Biologist, Architect, PSA Attorney). Each role can hold multiple firms split by buyer or seller side, with one or more contacts per firm. Informative metadata for the deal team; does not drive automation by itself.
+Per-deal consultant roster covering 13 roles (Landscape Architect, Civil Engineer, Soils Engineer, Cost to Complete, HOA, Dry Utility, Phase 1, Land Use, Biologist, Architect, PSA Attorney, Title Consultant, Escrow Consultant). Each role can hold multiple firms split by buyer or seller side, with one or more contacts per firm. Informative metadata for the deal team; does not drive automation by itself.
 
 ### Teams
 
@@ -104,7 +104,7 @@ Three Land-Advisors-branded PDFs are built into the app. All three open in a new
 
 - Marketing Report. Builder list grouped by tier with per-builder comments. Generated from the Contacts tab toolbar or the Marketing Report row on the Phase 1 checklist. This is what you send to ownership for status updates.
 - Q&A File. Approved Q&A items rendered as a clean branded document. Generated from the Q&A tab or the Phase 2 "Q&A File" checklist row.
-- Issues Report (DD Tracking). Current issues from the Issues tab as a PDF for DD calls.
+- Due Diligence Tracking. Combined PDF for the bi-weekly DD call: the 7 milestone dates from the Phase 4 checklist, current issues grouped by status (no summary stats), the full Deal Team (Owner / Broker / Buyer subteams), and the consultant roster. Generated from the Issues tab toolbar or the Phase 4 "Complete Due Diligence" row.
 
 The fonts and logo are baked in so the output matches Land Advisors brand standards without any setup.
 
@@ -114,9 +114,12 @@ The fonts and logo are baked in so the output matches Land Advisors brand standa
 
 Launch a blast from two places: the toolbar on the Contacts tab, or the relevant Phase 2 checklist row (Send out OM Blast, Q&A File, Confidentiality Agreement, Share Market Study, 1-week notice, Day-of Reminder, Follow up Missing Offers).
 
-A modal opens with a recipient preview. Filter by tier (Green / Yellow / Red) and by lead user. For the OM blast, pick which file from the Offering Memorandum checklist item to attach. The preview lists every recipient with their builder and tier; anyone toggled off via the bell icon is already excluded. Per-builder CC selections persist across blasts.
+A two-step modal opens (both steps share one window — clicking Next swaps the body in place rather than stacking a second modal):
 
-Review the subject, body, and attachment, then send. Emails go from a Lakebridge-verified sender domain configured in Resend, so recipients see them from your normal LAO address.
+- **Step 1, Recipients.** Filter by tier (Green / Yellow / Red) and by lead user. The recipient preview groups contacts under their builder and gives each emailable contact a checkbox (defaulted to checked). Uncheck any contact you want to skip, or use the builder-level select-all / none. Anyone toggled off via the Contacts-tab bell icon is already excluded; contacts without an email show but can't be selected. The "Next" button counts only checked emails.
+- **Step 2, Preview & send.** Review and edit the subject and body once and the change applies to every per-builder email. Pick which attachments to include (for OM blasts, the OM file pre-selected from the Phase 1 row). Per-builder CC selections persist across blasts. Click "Back" to return to Step 1 with all filter and checkbox state intact. Click Send to deliver.
+
+Emails go from a Lakebridge-verified sender domain configured in Resend, so recipients see them from your normal LAO address.
 
 There is no in-app inbox or reply tracking. Recipients reply directly to your verified address; you read replies in Outlook as usual.
 

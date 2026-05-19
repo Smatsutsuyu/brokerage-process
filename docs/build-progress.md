@@ -102,6 +102,14 @@ Major reconciliation pass against Chris's `Marketing Process Checklist.xlsx` v2 
 - Member-remove flow: hard delete with cascade, last-owner guardrail, fix for inviting a member signing the owner out (`12685c5`).
 - Auto-clean orphan `deal_buyers` rows on builder delete (`1434e4d`, `85e7747`).
 
+## DD Tracking + brand sweep + blast UX (2026-05-18)
+
+- **Due Diligence Tracking PDF** (`8c6a0bb`) replaces the standalone Issues Report. Single combined report covering the 7 Phase 4 milestone dates, issues grouped by status (no summary stats — Chris's feedback), the Deal Team (Owner / Broker / Buyer), and the consultant roster. New route `/api/deals/[id]/dd-tracking.pdf` and a fresh `DD_TRACKING_TEMPLATE` email body. Phase 4 row renamed "Issues Tracking Sheet & Send Out before calls" → "Complete Due Diligence" via `apply-renames`. Old issues-report route + lib doc + view components deleted; loose-match in `phase-section` keeps both names recognized while deals migrate.
+- **Brand sweep, Lakebridge Capital → Land Advisors Portal** (`f1b84de`). Tab titles, sign-in subtitle, root meta description, outbound-email footer, invite-member modal, and Team-list "Org user" tooltip all rebranded. Internal admin notification subjects and code comments left alone.
+- **Two new consultant roles, Title and Escrow** (`5707562`, migration `0028`). Append to `consultant_role` enum, label map updated, TypeScript union extended. 11 roles → 13.
+- **Email blast modal, single-window flow + per-recipient checkboxes** (`c2aa495`). Extracted `EmailPreviewBody` from `EmailPreviewModal` so it can be embedded inside another Dialog. `BlastModal` now switches `step` state between filter and preview in one Dialog (no stacked modals); recipient list in Step 1 has per-contact checkboxes (default checked) plus a builder-level select-all with indeterminate state; Step 2 footer shows Back with an arrow instead of Cancel. Standalone `EmailPreviewModal` wrapper preserved for `DealTeamSendButton`.
+- **Team-add Select controlled-from-first-render fix** (`75b0a8d`). Use `null` instead of `undefined` to keep Base UI's Select controlled and quiet its warning.
+
 ## Architecture decisions made along the way
 
 - **Auth: Clerk to Better Auth** (2026-05-01). Self-hosted on our Postgres, reduces vendor count.

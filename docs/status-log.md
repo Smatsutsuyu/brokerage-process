@@ -4,6 +4,45 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-18 — DD Tracking PDF, brand sweep, blast UX, new consultant roles
+
+Five logical commits, all live on `main` and auto-deploying through Vercel. DB backup branch taken on Neon ahead of the push as a safety precaution since today included an enum migration plus an `apply-renames` rename.
+
+### Done — Due Diligence Tracking PDF replaces Issues Report (`8c6a0bb`)
+- Chris's feedback: combine four things into one report sent before each bi-weekly DD call — the 7 milestone dates, issues, deal team, consultants. Drop the open/in-progress/resolved summary stats. Relabel the row from "Issues Tracking Sheet & Send Out before calls" to "Complete Due Diligence".
+- New `src/lib/pdf/dd-tracking.tsx` + `src/app/api/deals/[id]/dd-tracking.pdf/route.ts`. Pulls the milestone dates from the Phase 4 checklist items flagged `dateField: true`, joins through `checklist_categories` to scope per deal. Land Advisors branding, inline disposition. The 7 dates are hardcoded as a canonical ordered list in the route so a missing row still renders as "not scheduled".
+- `apply-renames` entry carries the row rename across existing deals on next `vercel-build`. `phase-section`'s loose-match recognizes both new and legacy names so deals mid-rename still wire the action buttons.
+- Renamed view components: `issues-report-pdf-button` → `dd-tracking-pdf-button`, `issues-row-actions` → `dd-tracking-row-actions`. Email template `ISSUES_REPORT_TEMPLATE` → `DD_TRACKING_TEMPLATE` with updated copy.
+
+### Done — Lakebridge → Land Advisors brand sweep (`f1b84de`)
+- Chris noticed Outlook showed "Lakebridge Capital" as the tab name. Renamed everywhere user-facing: root tab title, sign-in subtitle, six sub-page tab titles, root meta description, outbound client-email footer, invite-member modal copy, and the Team-list "Org user" tooltip. Internal admin notification subjects ("[Lakebridge feedback]") and code comments left alone since they're not client-facing.
+
+### Done — Two new consultant roles, Title and Escrow (`5707562`, migration `0028`)
+- Append `title` and `escrow` to the `consultant_role` Postgres enum. Display labels: "Title Consultant", "Escrow Consultant". TypeScript `ConsultantRole` union extended (manually maintained; flagged as a future refactor opportunity to derive from the schema).
+- Migration uses `ALTER TYPE ADD VALUE` on separate statements as Postgres requires. Runs on next `vercel-build`.
+
+### Done — Email blast modal: single-window flow + per-recipient checkboxes (`c2aa495`)
+- Chris's feedback: (1) make recipients individually selectable so the tier + lead filter isn't the only knob, and (2) don't stack modals when going from filter → preview.
+- Extracted `EmailPreviewBody` from `EmailPreviewModal` so the preview content can be embedded inside another Dialog. The standalone modal wrapper stays for `DealTeamSendButton`'s single-step case (no regression there).
+- `BlastModal` now switches an internal `step` state between filter and preview inside the same Dialog. Step 1's recipient list has a checkbox per emailable contact (defaulted checked), plus a builder-level select-all with an indeterminate state when partially selected. Step 2's footer shows a Back button (with arrow) that returns to Step 1 with filter + checkbox state intact. Send still closes the dialog.
+
+### Done — Team-add Select stays controlled from first render (`75b0a8d`)
+- Small fix: pass `null` instead of `undefined` to Base UI's Select for the unset-role case. `undefined` makes the Select uncontrolled, so transitioning to a string value later triggers the controlled/uncontrolled warning.
+
+### Decisions
+- **Migrate the row rather than retire it.** Renaming the Phase 4 row in-place via `apply-renames` is cleaner than introducing a parallel "Due Diligence Tracking" row and asking Chris to migrate. The Excel functionality (PDF + Send to Deal Team) stays on the same lifecycle position; only the label and the underlying PDF change.
+- **Append enum values rather than reorder.** Postgres allows ADD VALUE BEFORE/AFTER but Drizzle's migrator emits plain appends. Order in the consultant picker is driven by `consultant-roles.ts` (display order), not enum declaration, so the appended `title`/`escrow` slot at the bottom of the picker — fine since they're closing-stage roles.
+- **Keep both Cancel and Back semantics distinct.** Cancel discards the whole flow and closes the dialog; Back returns to the previous step preserving state. Step 2 only ever shows Back since you're already past the dismiss-able stage.
+
+### Trade-offs noted for follow-up
+- Step 2 subject/body edits get lost on Back since `EmailPreviewBody` unmounts when stepping back. Same as the prior stacked-modal Cancel behavior, so not a regression — but if it bites in practice, the fix is hoisting subject/body state up into `BlastModal` and passing them down as controlled props.
+- The `ConsultantRole` TypeScript union is manually maintained alongside the Drizzle enum. Deriving the type from the schema would be a small follow-up that prevents future drift.
+
+### Deferred / Pending
+- Real Resend send is still mocked end-to-end pending sender-domain DNS verification (carryover from earlier weeks). No change to the blast or Deal Team send transports today.
+
+---
+
 ## 2026-05-07 (afternoon) — Excel-import hardening + checklist notes hidden by default
 
 Two unrelated polish items in the same session.
