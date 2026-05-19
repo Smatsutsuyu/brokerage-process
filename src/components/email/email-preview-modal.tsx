@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import {
+  ArrowLeft,
   Building2,
   ChevronLeft,
   ChevronRight,
@@ -93,9 +94,8 @@ export type EmailAttachment =
     }
   | { id: string; kind: "link"; url: string; label: string | null };
 
-type EmailPreviewModalProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+// Shared props between the standalone modal and the embeddable body.
+type EmailPreviewBaseProps = {
   // What we're previewing — surfaces in the modal title.
   // e.g. "OM blast", "Q&A distribution", "Day-of reminder".
   title: string;
@@ -137,6 +137,29 @@ type EmailPreviewModalProps = {
   // For now every caller passes a no-op + toast since email infra isn't
   // wired up; the signature is here so we don't have to refactor when it is.
   onSend?: (emails: ResolvedEmail[]) => Promise<void> | void;
+};
+
+// The embeddable body component's props. Adds an explicit close callback
+// (caller decides what "close" means: dismiss the standalone modal, or
+// reset the parent flow) and an optional back callback for the
+// step-flow case in BlastModal where step 2 wants a Back button instead
+// of Cancel.
+type EmailPreviewBodyProps = EmailPreviewBaseProps & {
+  // Called when the user clicks Cancel (when no onBack is provided) or
+  // when a Send completes successfully. The caller decides what to do
+  // with the dialog state.
+  onClose: () => void;
+  // When provided, the footer shows a "Back" button in place of
+  // "Cancel". Used by BlastModal to step back to the filter view.
+  onBack?: () => void;
+};
+
+// Wrapper modal: same props as the body, plus open/onOpenChange for a
+// standalone dialog. Existing callers (DealTeamSendButton) keep working
+// unchanged.
+type EmailPreviewModalProps = EmailPreviewBaseProps & {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 };
 
 // Per-builder resolved email — the unit that would actually be sent.
@@ -184,9 +207,11 @@ function groupByBuilder(recipients: EmailRecipient[]) {
   return Array.from(map.values());
 }
 
-export function EmailPreviewModal({
-  open,
-  onOpenChange,
+// Inner content (header + body + footer) without the Dialog wrapper.
+// Use this when you want to embed the preview inside another Dialog (see
+// BlastModal's step 2). For a standalone preview dialog, use
+// `EmailPreviewModal` instead — it wraps this in Dialog/DialogContent.
+export function EmailPreviewBody({
   title,
   recipients,
   template,
@@ -199,7 +224,9 @@ export function EmailPreviewModal({
   ccInitial,
   onCcChange,
   onSend,
-}: EmailPreviewModalProps) {
+  onClose,
+  onBack,
+}: EmailPreviewBodyProps) {
   const groups = useMemo(() => groupByBuilder(recipients), [recipients]);
   const choices = attachmentChoices ?? [];
   const senders = senderOptions ?? [];
@@ -250,28 +277,28 @@ export function EmailPreviewModal({
   );
 
   // Reset to the resolved template + default attachment selection + default
-  // sender + initial CC selection every time the modal opens. Without
-  // this, reopening shows stale edits from the previous session.
+  // sender + initial CC selection on mount and whenever the relevant
+  // inputs change. The body unmounts/remounts each time it's shown
+  // (Dialog open transitions for the standalone case; conditional render
+  // in BlastModal's step flow) so this naturally resets each session.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (!open) return;
     setActiveIdx(0);
     setSelectedAttachmentIds(new Set(defaultSelectedAttachmentIds ?? []));
     setSelectedSenderId(defaultSenderId ?? senders[0]?.id ?? null);
     const m = new Map<string, Set<string>>();
     for (const e of ccInitial ?? []) m.set(e.builderId, new Set(e.userIds));
     setCcByBuilder(m);
-  }, [open, defaultSelectedAttachmentIds, defaultSenderId, senders, ccInitial]);
+  }, [defaultSelectedAttachmentIds, defaultSenderId, senders, ccInitial]);
 
-  // Re-interpolate subject/body whenever the modal opens OR the user
-  // swaps senders (so the signature line stays in sync). Tradeoff: any
-  // body edits the user made get overwritten when they switch senders.
-  // Acceptable since users typically pick the sender BEFORE editing.
+  // Re-interpolate subject/body whenever the user swaps senders (so the
+  // signature line stays in sync). Tradeoff: any body edits the user
+  // made get overwritten when they switch senders. Acceptable since
+  // users typically pick the sender BEFORE editing.
   useEffect(() => {
-    if (!open) return;
     setSubject(interpolate(template.subject, effectiveVars));
     setBody(interpolate(template.body, effectiveVars));
-  }, [open, template.subject, template.body, effectiveVars]);
+  }, [template.subject, template.body, effectiveVars]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   function toggleAttachment(id: string) {
@@ -349,23 +376,22 @@ export function EmailPreviewModal({
           duration: 5000,
         });
       }
-      onOpenChange(false);
+      onClose();
     } finally {
       setSending(false);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Preview &amp; send · {title}</DialogTitle>
-          <DialogDescription>
-            One email per builder. Edit the subject or body once and the change
-            applies to every email. Use the arrows to step through recipients
-            and verify the To: line.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <DialogHeader>
+        <DialogTitle>Preview &amp; send · {title}</DialogTitle>
+        <DialogDescription>
+          One email per builder. Edit the subject or body once and the change
+          applies to every email. Use the arrows to step through recipients
+          and verify the To: line.
+        </DialogDescription>
+      </DialogHeader>
 
         {total === 0 ? (
           <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center">
@@ -640,22 +666,44 @@ export function EmailPreviewModal({
           </div>
         )}
 
-        <DialogFooter>
-          <div className="mr-auto text-[10px] text-gray-500">
-            Preview only — sending isn&rsquo;t wired up yet (Resend domain pending).
-          </div>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+      <DialogFooter>
+        <div className="mr-auto text-[10px] text-gray-500">
+          Preview only — sending isn&rsquo;t wired up yet (Resend domain pending).
+        </div>
+        {onBack ? (
+          <Button type="button" variant="outline" onClick={onBack}>
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back
+          </Button>
+        ) : (
+          <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="button" disabled={total === 0 || sending} onClick={handleSend}>
-            {sending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Send className="h-3.5 w-3.5" />
-            )}
-            Send {total > 0 && `${total} ${total === 1 ? "email" : "emails"}`}
-          </Button>
-        </DialogFooter>
+        )}
+        <Button type="button" disabled={total === 0 || sending} onClick={handleSend}>
+          {sending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Send className="h-3.5 w-3.5" />
+          )}
+          Send {total > 0 && `${total} ${total === 1 ? "email" : "emails"}`}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+// Standalone modal wrapper. Used by DealTeamSendButton — the case where
+// the preview is the entire flow (no filter step beforehand).
+export function EmailPreviewModal({
+  open,
+  onOpenChange,
+  ...rest
+}: EmailPreviewModalProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <EmailPreviewBody {...rest} onClose={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );
