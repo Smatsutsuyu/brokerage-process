@@ -12,7 +12,7 @@ import { deleteIssue, type IssuePriority, type IssueStatus } from "../actions";
 
 import { AddIssueModal, type EditingIssue } from "./add-issue-modal";
 import { IssueStatusBadge } from "./issue-status-badge";
-import { IssuesReportPdfButton } from "./issues-report-pdf-button";
+import { DdTrackingPdfButton } from "./dd-tracking-pdf-button";
 
 export type IssueRow = {
   id: string;
@@ -104,7 +104,7 @@ export function IssuesList({ dealId, items, users }: IssuesListProps) {
           </span>
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
-          <IssuesReportPdfButton dealId={dealId} />
+          <DdTrackingPdfButton dealId={dealId} />
           <PlannedAction
             label="Export to Excel"
             icon={FileText}

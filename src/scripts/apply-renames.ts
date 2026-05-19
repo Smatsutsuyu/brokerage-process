@@ -193,6 +193,15 @@ const RENAMES: RenameSpec[] = [
     oldName: "Issues Tracking Sheet (living document)",
     newName: "Issues Tracking Sheet & Send Out before calls",
   },
+  // 2026-05-18: relabel the row to match the new combined Due Diligence
+  // Tracking PDF (key dates + issues + deal team + consultants). The
+  // row's Send-to-Deal-Team button now sends that combined report.
+  {
+    type: "item",
+    phase: "phase_4",
+    oldName: "Issues Tracking Sheet & Send Out before calls",
+    newName: "Complete Due Diligence",
+  },
   {
     type: "item",
     phase: "phase_4",
@@ -327,6 +336,38 @@ const RENAMES: RenameSpec[] = [
     name: "Coordinate a Q&A File",
     reason:
       "Excel has just 'Q&A File' as one step. Coordinate + Send Out are now one item with both actions on it.",
+  },
+
+  // 2026-05-18 — Phase 4 milestone-date items revised per Chris's
+  // feedback. The bottom block of "Due Diligence Tracking" moves from
+  // 5 items to 7, with semantic adjustments to match the deal lifecycle
+  // (LOI / PSA / CTC drafts / IC approval / feasibility waive / close).
+  // Existing items get renamed (preserving any data on them) and two
+  // brand-new items (LOI Signed Date, PSA Effective Date) get inserted
+  // by reconcile from the updated template.
+  {
+    type: "item",
+    phase: "phase_4",
+    oldName: "Determine CTC Due Date",
+    newName: "Receive 1st Draft Cost to Complete",
+  },
+  {
+    type: "item",
+    phase: "phase_4",
+    oldName: "Finalize CTC / New Purchase Price",
+    newName: "Finalize Cost to Complete / Final Purchase Price",
+  },
+  {
+    type: "item",
+    phase: "phase_4",
+    oldName: "Investment Committee",
+    newName: "Investment Committee Approval",
+  },
+  {
+    type: "item",
+    phase: "phase_4",
+    oldName: "Feasibility",
+    newName: "Waive Feasibility",
   },
 ];
 

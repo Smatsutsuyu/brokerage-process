@@ -27,7 +27,7 @@ import {
 import { BuyerBlastButton } from "./buyer-blast-button";
 import { ConsultantRosterRowActions } from "./consultant-roster-row-actions";
 import { DealTeamSendButton } from "./deal-team-send-button";
-import { IssuesRowActions } from "./issues-row-actions";
+import { DdTrackingRowActions } from "./dd-tracking-row-actions";
 import { MarketingReportPdfButton } from "./marketing-report-pdf-button";
 import { OmBlastButton } from "./om-blast-button";
 import { QaFilePdfButton } from "./qa-file-pdf-button";
@@ -61,10 +61,12 @@ function isOmBlastItem(name: string): boolean {
   return n.includes("send out om") && n.includes("blast");
 }
 
-// Loose-match for the "Issues Tracking Sheet" row in Phase 4. Anchored
-// on "issues tracking" so minor copy edits don't lose the action buttons.
-function isIssuesTrackingItem(name: string): boolean {
-  return name.toLowerCase().includes("issues tracking");
+// Loose-match for the Phase 4 "Complete Due Diligence" row (formerly
+// "Issues Tracking Sheet"). Matches either the new name or the legacy
+// substring so deals mid-rename still wire the action buttons.
+function isCompleteDdItem(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.includes("complete due diligence") || lower.includes("issues tracking");
 }
 
 // Loose-match for the "Create Consultant Roster & Send Out" row in
@@ -345,12 +347,14 @@ export function PhaseSection({
                                 attachmentSourceItemId={omItemId}
                               />
                             )}
-                            {/* Phase 4 Issues Tracking row: Generate
-                                PDF + Send to Deal Team. Matches Excel
-                                "PDF Report and Send to those checked
-                                on deal team from Roster Report." */}
-                            {isIssuesTrackingItem(item.name) && (
-                              <IssuesRowActions dealId={dealId} />
+                            {/* Phase 4 Complete Due Diligence row:
+                                Generate PDF (combined milestones +
+                                issues + deal team + consultants) and
+                                Send to Deal Team. Matches Excel "PDF
+                                Report and Send to those checked on
+                                deal team from Roster Report." */}
+                            {isCompleteDdItem(item.name) && (
+                              <DdTrackingRowActions dealId={dealId} />
                             )}
                             {/* Phase 4 Consultant Roster row: Send to
                                 Deal Team. Matches Excel "Check Box,

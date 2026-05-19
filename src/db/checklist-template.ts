@@ -338,11 +338,18 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
               },
             ],
           },
-          { name: "Issues Tracking Sheet & Send Out before calls", linksTo: "issues" },
-          { name: "Determine CTC Due Date", dateField: true },
-          { name: "Finalize CTC / New Purchase Price", dateField: true },
-          { name: "Investment Committee", dateField: true },
-          { name: "Feasibility", dateField: true },
+          { name: "Complete Due Diligence", linksTo: "issues" },
+          // Milestone date-fields below. Chris populates projected dates
+          // via the +Date affordance up front and checks them off as each
+          // milestone hits. Ordering is the deal lifecycle: LOI signed,
+          // PSA effective, CTC drafts, IC approval, feasibility waive,
+          // close.
+          { name: "LOI Signed Date", dateField: true },
+          { name: "PSA Effective Date", dateField: true },
+          { name: "Receive 1st Draft Cost to Complete", dateField: true },
+          { name: "Finalize Cost to Complete / Final Purchase Price", dateField: true },
+          { name: "Investment Committee Approval", dateField: true },
+          { name: "Waive Feasibility", dateField: true },
           { name: "Closing Date", dateField: true },
         ],
       },

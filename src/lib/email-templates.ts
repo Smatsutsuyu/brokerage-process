@@ -149,10 +149,11 @@ Thanks,
 {{senderName}}`,
 };
 
-// Phase 4 - Send Issues PDF before bi-weekly DD calls.
-export const ISSUES_REPORT_TEMPLATE: EmailTemplate = {
-  subject: "Issues tracker, {{dealName}}",
-  body: `Attached is the current issues tracker for {{dealName}}, ahead of our next call.
+// Phase 4 - Send the combined Due Diligence Tracking PDF (key dates +
+// issues + deal team + consultants) before bi-weekly DD calls.
+export const DD_TRACKING_TEMPLATE: EmailTemplate = {
+  subject: "Due diligence tracker, {{dealName}}",
+  body: `Attached is the current Due Diligence Tracking report for {{dealName}}, covering key milestone dates, open issues, the deal team, and consultants ahead of our next call.
 
 Let us know if anything's missing or if any open items need to move ahead of schedule.
 
