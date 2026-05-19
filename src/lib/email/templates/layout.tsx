@@ -29,7 +29,7 @@ export function EmailLayout({
           <Hr style={hr} />
           <Section>
             <Text style={footer}>
-              Lakebridge Capital · Land Advisors Organization
+              Land Advisors Organization
               <br />
               100 Spectrum Center Drive, Suite 1400, Irvine CA 92618
             </Text>

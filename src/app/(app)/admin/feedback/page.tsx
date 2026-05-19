@@ -21,7 +21,7 @@ import { TestSendButton } from "./test-send-button";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Feedback — Lakebridge Capital",
+  title: "Feedback — Land Advisors Portal",
 };
 
 export default async function FeedbackAdminPage() {

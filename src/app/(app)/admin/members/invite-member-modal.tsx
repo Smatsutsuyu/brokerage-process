@@ -97,8 +97,7 @@ export function InviteMemberModal({ open, onOpenChange }: InviteMemberModalProps
         <DialogHeader>
           <DialogTitle>Invite member</DialogTitle>
           <DialogDescription>
-            Adds a member to Lakebridge with an initial password. Share the credentials with them
-            out-of-band.
+            Adds a member with an initial password. Share the credentials with them out-of-band.
           </DialogDescription>
         </DialogHeader>
 

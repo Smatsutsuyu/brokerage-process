@@ -12,7 +12,7 @@ import { ContactsList, type ContactRow } from "./contacts-list";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Contacts — Lakebridge Capital",
+  title: "Contacts — Land Advisors Portal",
 };
 
 export default async function ContactsPage() {

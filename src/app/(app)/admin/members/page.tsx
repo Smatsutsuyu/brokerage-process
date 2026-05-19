@@ -12,7 +12,7 @@ import { MembersList, type MemberRow } from "./members-list";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Members — Lakebridge Capital",
+  title: "Members — Land Advisors Portal",
 };
 
 export default async function MembersPage() {

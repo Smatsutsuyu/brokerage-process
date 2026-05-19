@@ -247,7 +247,7 @@ function MemberRow({ dealId, member, onEdit }: MemberRowProps) {
     member.source.kind === "user"
       ? {
           label: "Org user",
-          tip: "Linked to a Lakebridge org user. Name and email come from the user record.",
+          tip: "Linked to an org user. Name and email come from the user record.",
           icon: UserRound,
           color: "text-blue-600",
         }

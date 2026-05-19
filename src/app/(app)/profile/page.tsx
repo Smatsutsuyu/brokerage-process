@@ -11,7 +11,7 @@ import { SignOutButton } from "./sign-out-button";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "My profile — Lakebridge Capital",
+  title: "My profile — Land Advisors Portal",
 };
 
 const ROLE_LABEL: Record<"owner" | "broker" | "analyst" | "viewer", string> = {

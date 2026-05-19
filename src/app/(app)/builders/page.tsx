@@ -12,7 +12,7 @@ import { BuildersList, type BuilderRow } from "./builders-list";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Builders — Lakebridge Capital",
+  title: "Builders — Land Advisors Portal",
 };
 
 export default async function BuildersPage() {

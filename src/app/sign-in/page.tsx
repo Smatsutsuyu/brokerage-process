@@ -9,7 +9,7 @@ import { SignInForm } from "./sign-in-form";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Sign in — Lakebridge Capital",
+  title: "Sign in — Land Advisors Portal",
 };
 
 export default async function SignInPage() {
@@ -25,7 +25,7 @@ export default async function SignInPage() {
         </div>
         <h1 className="text-center text-xl font-bold text-gray-900">Sign in</h1>
         <p className="mb-6 text-center text-sm text-gray-500">
-          Lakebridge Capital deal lifecycle platform
+          Land Advisors Portal
         </p>
         <Suspense>
           <SignInForm />

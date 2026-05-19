@@ -9,8 +9,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Lakebridge Capital",
-  description: "Deal lifecycle platform for Lakebridge Capital / Land Advisors Organization.",
+  title: "Land Advisors Portal",
+  description: "Deal lifecycle platform for Land Advisors Organization.",
 };
 
 // ClerkProvider wrapping goes here once real Clerk keys are provisioned.
