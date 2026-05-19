@@ -14,6 +14,7 @@ Built on Next.js 16 (App Router + Turbopack), React 19, TypeScript strict, Tailw
 | Operating this in production after handoff    | [docs/operations.md](docs/operations.md)                                                 |
 | A user (admin or broker) learning the app     | [docs/features.md](docs/features.md)                                                     |
 | Looking for what shipped when                 | [docs/build-progress.md](docs/build-progress.md), [docs/status-log.md](docs/status-log.md) |
+| Picking the next fix or improvement to ship   | [docs/backlog.md](docs/backlog.md) (start with P0)                                       |
 
 ## Local quickstart
 

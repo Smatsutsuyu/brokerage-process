@@ -15,6 +15,7 @@ This file is the authoritative project context for Claude Code working on the La
 - [docs/schema.md](docs/schema.md): every table, enum, FK chain, plus the checklist template + reconcile/rename framework that auto-applies template changes on deploy.
 - [docs/features.md](docs/features.md): user-facing feature inventory organized by goal (sidebar, deal tabs, PDFs, blasts, admin).
 - [docs/operations.md](docs/operations.md): handoff-targeted ops runbook (vendor accounts, deploys, where to look when something breaks).
+- [docs/backlog.md](docs/backlog.md): prioritized list of fixes / optimizations / hardening items from the 2026-05-19 multi-agent review. Pick from P0 first.
 - [docs/status-log.md](docs/status-log.md): historical prose log of decisions + blockers (entries through ~2026-05-07; gap covered by build-progress.md).
 
 **Reviewing client feedback during the build**: Chris uses an in-app feedback widget (floating button + per-section 💬 icons) to leave notes while exercising the platform. Notes flow into the `feedback_items` Postgres table. Read them with `npm run feedback:report` (defaults to "new" items grouped by section, with build commit SHA so you can correlate against deployed code). Disabled via `NEXT_PUBLIC_FEEDBACK_ENABLED=false` for production launch. See `docs/local-development.md` for full mechanics including how to mark items reviewed/actioned.
