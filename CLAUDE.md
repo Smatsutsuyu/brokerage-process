@@ -8,11 +8,18 @@ This file is the authoritative project context for Claude Code working on the La
 
 **If this is your first session on this project, read this entire file before doing anything.** Then read `references/marketing-process-checklist.html` (Chris's prototype, the authoritative UI reference) and `references/Marketing Process Checklist.xlsx` (Chris's wireframe spreadsheet, the source for hierarchical checklist structure).
 
-**To run the platform locally**, see [docs/local-development.md](docs/local-development.md). TL;DR: `npm install`, `npm run db:up`, `npm run db:migrate`, `npm run dev`. Local Postgres runs in Docker; Clerk/Resend keys can stay as placeholders until those accounts are live.
+**To run the platform locally**, see [docs/local-development.md](docs/local-development.md). TL;DR: `npm install`, `npm run db:up`, `npm run db:migrate`, `npm run dev`. Local Postgres runs in Docker.
+
+**Companion docs (read these before changing anything in their domain):**
+- [docs/build-progress.md](docs/build-progress.md): running record of what's actually shipped, phase by phase, with commit references. Replaces the previous "Phase X status" prose in this file.
+- [docs/schema.md](docs/schema.md): every table, enum, FK chain, plus the checklist template + reconcile/rename framework that auto-applies template changes on deploy.
+- [docs/features.md](docs/features.md): user-facing feature inventory organized by goal (sidebar, deal tabs, PDFs, blasts, admin).
+- [docs/operations.md](docs/operations.md): handoff-targeted ops runbook (vendor accounts, deploys, where to look when something breaks).
+- [docs/status-log.md](docs/status-log.md): historical prose log of decisions + blockers (entries through ~2026-05-07; gap covered by build-progress.md).
 
 **Reviewing client feedback during the build**: Chris uses an in-app feedback widget (floating button + per-section 💬 icons) to leave notes while exercising the platform. Notes flow into the `feedback_items` Postgres table. Read them with `npm run feedback:report` (defaults to "new" items grouped by section, with build commit SHA so you can correlate against deployed code). Disabled via `NEXT_PUBLIC_FEEDBACK_ENABLED=false` for production launch. See `docs/local-development.md` for full mechanics including how to mark items reviewed/actioned.
 
-**Current phase:** Phase 1 (Foundation) — **functionally complete as of 2026-05-01**, awaiting Lakebridge vendor accounts (Vercel, Neon, Resend) for production deploy and Phase 2 kickoff. Phase 1 deliverables: hosted multi-user version of the prototype with Better Auth, hierarchical checklist, Buyer/Contact CRUD with tier tagging, Q&A workflow, Issues tracker, Consultant roster, profile + members admin pages, in-app feedback widget. Plus four parallel Contacts UX prototypes for client review and Phase 2 placeholder buttons throughout the deal page (Sonner toasts naming each future feature) so Chris can sign off on the design before Phase 2 begins.
+**Current phase (as of 2026-05-18):** Phase 1 shipped 2026-05-01. Phase 2 (templated documents + email pipeline) substantially shipped: Marketing Report PDF, Q&A File PDF, Issues Report PDF, Resend pipeline with owner-only feedback notification subscriptions, OM blast preview modal with tier + lead filtering, per-contact communication opt-out, per-builder Confi-signed tracking, Deal Team tab with send-to-team buttons, threaded feedback comments + file attachments, per-user deal reordering in the sidebar, replaced the placeholder LAO mountain wordmark with the real LAO logo image. Phase 1-4 checklist content reconciled against Excel v2 + Chris's 2026-05-18 Phase 4 milestone-date rework. Auto-applied template-evolution framework (apply-renames + reconcile-checklists, both wired into vercel-build) lets the template be the source of truth without manual data migrations. **Still pending in Phase 2:** AI deliverables (deferred, see scope decisions below). **Phase 3 (polish + handoff):** has not formally begun; this file plus the four companion docs above are the start of the handoff documentation pass.
 
 **Headline scope decisions (locked, do not revisit without explicit instruction):**
 
@@ -234,48 +241,25 @@ Build cost handled separately via engagement letter (not in scope of this CLAUDE
 
 Approximately seven weeks across three phases. Compressed from the original eight weeks because all AI-led work is deferred. Client testing is built into each phase via a preview deploy and 2-3 days of active client use.
 
-### Phase 1: Foundation (3 weeks)
+> Note: the per-phase status callouts below are intentionally high level. The running record of what actually shipped (with commit references) lives in [docs/build-progress.md](docs/build-progress.md). Treat that file as the source of truth when this section disagrees with it.
 
-- Project scaffold (Next.js, TypeScript, Tailwind, shadcn/ui)
-- Auth integration (Clerk with organizations)
-- Database schema and migrations (Drizzle ORM)
-- Database structure for organizations, users, deals, builders, contacts, hierarchical checklist items, Q&A items, issues, consultants, document metadata
-- UI built from prototype, faithful to its layout, with hierarchical checklist structure (per Excel) rather than flat
-- Vercel Blob setup
-- Deploy to Vercel preview environment for client testing in second half of phase
+### Phase 1: Foundation (3 weeks) — shipped 2026-05-01
 
-### Phase 2: Document and Email Generation (2 weeks)
+Scaffold, schema, auth, app shell, Phase-1-equivalent prototype functionality (hierarchical checklist, Buyer/Contact CRUD, Q&A, Issues, Consultants), admin pages, in-app feedback widget. Vendor swap from Clerk to Better Auth done in the same window; Sentry dropped in favor of Vercel function logs.
 
-Templated outputs only. No LLM calls. Mid-phase preview deploy after PDFs are working; end-of-phase deploy after email send works.
+### Phase 2: Document and Email Generation (2 weeks) — substantially shipped, finishing 2026-05
 
-- Document upload to Vercel Blob, organized by deal and document type → **Done 2026-05-06** (per-checklist-item upload, private store, PDF inline viewer via streaming, replace + delete with auto-versioning at the data layer)
-- Document viewer (PDF inline, Excel preview, image preview) → **PDF inline done; Excel/image preview deferred**
-- Document versioning (automatic — every save creates a version) → **Done at data layer** (each upload bumps version per (deal, item) pair, old versions retained in blob); version-history UI to surface old versions deferred
-- React-PDF infrastructure for branded outputs (Land Advisors branding throughout)
-- Templates implemented:
-  - Q&A File (Land Advisors-branded PDF, structured from approved Q&A items)
-  - Marketing Report (filtered buyer list by tier)
-  - Entitlement Schedule
-  - Custom Underwriting File (xlsx generation)
-  - Compiled Package (PDF merge)
-  - CFD Analysis, Premium Analysis, Valuation, Entitlement Summary (templated narrative + structured data)
-- Email pipeline via Resend:
-  - Sender domain verification (DNS step Chris will assist with)
-  - Templated email composition with variable substitution
-  - In-platform review/edit before send
-  - Send via Resend API
-  - Sent status tracking and history per deal/recipient
+Templated outputs only. No LLM calls.
 
-### Phase 3: Polish, Operations, Handoff (2 weeks)
+- **Documents**: per-checklist-item upload + private streaming view + delete via Vercel Blob (2026-05-06). PDF inline viewer works; Excel/image previews deferred. Versioning at data layer (each upload bumps version); version-history UI deferred.
+- **PDFs shipped**: Marketing Report (per-builder tier + comments), Q&A File (approved items), Issues Report. Land Advisors branding via bundled Metropolis font + the real LAO logo image.
+- **PDFs deferred to a future engagement**: Custom Underwriting File (xlsx), CFD Analysis, Premium Analysis, Valuation, Entitlement Schedule, Entitlement Summary. These items still surface PlannedAction placeholder buttons on their checklist rows.
+- **Email pipeline (Resend)**: send wrapper + notify dispatchers wired; sender domain on `portal.lakebridgecap.com` for dev. Phase 2 production cutover to a `landadvisors.com` sender is pending DNS coordination with LAO IT (see Open Architectural Question below). Templated feedback notifications work end-to-end; OM blast preview modal renders the recipient list (tier + lead + opt-out filters) but the actual send button is wired off pending Chris's sign-off on the recipient logic.
 
-- Audit log UI and exports
-- Backup verification and restore drill
-- Admin panel: user management, role assignment, billing visibility (links to vendor billing dashboards)
-- Operational runbook (account access, common admin tasks, monitoring response, escalation paths)
-- Recorded video walkthroughs of admin panel and common scenarios
-- Architecture diagram and developer onboarding guide
-- Final security review and dependency audit
-- Production cutover and final acceptance testing
+### Phase 3: Polish, Operations, Handoff (2 weeks) — in progress
+
+- **Documentation pass (this commit)**: [docs/operations.md](docs/operations.md), [docs/schema.md](docs/schema.md), [docs/features.md](docs/features.md), [docs/build-progress.md](docs/build-progress.md). CLAUDE.md updated to point at them.
+- **Outstanding**: production cutover to `landadvisors.com` sender domain (Resend + DNS + EMAIL_FROM env). Audit log surface. Recorded video walkthroughs. Architecture diagram. Final security + dependency audit.
 
 ---
 
@@ -506,7 +490,7 @@ When starting work:
 13. **Document versioning: automatic, every save creates a version.**
 14. **Document retention: 1 year is the working assumption.** Build with configurable retention; default to 365 days.
 15. **Checklist dependencies: enforce, do not warn.** Block items until prerequisites are checked. Examples: "Send out OM / Blast" requires "Offering Memorandum" complete; "Send out Q&A File" requires "Coordinate a Q&A File" complete.
-16. **Consultant roster has 11 roles** (the original 9 plus Architect and PSA Attorney). Each role can hold multiple firms split by buyer/seller side, and each firm can hold multiple individual contacts. Treat this as informative metadata, not a primary feature.
+16. **Consultant roster has 13 roles** (the original 9 plus Architect, PSA Attorney, Title Consultant, Escrow Consultant). Each role can hold multiple firms split by buyer/seller side, and each firm can hold multiple individual contacts. Treat this as informative metadata, not a primary feature.
 17. **Deal Team is the unifying concept** comprising Owner Team (sellers/principals), Broker Team (Lakebridge), and Buyer Team (post-selection). These groupings drive who gets which emails.
 18. **Workflow assumption: 20 deals at peak, 50 max, 2 new deals per month.** The platform should handle this comfortably without optimization tricks.
 
@@ -619,7 +603,7 @@ By end of week 1: logged-in user, org context active, empty deal pages, all infr
 - Buyer/contact management with tier tagging → **Done** (4-state tier: Green / Yellow / Red / Not Selected; lead picker; called/OM tracking)
 - Q&A workflow (add, edit, approve) → **Done** (locked-by-default after approval; one-click "approve all")
 - Issues tracker → **Done** (status, priority, assignee, identified/resolved dates)
-- Consultant roster → **Done** (11 roles with buyer/seller side, multiple firms per role)
+- Consultant roster → **Done** (13 roles with buyer/seller side, multiple firms per role)
 - Profile page + Members admin → **Done** (added during 2026-05-01 batch)
 - In-app feedback widget → **Done** (per-section 💬 affordances + floating button; `npm run feedback:report` reads it)
 - Four Contacts UX prototypes → **Done** (parallel tabs for client review)

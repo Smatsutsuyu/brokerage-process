@@ -1,0 +1,172 @@
+# Features
+
+The Land Advisors Portal is a multi-user deal management platform for Lakebridge Capital and Land Advisors brokers. It tracks each land brokerage deal through a four-phase lifecycle, manages the buyer contacts on each deal, generates Land-Advisors-branded PDFs (Marketing Report, Q&A File, Issues Report), and sends templated email blasts through Resend.
+
+What this app does not do: no in-app notifications (alerts go to your email inbox), no Outlook or calendar integration, no AI drafting, parsing, or summarizing. Document generation is templated and deterministic. AI features are deferred to a future engagement.
+
+---
+
+## Sign in and your profile
+
+Sign in with email and password at `/sign-in`. There is no self-service "forgot password" flow yet, so if you lock yourself out, ask an owner to reset you from Admin > Members.
+
+Your profile lives at `/profile`. From there you can edit your display name and phone, change your password (minimum 8 characters; you stay signed in on this device), and sign out.
+
+Owners get an extra Feedback notifications card on the profile with four email subscriptions:
+
+1. Every time new feedback is submitted (org-wide feed).
+2. When someone replies on a thread you have commented on.
+3. When someone comments on feedback you created.
+4. When the status changes on feedback you created.
+
+Toggles save on click. Non-owners do not see this card.
+
+---
+
+## Browsing deals (the sidebar)
+
+The left sidebar is always present once you are signed in. The top shows the Land Advisors logo and a "New Deal" button. Below that is the deal list. Each deal row shows:
+
+- A star if the deal is high priority.
+- The deal name, city, and state.
+- A small progress bar with completed-item count (e.g. `12/47`).
+- A phase chip (Phase 1-4 or Complete), inferred from the lowest phase that still has unchecked items.
+
+Hover any deal row to reveal small up and down chevrons on the right edge. Click to reorder. The ordering is per-user, so each member arranges their own working list without affecting anyone else.
+
+Above the sidebar, a dark navy ribbon spans the top of the app and pins every deal flagged as high priority in your org. Click any pinned deal to jump to it. If nothing is starred, the ribbon shows "Star a deal to pin it here."
+
+Below the deal list, the sidebar links to two org-wide directories (Builders, Contacts) and, for owners only, an Admin section with Members and Feedback. Your name and role sit at the bottom; clicking opens your profile.
+
+---
+
+## Working a deal (the deal page tabs)
+
+Click a deal in the sidebar to open it. The deal page has a header (deal name, status, priority star, location, units, type) and six tabs. Each tab is a workspace for one slice of the deal.
+
+### Checklist
+
+The centerpiece of the workflow. Items are grouped into four phases matching the deal lifecycle (Phase 1 going-to-market, Phase 2 marketing process, Phase 3 summary of offers, Phase 4 due diligence). Within each phase, items group by category. When every item in a phase is complete, the section auto-collapses.
+
+Every item supports a completion checkbox (with timestamp and who completed it), inline notes, file attachments stored on Vercel Blob (replacing a file auto-versions the prior copy), and an external link slot for Dropbox folders or any URL.
+
+Some items have extra affordances:
+
+- Phase 4 milestone items (LOI Signed, PSA Effective, Cost to Complete drafts, Investment Committee Approval, Waive Feasibility, Closing Date) get a date chip on the row so you can record projected or actual dates.
+- Some items have an "Open [Tab]" jump button when their data lives in a sibling tab. "Create Consultant Roster" jumps to Consultants; "Complete Due Diligence" jumps to Issues.
+- Some items have inline action buttons that share behavior with the relevant tab. Wired and working today: Send OM Blast on the OM Blast row, Send Q&A File on the Q&A File row, Share Market Study on its row, Send to Deal Team on Share Due Diligence Material and on Complete Due Diligence, Marketing Report PDF on its row, and the inline PSA Attorney picker on Determine PSA Attorney. CFD Analysis, Premium Analysis, Valuation, Entitlement Schedule, Entitlement Summary, Custom Underwriting File, and Compiled Package still surface "Coming soon" placeholder toasts and are scoped for a future phase.
+
+### Contacts
+
+Manage the buyer list for this deal in a card layout grouped by tier (Interested / Evaluating / Immediate Pass / Not Selected). Filter chips at the top narrow by tier.
+
+For each builder card you can:
+
+- Set the tier (Green / Yellow / Red / Not Selected).
+- Assign a Lead (which broker owns the relationship).
+- Tick the four per-builder checkboxes: Called, Confi (signed), OM (sent), Offer (received).
+- Add a free-text comment that flows into the Marketing Report PDF.
+- Add, edit, or remove contacts within the builder. Each contact has a bell icon to toggle "receives communication." Anyone toggled off is excluded from email blasts to that builder.
+- Pick an existing org contact to attach, or add a brand-new contact.
+- Remove the builder from this deal.
+
+The toolbar above the cards exposes deal-level actions: download the Marketing Report PDF, start an OM blast.
+
+### Q&A
+
+Capture questions from buyers and your drafted answers. Add, edit, and approve items. Approval locks the item so it does not change after distribution; one-click "approve all" handles the common batch case.
+
+Once items are approved, Generate PDF renders them into a Land-Advisors-branded Q&A File. Send Q&A emails that PDF to selected recipients via Resend.
+
+### Issues
+
+A living issues tracker for due diligence. Add an issue with a title, description, priority (low / medium / high / urgent), assignee, status (open / in-progress / resolved), and identified/resolved dates. The tab badge shows the open count. Click Generate PDF to download an Issues Report for your DD calls.
+
+### Consultants
+
+Per-deal consultant roster covering 11 roles (Landscape Architect, Civil Engineer, Soils Engineer, Cost to Complete, HOA, Dry Utility, Phase 1, Land Use, Biologist, Architect, PSA Attorney). Each role can hold multiple firms split by buyer or seller side, with one or more contacts per firm. Informative metadata for the deal team; does not drive automation by itself.
+
+### Teams
+
+The Teams tab unifies the Deal Team into three groupings:
+
+- Owner Team: sellers and principals on this deal.
+- Broker Team: everyone running point for Lakebridge or Land Advisors. Pick from org users; outside cobrokers should be added via Admin > Members first.
+- Buyer Team: the chosen buyer's contacts, picked from contacts already on the deal.
+
+Each member has an Include in emails toggle. Inclusion drives the recipient list when you use the Send to Deal Team buttons (for example, sharing DD material). Members can be real users, existing contacts on the deal, or free-text entries for someone who has no platform record yet.
+
+---
+
+## Generating documents (the PDFs)
+
+Three Land-Advisors-branded PDFs are built into the app. All three open in a new browser tab as inline PDFs so you can preview before forwarding.
+
+- Marketing Report. Builder list grouped by tier with per-builder comments. Generated from the Contacts tab toolbar or the Marketing Report row on the Phase 1 checklist. This is what you send to ownership for status updates.
+- Q&A File. Approved Q&A items rendered as a clean branded document. Generated from the Q&A tab or the Phase 2 "Q&A File" checklist row.
+- Issues Report (DD Tracking). Current issues from the Issues tab as a PDF for DD calls.
+
+The fonts and logo are baked in so the output matches Land Advisors brand standards without any setup.
+
+---
+
+## Sending email blasts
+
+Launch a blast from two places: the toolbar on the Contacts tab, or the relevant Phase 2 checklist row (Send out OM Blast, Q&A File, Confidentiality Agreement, Share Market Study, 1-week notice, Day-of Reminder, Follow up Missing Offers).
+
+A modal opens with a recipient preview. Filter by tier (Green / Yellow / Red) and by lead user. For the OM blast, pick which file from the Offering Memorandum checklist item to attach. The preview lists every recipient with their builder and tier; anyone toggled off via the bell icon is already excluded. Per-builder CC selections persist across blasts.
+
+Review the subject, body, and attachment, then send. Emails go from a Lakebridge-verified sender domain configured in Resend, so recipients see them from your normal LAO address.
+
+There is no in-app inbox or reply tracking. Recipients reply directly to your verified address; you read replies in Outlook as usual.
+
+---
+
+## Contacts and Builders directories
+
+These two sidebar links surface org-wide views, independent of any deal.
+
+- `/contacts`. Every buyer-side contact in your org, sortable and searchable, showing builder affiliation and which deals each contact is on. Use "Import from Excel" to bulk-load contacts from a marketing list. You can add or edit contacts standalone (not tied to a builder) or under a specific builder.
+- `/builders`. Every builder in your org, with classification (private / public), contact count, and the deals each builder is on. Edit, add, or remove builders.
+
+Both directories are the master list. Per-deal contact attachment happens from the Contacts tab on a deal.
+
+---
+
+## Submitting in-app feedback
+
+Any user can submit feedback. Two affordances: a floating button in the bottom corner of every page, and small message-bubble icons attached to specific sections (clicking one pre-tags the feedback with that section).
+
+The form lets you set severity (Nit / Suggestion / Bug / Blocker), write a comment, and attach files under 10 MB each. Submissions auto-include the current page path and deployed commit SHA so reviewers can correlate against shipped code. Keep the conversation going by replying on the thread (under Admin > Feedback if you are an owner, or via email notifications if you have subscribed).
+
+---
+
+## Admin tools (owner-only)
+
+Owners get two extra sidebar links under Admin.
+
+### Members (`/admin/members`)
+
+Invite users, change their role (Owner / Broker / Analyst / Viewer), and disable or remove access. Disabling a user keeps the historical record (their name still shows on past completed checklist items, comments, etc.) but blocks sign-in. This is where outside cobrokers get added before the Teams tab can include them.
+
+### Feedback (`/admin/feedback`)
+
+Triage every piece of feedback submitted across the org. For each item you see who submitted it, when, the page they were on, the deployed commit SHA, severity, status, and any attachments. Move the status through the workflow (New > Reviewed > Actioned > Complete, or Won't Fix), reply on the comment thread, and filter by status, severity, or section. A Send Test Email button lets you fire a test feedback notification to yourself to confirm email delivery is healthy.
+
+---
+
+## Concepts worth knowing
+
+A short glossary for terms you will see throughout the app.
+
+- Tier. Per-deal interest level for a buyer. Green is interested, Yellow is evaluating, Red is passed, Not Selected means the builder is on the deal but has not been classified yet. Tiers are per-deal, so the same builder can be Green on one deal and Red on another.
+- Deal Team. The union of three groupings on a deal: Owner Team (sellers/principals), Broker Team (Lakebridge/LAO staff running point), and Buyer Team (the chosen buyer's contacts once an offer is selected). The Teams tab drives who receives deal team email sends.
+- Confi. Confidentiality Agreement. The per-builder "Confi" checkbox on the Contacts tab tracks whether the builder has signed.
+- OM. Offering Memorandum. The marketing document for a deal; sits on the Phase 1 Underwriting & OM checklist as an upload and gets attached to the Phase 2 OM Blast.
+- PSA. Purchase and Sale Agreement. Drafted by the chosen PSA Attorney; kicked off in Phase 4.
+- DD. Due Diligence. Phase 4 of the deal lifecycle.
+- CTC. Cost to Complete. The infrastructure cost analysis that drives the final purchase price; one of the Phase 1 third-party marketing reports and a key Phase 4 milestone.
+- LOI. Letter of Intent. Signed by the chosen buyer at the end of Phase 3 and tracked as a Phase 4 milestone date.
+- SOO. Summary of Offers. The matrix comparing buyer offers side by side; lives in Phase 3.
+
+For the deeper engagement context (why the platform exists, the build phases, the vendor stack, the scope boundaries), see `CLAUDE.md` in the repo root.
