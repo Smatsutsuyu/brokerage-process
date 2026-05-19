@@ -57,6 +57,8 @@ export const consultantRoleEnum = pgEnum("consultant_role", [
   "biologist",
   "architect",
   "psa_attorney",
+  "title",
+  "escrow",
 ]);
 
 export const documentStatusEnum = pgEnum("document_status", ["draft", "final"]);

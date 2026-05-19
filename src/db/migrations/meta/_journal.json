@@ -197,6 +197,13 @@
       "when": 1778900200000,
       "tag": "0027_user_deal_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1779161638100,
+      "tag": "0028_glossy_living_lightning",
+      "breakpoints": true
     }
   ]
 }

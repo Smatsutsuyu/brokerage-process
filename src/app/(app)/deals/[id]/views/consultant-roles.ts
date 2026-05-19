@@ -12,6 +12,8 @@ export const CONSULTANT_ROLES: Array<{ value: ConsultantRole; label: string }> =
   { value: "biologist", label: "Biologist" },
   { value: "architect", label: "Architect" },
   { value: "psa_attorney", label: "PSA Attorney" },
+  { value: "title", label: "Title Consultant" },
+  { value: "escrow", label: "Escrow Consultant" },
 ];
 
 export const ROLE_LABEL = Object.fromEntries(

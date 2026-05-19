@@ -756,7 +756,9 @@ export type ConsultantRole =
   | "land_use"
   | "biologist"
   | "architect"
-  | "psa_attorney";
+  | "psa_attorney"
+  | "title"
+  | "escrow";
 
 export type ConsultantSide = "buyer" | "seller";
 
