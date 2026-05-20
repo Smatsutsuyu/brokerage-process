@@ -130,10 +130,23 @@ export async function sendResolvedEmails(
       .filter((a): a is Extract<ResolvedEmail["attachments"][number], { kind: "link" }> => a.kind === "link")
       .map((a) => ({ url: a.url, label: a.label }));
 
+    // BCC the sender on every send so a copy lands in their inbox.
+    // Resend sends through its own SMTP, not the sender's mailbox, so
+    // without this the sender's Outlook has no record the message went
+    // out. Dedupe in case the sender is already in to/cc (their copy
+    // would otherwise duplicate). Generalizes to future per-user senders.
+    const toEmails = email.to.map((t) => t.email);
+    const ccEmails = email.cc.map((c) => c.email);
+    const senderAddr = email.from.email.toLowerCase();
+    const alreadyAddressed = [...toEmails, ...ccEmails].some(
+      (e) => e.toLowerCase() === senderAddr,
+    );
+
     const result = await sendEmail({
       from: email.from.email,
-      to: email.to.map((t) => t.email),
-      cc: email.cc.length > 0 ? email.cc.map((c) => c.email) : undefined,
+      to: toEmails,
+      cc: ccEmails.length > 0 ? ccEmails : undefined,
+      bcc: alreadyAddressed ? undefined : email.from.email,
       subject: email.subject,
       text: appendLinksToBody(email.body, linkAtts),
       attachments: fileAtts,

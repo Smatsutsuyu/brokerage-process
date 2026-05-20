@@ -28,6 +28,7 @@ export type SendEmailInput = {
   from?: string;
   to: string | string[];
   cc?: string | string[];
+  bcc?: string | string[];
   subject: string;
   // One of `react` or `html` should be provided. `react` wins if both are.
   react?: React.ReactElement;
@@ -79,6 +80,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       from,
       to: input.to,
       cc: input.cc,
+      bcc: input.bcc,
       subject: input.subject,
       replyTo: input.replyTo,
       text: input.text,

@@ -26,6 +26,9 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 - Vercel env var sweep: confirm `RESEND_API_KEY` is the landadvisors key (Chris confirmed it is) and that `EMAIL_FROM` is set to `feedback@landadvisors.com` in production.
 - Per-user `@landadvisors.com` sender addresses — would let the composer offer the signed-in user as a second "From" option.
 
+### Follow-up (same day)
+- **BCC the sender on every client-facing send.** Resend doesn't deposit in the sender's Outlook Sent folder, so without this Chris has no mailbox record of platform sends. `sendResolvedEmails` now adds `bcc: email.from.email` (deduped if the sender is already in to/cc). Generalizes to future per-user senders. `SendEmailInput` gained a `bcc` field; not used by the feedback pipeline.
+
 ### Blockers
 - None.
 
