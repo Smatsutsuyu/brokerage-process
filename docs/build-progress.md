@@ -102,6 +102,18 @@ Major reconciliation pass against Chris's `Marketing Process Checklist.xlsx` v2 
 - Member-remove flow: hard delete with cascade, last-owner guardrail, fix for inviting a member signing the owner out (`12685c5`).
 - Auto-clean orphan `deal_buyers` rows on builder delete (`1434e4d`, `85e7747`).
 
+## Email pipeline live cutover (2026-05-20)
+
+DNS records for `landadvisors.com` are in. Resend consolidated to a single account (landadvisors.com domain verified); the older lakebridgecap.com Resend instance is being retired.
+
+- **`sendEmail()` accepts per-call `from`, `cc`, `attachments`** so the same wrapper covers both pipelines. When `from` is omitted it falls back to `EMAIL_FROM`, preserving the feedback-notification behavior.
+- **New `src/lib/email/blast.ts`** with `sendResolvedEmails(emails, { orgId })`. Resolves selected file attachments by org-scoped lookup in `documents`, fetches the bytes from Vercel Blob, then sends per-builder sequentially (respecting Resend's rate limit). Link-type attachments are appended to the body as a "Links:" section since most are auth-required folder URLs (Dropbox / SharePoint) that can't be fetched server-side. Partial failures recorded per builder, not aborted.
+- **`sendBlastEmails` server action** in `actions.ts` — thin org-scope wrapper around `sendResolvedEmails`.
+- **`BlastModal` and `DealTeamSendButton` now call the real action**, replacing the toast mocks. Composer toast reports success / partial-failure / total-failure with per-builder reasons.
+- **Sender dropdown simplified to a single fixed option, `cshiota@landadvisors.com`.** The signed-in-user fallback option was dropped, users sign in with `@lakebridgecap.com` addresses which can't be used as a sender without a separate domain verification.
+- **`EMAIL_FROM` cutover** to `feedback@landadvisors.com`. Feedback notifications now send from the same verified domain as the client-facing pipeline.
+- **Docs:** `.env.example`, `operations.md`, and `CLAUDE.md` updated to reflect the single-account / single-domain consolidation.
+
 ## DD Tracking + brand sweep + blast UX (2026-05-18)
 
 - **Due Diligence Tracking PDF** (`8c6a0bb`) replaces the standalone Issues Report. Single combined report covering the 7 Phase 4 milestone dates, issues grouped by status (no summary stats — Chris's feedback), the Deal Team (Owner / Broker / Buyer), and the consultant roster. New route `/api/deals/[id]/dd-tracking.pdf` and a fresh `DD_TRACKING_TEMPLATE` email body. Phase 4 row renamed "Issues Tracking Sheet & Send Out before calls" → "Complete Due Diligence" via `apply-renames`. Old issues-report route + lib doc + view components deleted; loose-match in `phase-section` keeps both names recognized while deals migrate.
@@ -125,14 +137,12 @@ Major reconciliation pass against Chris's `Marketing Process Checklist.xlsx` v2 
 
 ## Known follow-ups
 
-- **DNS access for Resend sender-domain verification on `mail.lakebridgecap.com`** is the highest-leverage open item. The 2026-05-07 status log captures the M365 access dead-ends Sean tried. Decision punted back to Chris: either provision `sean@lakebridgecap.com` with Domain Name Administrator, or Chris adds the records himself when the time comes. Until this is done, OM blast and Deal Team sends are mocked end-to-end (the UI is real, the actual Resend call is stubbed with a toast).
 - **Harden the open `/api/auth/sign-up/email` endpoint** before public production launch. Better Auth's `disableSignUp: true` blocks our own server-side seed/invite calls, so we need a custom server-side guard.
 - **Version-history UI for documents** deferred. Old blobs remain in storage on replace; surfacing them in the UI is a small lift if Chris asks.
 - **Excel/image inline preview** deferred. Browsers render PDFs natively, but `.xlsx`/`.docx` need a third-party viewer (Microsoft Office Online iframe is the likely path).
 - **Audit log entries for member changes** (role / disable). Schema supports it; not yet wired.
 - **The `r2_key` column name** in `documents` stores Vercel Blob URLs despite the historical name. Cosmetic rename deferred.
-- **`RESEND_API_KEY=re_placeholder_phase1`** is still committed in env validation; double-check no code path silently fails open once a real key lands.
-- **Real send for OM blast and Deal Team sends** wires up once DNS is verified; the composer UIs are complete.
+- **Per-user `@landadvisors.com` sender addresses** would let the composer's "From:" dropdown offer the signed-in user as a second option. Out of scope for now — single `cshiota@landadvisors.com` covers the immediate need.
 - **Default builder classification on Excel import** still defaults to `private`; Chris to confirm whether `developer` should become the new default or whether more categories (REIT, institutional investor) are needed.
 
 ## Intentionally out of scope

@@ -16,6 +16,7 @@ import { type EmailTemplate } from "@/lib/email-templates";
 import {
   getDealTeamRecipients,
   getOmBlastTemplateContext,
+  sendBlastEmails,
   type DealTeamRecipientGroup,
 } from "../actions";
 
@@ -139,14 +140,30 @@ export function DealTeamSendButton({
         senderOptions={senderOptions}
         defaultSenderId={defaultSenderId}
         onSend={async (emails) => {
-          toast.success(
-            `Mock-sent ${emails.length} ${emails.length === 1 ? "email" : "emails"}`,
-            {
-              description:
-                "Email infrastructure isn't wired yet. No real messages were sent.",
-              duration: 5000,
-            },
-          );
+          const result = await sendBlastEmails(emails);
+          if (result.failed === 0) {
+            toast.success(
+              `Sent ${result.sent} ${result.sent === 1 ? "email" : "emails"}`,
+              { duration: 4000 },
+            );
+          } else if (result.sent === 0) {
+            const first = result.outcomes.find((o) => !o.ok);
+            toast.error(
+              `Send failed for all ${result.failed} ${result.failed === 1 ? "email" : "emails"}`,
+              {
+                description: first && !first.ok ? first.reason : "Check Resend logs.",
+                duration: 8000,
+              },
+            );
+          } else {
+            const failed = result.outcomes.filter((o) => !o.ok);
+            toast.warning(`Sent ${result.sent}, failed ${result.failed}`, {
+              description: failed
+                .map((f) => `${f.builderName}: ${"reason" in f ? f.reason : ""}`)
+                .join("; "),
+              duration: 10000,
+            });
+          }
         }}
       />
     </>

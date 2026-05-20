@@ -24,7 +24,9 @@ import {
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { findBuilderByName } from "@/lib/builders";
+import { sendResolvedEmails, type BlastSendResult } from "@/lib/email/blast";
 import { formatPhone } from "@/lib/phone";
+import type { ResolvedEmail } from "@/components/email/email-preview-modal";
 
 export async function toggleChecklistItem(input: {
   itemId: string;
@@ -1315,11 +1317,10 @@ export async function getLeadOptionsForOrg(): Promise<{ id: string; name: string
   return rows.map((r) => ({ id: r.id, name: r.name || r.email }));
 }
 
-// Available "From:" choices for outbound emails. Always lists Chris's
-// landadvisors.com address first (the canonical client-facing sender),
-// then the signed-in user as a separate option below a section break.
-// When the signed-in user IS Chris, the second entry is suppressed to
-// avoid a confusing duplicate.
+// Available "From:" choices for outbound client-facing email. Only
+// landadvisors.com is verified in Resend, so the only choice today is
+// Chris's address. Kept as a typed list (not a constant) so we can grow
+// to per-user landadvisors addresses without changing the call sites.
 export type EmailSenderOption = {
   id: string;
   // Display name shown alongside the address (e.g. "Chris Shiota").
@@ -1337,12 +1338,15 @@ const CHRIS_SENDER: EmailSenderOption = {
 };
 
 // Template variables for the OM-blast email composer. Pulled from the deal
-// row + the signed-in user. Sender first name uses the first whitespace-
-// delimited token of the user's display name (Chris's signature style).
+// row. Returns sender options too so the preview modal can render the
+// "From:" dropdown without a second round-trip.
 //
-// Returns sender options too so the preview modal can render a "From:"
-// dropdown without a second round-trip — keeps the picker open-blocking
-// to one server call.
+// Sender list is intentionally a single fixed entry — cshiota@landadvisors.com.
+// Resend only has the landadvisors.com domain verified; users sign in with
+// their @lakebridgecap.com addresses which can't be used as a from-address
+// for client-facing sends. Keeping the dropdown (even with one row) so the
+// "From" field is visible in the composer, and so we can add per-user
+// landadvisors addresses later without restructuring the modal.
 export async function getOmBlastTemplateContext(input: { dealId: string }): Promise<{
   vars: Record<string, string>;
   senderOptions: EmailSenderOption[];
@@ -1350,7 +1354,6 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
 }> {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
-  const me = await getCurrentUser();
 
   const [deal] = await db
     .select({
@@ -1364,25 +1367,8 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
     .limit(1);
   if (!deal) throw new Error("Deal not found");
 
-  const senderFull = me?.name?.trim() ?? "";
-  const senderFirst = senderFull.split(/\s+/)[0] || senderFull || "Chris";
-
-  // Build the sender list: Chris first, then the current user (suppressed
-  // when current user IS Chris to avoid a duplicate row).
-  const isCurrentChris = (me?.email ?? "").toLowerCase() === CHRIS_SENDER.email.toLowerCase();
   const senderOptions: EmailSenderOption[] = [CHRIS_SENDER];
-  if (me && !isCurrentChris) {
-    senderOptions.push({
-      id: `user-${me.id}`,
-      name: me.name || me.email,
-      email: me.email,
-      firstName: senderFirst,
-    });
-  }
-  // Default to the current user when they're not Chris (most natural —
-  // "send as me by default"); otherwise default to Chris (the only option).
-  const defaultSenderId =
-    !isCurrentChris && me ? `user-${me.id}` : CHRIS_SENDER.id;
+  const defaultSenderId = CHRIS_SENDER.id;
 
   return {
     vars: {
@@ -1390,10 +1376,7 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
       city: deal.city ?? "",
       units: deal.units != null ? String(deal.units) : "",
       type: deal.type ?? "",
-      // senderName starts as the default sender's first name. The preview
-      // modal re-interpolates the body when the user picks a different
-      // sender so the signature stays in sync.
-      senderName: defaultSenderId === CHRIS_SENDER.id ? CHRIS_SENDER.firstName : senderFirst,
+      senderName: CHRIS_SENDER.firstName,
     },
     senderOptions,
     defaultSenderId,
@@ -2246,6 +2229,22 @@ export async function setDealTeamMemberIncluded(input: {
     );
 
   revalidatePath(`/deals/${input.dealId}`);
+}
+
+// Server-action entry point for the OM blast + Deal Team Send composers.
+// Thin wrapper: org-scopes the request, then hands off to the blast
+// helper which fetches Blob attachments and calls Resend per builder.
+//
+// We don't re-derive recipients / subject / body server-side — the user
+// already edited them in the preview modal. The trust boundary is the
+// org check + attachment ownership check inside sendResolvedEmails: a
+// forged documentId from a sibling org can't pull a file.
+export async function sendBlastEmails(
+  emails: ResolvedEmail[],
+): Promise<BlastSendResult> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+  return sendResolvedEmails(emails, { orgId: org.id });
 }
 
 // Verifies that an item belongs to the active deal. Useful for any

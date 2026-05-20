@@ -133,23 +133,22 @@ Vercel's status page at `https://www.vercel-status.com` is worth checking first 
 
 ## Email pipeline
 
-The platform sends mail through Resend. Configuration lives in three places:
+The platform sends mail through Resend. One Resend account covers both pipelines (feedback notifications and client-facing sends). Configuration lives in three places:
 
-- **Resend dashboard, Domains**: the sender domain (planned: `mail.lakebridgecap.com`) is added here. Resend supplies the DKIM, SPF, and DMARC records to publish.
-- **DNS host for `lakebridgecap.com`**: the records from Resend are added at the domain's DNS host (Microsoft 365 in current config). Verification takes minutes to a few hours.
+- **Resend dashboard, Domains**: the `landadvisors.com` sender domain is verified here. Resend supplies the DKIM, SPF, and DMARC records to publish.
+- **DNS host for `landadvisors.com`**: the records from Resend are published at LAO IT's DNS host. Verification takes minutes to a few hours.
 - **Vercel environment variables**:
   - `RESEND_API_KEY` (Secret): the API key from Resend, scoped to send-only.
-  - `EMAIL_FROM`: the from-address (something like `noreply@mail.lakebridgecap.com`).
+  - `EMAIL_FROM`: the from-address for the feedback pipeline only — `feedback@landadvisors.com`. Client-facing sends (OM blast, Deal Team) use a hardcoded `cshiota@landadvisors.com` from the composer's sender dropdown and override `from` on the per-send call.
 
-When `RESEND_API_KEY` is unset or empty, the platform's `sendEmail` helper becomes a no-op: it logs the intended send and returns success. The user-facing action does not fail. This was deliberate so dev and the brief domain-verification window do not break the app.
+When `RESEND_API_KEY` is unset or empty, the platform's `sendEmail` helper becomes a no-op: it logs the intended send and returns success. The user-facing action does not fail. This lets dev boot without a Resend account.
 
 If an email fails after the API key is set:
 
-1. The error is logged to Vercel function logs (search for `sendEmail`).
-2. The user-facing action still succeeds (an OM blast is still recorded as sent in the database) so the UI does not get stuck.
-3. The Resend dashboard Logs tab shows the underlying delivery failure.
-
-Real send for OM blast and Deal Team sends is still mocked at the time of writing; the composer UIs are complete, but actual Resend calls are stubbed pending DNS verification of `mail.lakebridgecap.com`. Activation is a flag flip after DNS is verified.
+1. The error is logged to Vercel function logs (search for `sendEmail` or `email:api-error`).
+2. For feedback notifications, the user-facing action still succeeds (the comment, status change, or feedback creation is committed) so the UI does not get stuck.
+3. For client-facing sends (OM blast, Deal Team), the composer toast surfaces a per-builder failure summary so the user knows which sends to retry or send manually.
+4. The Resend dashboard Logs tab shows the underlying delivery failure with the SMTP / API error.
 
 ## Storage
 
@@ -231,7 +230,7 @@ Canonical list of expected env vars (from `src/lib/env.ts`):
 - `BETTER_AUTH_SECRET` (Sensitive, required, 32+ chars): signing secret for auth sessions.
 - `BETTER_AUTH_URL` (required): the public URL of the app (production: `https://brokerage.lakebridgecap.com`).
 - `RESEND_API_KEY` (Sensitive, optional): Resend API key. When unset, email sends are no-ops.
-- `EMAIL_FROM` (optional): from-address for outbound mail (for example `noreply@mail.lakebridgecap.com`).
+- `EMAIL_FROM` (optional): from-address for the feedback-notification pipeline (currently `feedback@landadvisors.com`). Client-facing sends override this per call.
 - `NEXT_PUBLIC_FEEDBACK_ENABLED` (optional, defaults to `true`): set to `false` to disable the in-app feedback widget in production.
 - `NEXT_PUBLIC_COMMIT_SHA` (auto-injected by Vercel from the build commit; do not set manually).
 - `NEXT_PUBLIC_APP_URL` (optional): used to build absolute URLs in emails. Set to the production URL.

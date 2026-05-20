@@ -14,8 +14,20 @@ function getResend(): Resend | null {
   return resendClient;
 }
 
+export type SendEmailAttachment = {
+  filename: string;
+  // Resend accepts a Buffer (binary) or a base64 string. We always pass
+  // Buffer here so callers don't have to think about encoding.
+  content: Buffer;
+};
+
 export type SendEmailInput = {
+  // Optional per-call override. When omitted, falls back to env.EMAIL_FROM
+  // (the feedback-pipeline default). Client-facing sends (OM blast, Deal
+  // Team) pass an explicit from like `cshiota@landadvisors.com`.
+  from?: string;
   to: string | string[];
+  cc?: string | string[];
   subject: string;
   // One of `react` or `html` should be provided. `react` wins if both are.
   react?: React.ReactElement;
@@ -26,6 +38,8 @@ export type SendEmailInput = {
   replyTo?: string | string[];
   // Optional: tag the send for grouping in Resend's dashboard.
   tags?: { name: string; value: string }[];
+  // File attachments. Each entry is sent inline with the message.
+  attachments?: SendEmailAttachment[];
 };
 
 export type SendEmailResult =
@@ -35,7 +49,7 @@ export type SendEmailResult =
 // Single entry point for outbound mail. Behaviors:
 // - RESEND_API_KEY unset → "disabled" result, logs the intended send to
 //   stdout so dev can verify the trigger fired without actually emailing.
-// - EMAIL_FROM unset → "config" result, refuses to send (sender required).
+// - No `from` (neither passed nor in EMAIL_FROM) → "config" result.
 // - Resend API error → "api" result with the error message; never throws.
 //   Callers should treat email as fire-and-forget side effects: a failed
 //   notification shouldn't break the user-facing action that triggered it.
@@ -49,24 +63,30 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     });
     return { ok: false, reason: "disabled" };
   }
-  if (!env.EMAIL_FROM) {
-    console.warn("[email:config-error] EMAIL_FROM not set; refusing to send", {
+  const from = input.from ?? env.EMAIL_FROM;
+  if (!from) {
+    console.warn("[email:config-error] no sender; refusing to send", {
       to: input.to,
       subject: input.subject,
     });
-    return { ok: false, reason: "config", error: "EMAIL_FROM not set" };
+    return { ok: false, reason: "config", error: "No `from` address (neither passed nor EMAIL_FROM)" };
   }
 
   try {
     // Resend's SDK accepts EITHER `react` (renders to HTML server-side) or
     // `html`. We pass through whichever the caller provided.
     const payload = {
-      from: env.EMAIL_FROM,
+      from,
       to: input.to,
+      cc: input.cc,
       subject: input.subject,
       replyTo: input.replyTo,
       text: input.text,
       tags: input.tags,
+      attachments: input.attachments?.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+      })),
       ...(input.react ? { react: input.react } : { html: input.html ?? "" }),
     };
     const result = await client.emails.send(payload);

@@ -38,6 +38,7 @@ import {
   getOmBlastTemplateContext,
   getOrgCcOptions,
   previewBlastRecipients,
+  sendBlastEmails,
   setBuilderCcUsers,
   type BlastPreviewRow,
 } from "../actions";
@@ -537,19 +538,34 @@ export function BlastModal({
               await setBuilderCcUsers({ dealId, builderId, userIds });
             }}
             onSend={async (emails) => {
-              const atts = emails[0]?.attachments ?? [];
-              const attDesc =
-                atts.length === 0
-                  ? ""
-                  : ` with ${atts.length} attachment${atts.length === 1 ? "" : "s"}`;
-              toast.success(
-                `Mock-sent ${emails.length} ${emails.length === 1 ? "email" : "emails"}${attDesc}`,
-                {
-                  description:
-                    "Email infrastructure isn't wired yet — no real messages were sent.",
-                  duration: 5000,
-                },
-              );
+              const result = await sendBlastEmails(emails);
+              if (result.failed === 0) {
+                toast.success(
+                  `Sent ${result.sent} ${result.sent === 1 ? "email" : "emails"}`,
+                  { duration: 4000 },
+                );
+              } else if (result.sent === 0) {
+                const first = result.outcomes.find((o) => !o.ok);
+                toast.error(
+                  `Send failed for all ${result.failed} ${result.failed === 1 ? "email" : "emails"}`,
+                  {
+                    description:
+                      first && !first.ok ? first.reason : "Check Resend logs.",
+                    duration: 8000,
+                  },
+                );
+              } else {
+                const failed = result.outcomes.filter((o) => !o.ok);
+                toast.warning(
+                  `Sent ${result.sent}, failed ${result.failed}`,
+                  {
+                    description: failed
+                      .map((f) => `${f.builderName}: ${"reason" in f ? f.reason : ""}`)
+                      .join("; "),
+                    duration: 10000,
+                  },
+                );
+              }
             }}
             onBack={() => setStep("filter")}
             onClose={() => onOpenChange(false)}

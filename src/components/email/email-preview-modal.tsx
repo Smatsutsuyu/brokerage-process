@@ -134,8 +134,8 @@ type EmailPreviewBaseProps = {
   onCcChange?: (input: { builderId: string; userIds: string[] }) => Promise<void> | void;
   // Called when the user clicks Send. The actual transport (Resend etc.)
   // is the caller's concern — this modal only owns the compose/preview UX.
-  // For now every caller passes a no-op + toast since email infra isn't
-  // wired up; the signature is here so we don't have to refactor when it is.
+  // Callers wire to the sendBlastEmails server action which handles
+  // Blob-attachment fetch + per-builder Resend calls.
   onSend?: (emails: ResolvedEmail[]) => Promise<void> | void;
 };
 
@@ -369,10 +369,11 @@ export function EmailPreviewBody({
       if (onSend) {
         await onSend(resolved);
       } else {
-        // Default: mocked send. Real Resend wiring lands when the sender
-        // domain is verified (landadvisors.com DNS pending).
-        toast.success(`Mock-sent ${resolved.length} ${resolved.length === 1 ? "email" : "emails"}`, {
-          description: "Email infrastructure isn't wired yet — no real messages were sent.",
+        // No onSend wired — shouldn't happen in production, but log loudly
+        // so a misconfigured caller surfaces in dev rather than silently
+        // dropping a click.
+        toast.error("No send handler wired to this modal", {
+          description: "Pass an onSend callback to actually send.",
           duration: 5000,
         });
       }
@@ -667,9 +668,6 @@ export function EmailPreviewBody({
         )}
 
       <DialogFooter>
-        <div className="mr-auto text-[10px] text-gray-500">
-          Preview only — sending isn&rsquo;t wired up yet (Resend domain pending).
-        </div>
         {onBack ? (
           <Button type="button" variant="outline" onClick={onBack}>
             <ArrowLeft className="h-3.5 w-3.5" />

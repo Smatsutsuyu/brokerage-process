@@ -255,12 +255,12 @@ Templated outputs only. No LLM calls.
 - **Documents**: per-checklist-item upload + private streaming view + delete via Vercel Blob (2026-05-06). PDF inline viewer works; Excel/image previews deferred. Versioning at data layer (each upload bumps version); version-history UI deferred.
 - **PDFs shipped**: Marketing Report (per-builder tier + comments), Q&A File (approved items), Issues Report. Land Advisors branding via bundled Metropolis font + the real LAO logo image.
 - **PDFs deferred to a future engagement**: Custom Underwriting File (xlsx), CFD Analysis, Premium Analysis, Valuation, Entitlement Schedule, Entitlement Summary. These items still surface PlannedAction placeholder buttons on their checklist rows.
-- **Email pipeline (Resend)**: send wrapper + notify dispatchers wired; sender domain on `portal.lakebridgecap.com` for dev. Phase 2 production cutover to a `landadvisors.com` sender is pending DNS coordination with LAO IT (see Open Architectural Question below). Templated feedback notifications work end-to-end; OM blast preview modal renders the recipient list (tier + lead + opt-out filters) but the actual send button is wired off pending Chris's sign-off on the recipient logic.
+- **Email pipeline (Resend)**: single Resend account on the verified `landadvisors.com` domain serves both pipelines. Feedback notifications send from `feedback@landadvisors.com` (via `EMAIL_FROM`). Client-facing sends (OM blast + Deal Team) use a hardcoded `cshiota@landadvisors.com` from the composer's sender dropdown, passed as a per-call `from` override. `sendBlastEmails` server action fetches selected attachments from Vercel Blob, then calls Resend per builder/team with partial-failure reporting back to the composer toast.
 
 ### Phase 3: Polish, Operations, Handoff (2 weeks) — in progress
 
 - **Documentation pass (this commit)**: [docs/operations.md](docs/operations.md), [docs/schema.md](docs/schema.md), [docs/features.md](docs/features.md), [docs/build-progress.md](docs/build-progress.md). CLAUDE.md updated to point at them.
-- **Outstanding**: production cutover to `landadvisors.com` sender domain (Resend + DNS + EMAIL_FROM env). Audit log surface. Recorded video walkthroughs. Architecture diagram. Final security + dependency audit.
+- **Outstanding**: audit log surface. Recorded video walkthroughs. Architecture diagram. Final security + dependency audit.
 
 ---
 
