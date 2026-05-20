@@ -139,7 +139,7 @@ The platform sends mail through Resend. One Resend account covers both pipelines
 - **DNS host for `landadvisors.com`**: the records from Resend are published at LAO IT's DNS host. Verification takes minutes to a few hours.
 - **Vercel environment variables**:
   - `RESEND_API_KEY` (Secret): the API key from Resend, scoped to send-only.
-  - `EMAIL_FROM`: the from-address for the feedback pipeline only — `feedback@landadvisors.com`. Client-facing sends (OM blast, Deal Team) use a hardcoded `cshiota@landadvisors.com` from the composer's sender dropdown and override `from` on the per-send call.
+  - `EMAIL_FROM`: the from-address for the feedback pipeline only — `no-reply@landadvisors.com`. The `no-reply` prefix is deliberate: feedback notifications are one-way and replies aren't monitored. Client-facing sends (OM blast, Deal Team) use a hardcoded `cshiota@landadvisors.com` from the composer's sender dropdown and override `from` on the per-send call.
 
 When `RESEND_API_KEY` is unset or empty, the platform's `sendEmail` helper becomes a no-op: it logs the intended send and returns success. The user-facing action does not fail. This lets dev boot without a Resend account.
 
@@ -230,7 +230,7 @@ Canonical list of expected env vars (from `src/lib/env.ts`):
 - `BETTER_AUTH_SECRET` (Sensitive, required, 32+ chars): signing secret for auth sessions.
 - `BETTER_AUTH_URL` (required): the public URL of the app (production: `https://brokerage.lakebridgecap.com`).
 - `RESEND_API_KEY` (Sensitive, optional): Resend API key. When unset, email sends are no-ops.
-- `EMAIL_FROM` (optional): from-address for the feedback-notification pipeline (currently `feedback@landadvisors.com`). Client-facing sends override this per call.
+- `EMAIL_FROM` (optional): from-address for the feedback-notification pipeline (currently `no-reply@landadvisors.com`). Client-facing sends override this per call.
 - `NEXT_PUBLIC_FEEDBACK_ENABLED` (optional, defaults to `true`): set to `false` to disable the in-app feedback widget in production.
 - `NEXT_PUBLIC_COMMIT_SHA` (auto-injected by Vercel from the build commit; do not set manually).
 - `NEXT_PUBLIC_APP_URL` (optional): used to build absolute URLs in emails. Set to the production URL.

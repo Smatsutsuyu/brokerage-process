@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { Building2, ChevronDown, ChevronUp, Contact, MessageSquare, Users } from "lucide-react";
+import { Building2, Contact, MessageSquare, Users } from "lucide-react";
+import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -8,31 +8,22 @@ import {
   checklistCategories,
   userDealOrders,
 } from "@/db/schema";
-import { and, eq, sql } from "drizzle-orm";
 import { LandAdvisorsLogo } from "@/components/brand/logo";
 import { NewDealButton } from "@/components/layout/new-deal-button";
-import { moveDealDown, moveDealUp } from "@/components/layout/reorder-actions";
+import {
+  SidebarDealsList,
+  type SidebarDealItem,
+} from "@/components/layout/sidebar-deals-list";
 import { SidebarNavLink } from "@/components/layout/sidebar-nav-link";
 import { UserLink } from "@/components/layout/user-link";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { cn } from "@/lib/utils";
 
 type SidebarProps = {
   activeDealId?: string;
 };
 
 type Phase = "phase_1" | "phase_2" | "phase_3" | "phase_4";
-
-// Inferred phase chip styling — matches the phase-section header colors
-// in the checklist view so the visual link is consistent.
-const PHASE_CHIP: Record<Phase | "complete", { label: string; cls: string }> = {
-  phase_1: { label: "Phase 1", cls: "bg-blue-100 text-blue-800" },
-  phase_2: { label: "Phase 2", cls: "bg-emerald-100 text-emerald-800" },
-  phase_3: { label: "Phase 3", cls: "bg-purple-100 text-purple-800" },
-  phase_4: { label: "Phase 4", cls: "bg-orange-100 text-orange-800" },
-  complete: { label: "Complete", cls: "bg-green-600 text-white" },
-};
 
 export async function Sidebar({ activeDealId }: SidebarProps) {
   const [org, me] = await Promise.all([getCurrentOrg(), getCurrentUser()]);
@@ -85,6 +76,23 @@ export async function Sidebar({ activeDealId }: SidebarProps) {
     return "complete";
   }
 
+  // Pre-shape rows into the client component's expected SidebarDealItem
+  // shape (numbers coerced, phase derived). Keeps the client free of
+  // Drizzle types + DB-typing concerns.
+  const items: SidebarDealItem[] = dealRows.map((d) => {
+    const total = Number(d.totalItems ?? 0);
+    return {
+      id: d.id,
+      name: d.name,
+      city: d.city,
+      state: d.state,
+      priority: (d.priority ?? "normal") as "normal" | "high",
+      total,
+      done: Number(d.doneItems ?? 0),
+      phase: total > 0 ? inferPhase(d) : null,
+    };
+  });
+
   return (
     <aside className="flex h-full min-h-0 w-[260px] flex-shrink-0 flex-col border-r border-gray-200 bg-white">
       <div className="border-b border-gray-200 p-4">
@@ -97,95 +105,7 @@ export async function Sidebar({ activeDealId }: SidebarProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">
-        {dealRows.length === 0 ? (
-          <div className="px-3 py-6 text-center text-xs text-gray-400 italic">
-            No deals yet. Run <code>npm run db:seed</code> to add sample data.
-          </div>
-        ) : (
-          dealRows.map((deal, idx) => {
-            const isActive = deal.id === activeDealId;
-            const total = Number(deal.totalItems ?? 0);
-            const done = Number(deal.doneItems ?? 0);
-            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-            const phaseChip = total > 0 ? PHASE_CHIP[inferPhase(deal)] : null;
-            const canMoveUp = idx > 0;
-            const canMoveDown = idx < dealRows.length - 1;
-            // Bound server actions to this deal's id; the rendered <form>
-            // posts with no body and the action receives the bound arg.
-            const moveUpBound = moveDealUp.bind(null, deal.id);
-            const moveDownBound = moveDealDown.bind(null, deal.id);
-            return (
-              <div
-                key={deal.id}
-                className={cn(
-                  "group relative mb-1 rounded-lg border border-transparent transition-colors",
-                  isActive ? "border-brand-blue bg-blue-50" : "hover:bg-gray-100",
-                )}
-              >
-                <Link href={`/deals/${deal.id}`} className="block px-3.5 py-3">
-                  <div className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-gray-900">
-                    {deal.priority === "high" && (
-                      <span className="text-brand-accent text-xs">★</span>
-                    )}
-                    <span className="truncate">{deal.name}</span>
-                    {phaseChip && (
-                      <span
-                        className={cn(
-                          "ml-auto flex-shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase",
-                          phaseChip.cls,
-                        )}
-                      >
-                        {phaseChip.label}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] text-gray-400">
-                    <span className="truncate">
-                      {[deal.city, deal.state].filter(Boolean).join(", ") || "—"}
-                    </span>
-                    <span className="ml-auto flex items-center gap-1.5">
-                      <span className="h-1 w-12 overflow-hidden rounded-full bg-gray-200">
-                        <span
-                          className="bg-brand-blue block h-full"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </span>
-                      <span className="font-medium tabular-nums">
-                        {done}/{total}
-                      </span>
-                    </span>
-                  </div>
-                </Link>
-                {/* Reorder controls: only visible on hover so they don't
-                    compete with the deal info at rest. Sit absolutely
-                    over the right edge; small gap from the phase chip
-                    above. */}
-                <div className="pointer-events-none absolute top-1 right-1 hidden flex-col gap-0.5 group-hover:flex">
-                  <form action={moveUpBound}>
-                    <button
-                      type="submit"
-                      disabled={!canMoveUp}
-                      aria-label={`Move ${deal.name} up`}
-                      className="pointer-events-auto flex h-4 w-4 items-center justify-center rounded bg-white/90 text-gray-500 shadow-sm hover:text-gray-900 disabled:opacity-30 disabled:hover:text-gray-500"
-                    >
-                      <ChevronUp className="h-3 w-3" />
-                    </button>
-                  </form>
-                  <form action={moveDownBound}>
-                    <button
-                      type="submit"
-                      disabled={!canMoveDown}
-                      aria-label={`Move ${deal.name} down`}
-                      className="pointer-events-auto flex h-4 w-4 items-center justify-center rounded bg-white/90 text-gray-500 shadow-sm hover:text-gray-900 disabled:opacity-30 disabled:hover:text-gray-500"
-                    >
-                      <ChevronDown className="h-3 w-3" />
-                    </button>
-                  </form>
-                </div>
-              </div>
-            );
-          })
-        )}
+        <SidebarDealsList deals={items} activeDealId={activeDealId} />
       </nav>
 
       {/* Org-wide directories — Contacts and Builders. Visible to everyone

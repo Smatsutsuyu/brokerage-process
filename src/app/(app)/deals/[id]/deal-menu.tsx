@@ -2,11 +2,11 @@
 
 import { useState, useTransition } from "react";
 import {
+  ChevronDown,
   FileStack,
   FileText,
   ImageIcon,
   Mail,
-  MoreHorizontal,
   Pencil,
   Sparkles,
   Trash2,
@@ -55,11 +55,13 @@ export function DealMenu({ deal, hasBanner }: DealMenuProps) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-          title="Deal options"
+          className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-gray-700 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900"
+          title="Edit deal, change banner, generate reports"
           aria-label="Deal options"
         >
-          <MoreHorizontal className="h-4 w-4" />
+          <Pencil className="h-3.5 w-3.5" />
+          Edit
+          <ChevronDown className="h-3 w-3 text-gray-400" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-60">
           <div className="flex items-center gap-1.5 border-b border-gray-100 px-2 py-1.5 text-[10px] font-bold tracking-wider text-amber-700 uppercase">

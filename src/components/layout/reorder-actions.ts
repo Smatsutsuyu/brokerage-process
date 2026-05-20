@@ -87,3 +87,34 @@ export async function moveDealUp(dealId: string): Promise<void> {
 export async function moveDealDown(dealId: string): Promise<void> {
   await move(dealId, "down");
 }
+
+// Bulk reorder. Caller passes the full new ordering as a list of deal IDs;
+// server validates each ID belongs to the user's org, then dense-orders
+// them 1..N. Used by the sidebar's drag-and-drop UI so a single drop
+// commits the new order in one round-trip (vs N swap calls).
+//
+// Silently drops unknown / sibling-org IDs rather than throwing — keeps
+// the UI's optimistic reorder responsive even if the client list is
+// briefly stale (e.g. another tab added a deal mid-drag).
+export async function reorderDeals(orderedDealIds: string[]): Promise<void> {
+  const me = await getCurrentUser();
+  const org = await getCurrentOrg();
+  if (!me || !org) return;
+  if (orderedDealIds.length === 0) return;
+
+  // Pull the user's full effective order so we know which IDs are valid
+  // and what the canonical full list is. Any IDs in the caller's list
+  // that aren't in this set get dropped (forged / cross-org / deleted).
+  const ordered = await getOrderedDeals(me.id, org.id);
+  const validIds = new Set(ordered.map((d) => d.id));
+  const filtered = orderedDealIds.filter((id) => validIds.has(id));
+  // Append any deals the caller didn't mention (e.g. one just created
+  // server-side after the client snapshot) so we don't drop them from
+  // the sidebar. They land at the end in their current relative order.
+  const mentioned = new Set(filtered);
+  const tail = ordered.filter((d) => !mentioned.has(d.id)).map((d) => d.id);
+  const finalOrder = [...filtered, ...tail];
+
+  await applyDenseOrder(me.id, finalOrder);
+  revalidatePath("/", "layout");
+}

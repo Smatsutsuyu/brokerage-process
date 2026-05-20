@@ -13,17 +13,17 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 - New `sendBlastEmails` server action in deal actions: thin org-scope wrapper around `sendResolvedEmails`.
 - `BlastModal` and `DealTeamSendButton` now call the real action — toast reports `sent / failed` counts and lists per-builder reasons on partial failure. Removed the "Preview only — sending isn't wired up yet" footer + the mock-send fallback comments.
 - Simplified the composer's sender dropdown to a single fixed option, `cshiota@landadvisors.com` (Chris-only). Per-user landadvisors addresses can come later without changing the modal.
-- `.env.example` `EMAIL_FROM` updated to `feedback@landadvisors.com`. CLAUDE.md + operations.md + build-progress.md updated to reflect the single-account / single-domain consolidation.
+- `.env.example` `EMAIL_FROM` updated to `no-reply@landadvisors.com`. CLAUDE.md + operations.md + build-progress.md updated to reflect the single-account / single-domain consolidation.
 - Typecheck passes clean.
 
 ### Decisions
 - **Sender dropdown drops the signed-in-user fallback.** Per Chris: everyone sends as Chris from landadvisors for now. Users sign in with `@lakebridgecap.com` addresses which can't be used as a sender without a separate domain verification.
-- **Single Resend account, landadvisors.com only.** Feedback notifications cut over from `feedback@lakebridgecap.com` to `feedback@landadvisors.com` to consolidate into one API key + one verified domain.
+- **Single Resend account, landadvisors.com only.** Feedback notifications cut over from `feedback@lakebridgecap.com` to `no-reply@landadvisors.com` to consolidate into one API key + one verified domain. The `no-reply` prefix avoids needing LAO IT to provision a monitored mailbox.
 - **Link-type attachments inline as body text, not server-side fetched.** Most are auth-required Dropbox / SharePoint folder URLs; fetching would 401. File attachments still flow as proper Resend attachments (Buffer from Blob).
 - **Sequential per-builder sends, not Resend batch endpoint.** Cleaner error reporting; respects free-tier rate limits naturally.
 
 ### Deferred / Pending
-- Vercel env var sweep: confirm `RESEND_API_KEY` is the landadvisors key (Chris confirmed it is) and that `EMAIL_FROM` is set to `feedback@landadvisors.com` in production.
+- Vercel env var sweep: confirm `RESEND_API_KEY` is the landadvisors key (Chris confirmed it is) and that `EMAIL_FROM` is set to `no-reply@landadvisors.com` in production.
 - Per-user `@landadvisors.com` sender addresses — would let the composer offer the signed-in user as a second "From" option.
 
 ### Follow-up (same day)

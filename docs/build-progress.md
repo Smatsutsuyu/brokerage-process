@@ -111,7 +111,7 @@ DNS records for `landadvisors.com` are in. Resend consolidated to a single accou
 - **`sendBlastEmails` server action** in `actions.ts` — thin org-scope wrapper around `sendResolvedEmails`.
 - **`BlastModal` and `DealTeamSendButton` now call the real action**, replacing the toast mocks. Composer toast reports success / partial-failure / total-failure with per-builder reasons.
 - **Sender dropdown simplified to a single fixed option, `cshiota@landadvisors.com`.** The signed-in-user fallback option was dropped, users sign in with `@lakebridgecap.com` addresses which can't be used as a sender without a separate domain verification.
-- **`EMAIL_FROM` cutover** to `feedback@landadvisors.com`. Feedback notifications now send from the same verified domain as the client-facing pipeline.
+- **`EMAIL_FROM` cutover** to `no-reply@landadvisors.com`. Feedback notifications now send from the same verified domain as the client-facing pipeline; the `no-reply` prefix signals these are one-way (the mailbox isn't monitored — no LAO IT coordination needed to provision a real inbox).
 - **Docs:** `.env.example`, `operations.md`, and `CLAUDE.md` updated to reflect the single-account / single-domain consolidation.
 
 ## DD Tracking + brand sweep + blast UX (2026-05-18)
