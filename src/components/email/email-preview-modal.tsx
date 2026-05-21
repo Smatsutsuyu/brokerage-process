@@ -120,6 +120,12 @@ type EmailPreviewBaseProps = {
   // What we're previewing — surfaces in the modal title.
   // e.g. "OM blast", "Q&A distribution", "Day-of reminder".
   title: string;
+  // Optional override for the description text under the title. When
+  // omitted, the default "one email per builder" copy renders — fits
+  // OM blast / Q&A / Day-of reminder and similar per-builder sends.
+  // Override for flows where that copy is wrong (e.g. single-email
+  // sends to one team grouping like Send Marketing Report).
+  description?: string;
   // Full set of recipients across all builders. The modal groups by
   // builderId so each builder = one outbound email with multiple To:
   // addresses (matches Chris's "one email per builder" rule).
@@ -234,6 +240,7 @@ function groupByBuilder(recipients: EmailRecipient[]) {
 // `EmailPreviewModal` instead — it wraps this in Dialog/DialogContent.
 export function EmailPreviewBody({
   title,
+  description,
   recipients,
   template,
   vars,
@@ -409,9 +416,8 @@ export function EmailPreviewBody({
       <DialogHeader>
         <DialogTitle>Preview &amp; send · {title}</DialogTitle>
         <DialogDescription>
-          One email per builder. Edit the subject or body once and the change
-          applies to every email. Use the arrows to step through recipients
-          and verify the To: line.
+          {description ??
+            "One email per builder. Edit the subject or body once and the change applies to every email. Use the arrows to step through recipients and verify the To: line."}
         </DialogDescription>
       </DialogHeader>
 

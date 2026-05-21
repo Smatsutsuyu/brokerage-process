@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -11,10 +12,12 @@ import {
   type EmailRecipient,
   type EmailSenderChoice,
 } from "@/components/email/email-preview-modal";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -154,6 +157,53 @@ function Inner({ dealId, onClose }: InnerProps) {
     );
   }
 
+  // Empty-state when no Owner Team members are configured (or none are
+  // included in emails). EmailPreviewBody would render its own generic
+  // "no recipients" message that mentions filters + adding emails to
+  // contacts, which is wrong here — for this flow the right fix is to
+  // populate the Owner Team on the Teams tab. Custom CTA points there.
+  if (contextLoaded && recipients.length === 0) {
+    return (
+      <>
+        <DialogHeader>
+          <DialogTitle>Send Marketing Report</DialogTitle>
+          <DialogDescription>
+            No Owner Team members are set up to receive this email.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center">
+          <Users className="h-10 w-10 text-gray-400" />
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-gray-900">
+              No Owner Team for this deal
+            </p>
+            <p className="max-w-md text-[13px] text-gray-600">
+              The Marketing Report goes to the Owner Team. Add at least one
+              Owner Team member with an email (and the Include in emails
+              toggle on) before sending.
+            </p>
+          </div>
+          <Link
+            href={`/deals/${dealId}?tab=team`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            onClick={onClose}
+          >
+            <Users className="h-3.5 w-3.5" />
+            Open Teams tab
+          </Link>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setStep("preview")}>
+            Back
+          </Button>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </>
+    );
+  }
+
   return (
     <>
       <DialogHeader className="sr-only">
@@ -169,8 +219,32 @@ function Inner({ dealId, onClose }: InnerProps) {
           Loading recipients...
         </div>
       ) : (
-        <EmailPreviewBody
+        <>
+          {/* Visible cue that this send targets the Owner Team. The
+              EmailPreviewBody's per-builder paginator below also shows
+              "Owner Team" as the group label, but a banner up front is
+              clearer than relying on the paginator chrome alone.
+              mt-4 pushes it below the dialog's X close button (which
+              sits at top-4 right-4) so they don't overlap. */}
+          <div className="mt-4 flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[12px] text-blue-900">
+            <Users className="h-3.5 w-3.5 flex-shrink-0 text-blue-700" />
+            <span>
+              Sending to the <strong>Owner Team</strong> for this deal (
+              {recipients.length} recipient{recipients.length === 1 ? "" : "s"}
+              ). Manage who&apos;s included on the{" "}
+              <Link
+                href={`/deals/${dealId}?tab=team`}
+                className="underline hover:text-blue-700"
+                onClick={onClose}
+              >
+                Teams tab
+              </Link>
+              .
+            </span>
+          </div>
+          <EmailPreviewBody
           title="Send Marketing Report"
+          description="One email to the Owner Team. Edit the subject or body before sending; the Marketing Report PDF is attached automatically."
           recipients={recipients}
           template={MARKETING_REPORT_DISTRIBUTION_TEMPLATE}
           vars={vars}
@@ -212,6 +286,7 @@ function Inner({ dealId, onClose }: InnerProps) {
             onClose();
           }}
         />
+        </>
       )}
     </>
   );
