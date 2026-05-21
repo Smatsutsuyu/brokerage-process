@@ -6,6 +6,7 @@ import { get } from "@vercel/blob";
 import { db } from "@/db";
 import { documents } from "@/db/schema";
 import type { ResolvedEmail } from "@/components/email/email-preview-modal";
+import { renderGeneratedAttachment } from "@/lib/email/generators";
 
 import { sendEmail, type SendEmailAttachment } from "./send";
 
@@ -85,7 +86,7 @@ function appendLinksToBody(body: string, links: { url: string; label: string | n
 // so the UI can show "20 sent, 3 failed" with details.
 export async function sendResolvedEmails(
   emails: ResolvedEmail[],
-  opts: { orgId: string },
+  opts: { orgId: string; dealId?: string },
 ): Promise<BlastSendResult> {
   // Collect every distinct file documentId across the batch. Resolve them
   // once — even though attachment selection is the same across all per-
@@ -99,6 +100,38 @@ export async function sendResolvedEmails(
     ),
   );
   const fileAttachmentsById = await resolveFileAttachments(documentIds, opts.orgId);
+
+  // Render every distinct generated-attachment key once and reuse the
+  // bytes across per-builder sends. Generators need the dealId to know
+  // what to render; callers attaching kind: "generated" must pass it
+  // via opts. Missing dealId on a generated batch is a programming
+  // error — fail loud here rather than silently dropping the attachment.
+  const generatorKeys = Array.from(
+    new Set(
+      emails.flatMap((e) =>
+        e.attachments.filter((a) => a.kind === "generated").map((a) => a.generator),
+      ),
+    ),
+  );
+  const generatedAttachmentsByKey = new Map<string, SendEmailAttachment>();
+  if (generatorKeys.length > 0) {
+    if (!opts.dealId) {
+      throw new Error(
+        "sendResolvedEmails: opts.dealId is required when any attachment is kind: 'generated'",
+      );
+    }
+    const dealId = opts.dealId;
+    await Promise.all(
+      generatorKeys.map(async (generator) => {
+        const att = await renderGeneratedAttachment({
+          generator,
+          dealId,
+          orgId: opts.orgId,
+        });
+        if (att) generatedAttachmentsByKey.set(generator, att);
+      }),
+    );
+  }
 
   const outcomes: BlastSendOutcome[] = [];
 
@@ -126,6 +159,10 @@ export async function sendResolvedEmails(
       .filter((a): a is Extract<ResolvedEmail["attachments"][number], { kind: "file" }> => a.kind === "file")
       .map((a) => fileAttachmentsById.get(a.documentId))
       .filter((a): a is SendEmailAttachment => Boolean(a));
+    const generatedAtts = email.attachments
+      .filter((a): a is Extract<ResolvedEmail["attachments"][number], { kind: "generated" }> => a.kind === "generated")
+      .map((a) => generatedAttachmentsByKey.get(a.generator))
+      .filter((a): a is SendEmailAttachment => Boolean(a));
     const linkAtts = email.attachments
       .filter((a): a is Extract<ResolvedEmail["attachments"][number], { kind: "link" }> => a.kind === "link")
       .map((a) => ({ url: a.url, label: a.label }));
@@ -149,7 +186,7 @@ export async function sendResolvedEmails(
       bcc: alreadyAddressed ? undefined : email.from.email,
       subject: email.subject,
       text: appendLinksToBody(email.body, linkAtts),
-      attachments: fileAtts,
+      attachments: [...fileAtts, ...generatedAtts],
       tags: [
         { name: "blast-type", value: "outbound" },
         { name: "builder-id", value: email.builderId },

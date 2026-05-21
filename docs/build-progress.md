@@ -102,6 +102,24 @@ Major reconciliation pass against Chris's `Marketing Process Checklist.xlsx` v2 
 - Member-remove flow: hard delete with cascade, last-owner guardrail, fix for inviting a member signing the owner out (`12685c5`).
 - Auto-clean orphan `deal_buyers` rows on builder delete (`1434e4d`, `85e7747`).
 
+## Favicon, deal menu, sidebar drag-and-drop, attachment guards (2026-05-21)
+
+- **LAO favicon** replaces the default Next.js mark. Cropped the triangle icon from `public/lao-logo.jpg`, knocked out the white background to transparent, padded ~22% so it doesn't touch tab edges. Emits `src/app/icon.png` (32) and `src/app/apple-icon.png` (180) via the App Router file convention; old `favicon.ico` removed.
+- **Deal options menu** (top-right of deal header) replaced the muted 3-dots icon with a labeled "Edit" button: pencil + label + chevron, with a visible border at rest. Reads as a clickable affordance instead of a hint.
+- **Sidebar deal list rebuilt on `@dnd-kit/sortable`.** Each row carries a thin always-present grip-handle gutter on the left (no more overlap with the phase chip). Title gets the full first row; phase chip moved to the end of row 2 next to the progress bar so long names no longer truncate. `min-w-0` on the Link container so flex children actually truncate. New `reorderDeals(orderedIds[])` server action persists the full ordering in one round-trip; old `moveDealUp` / `moveDealDown` server actions remain in `reorder-actions.ts` (no UI callers).
+- **`InlineErrorBubble` + `useInlineError` hook** (new, `src/components/inline-error-bubble.tsx`) — reusable rejection-bubble pattern for row-button click validation. Centered horizontally on the trigger, sized to content's preferred single-line width (`w-max` + 320px cap so a narrow parent can't squeeze the bubble into one-word-per-line wrapping), and viewport-clamped via a pre-paint `useLayoutEffect` measurement so it never spills off the screen edge when the trigger is near a viewport boundary. High-contrast red-on-red, auto-dismissing after 6s, click-to-dismiss. Standard pattern for "Send a file and/or link in an email" row buttons; documented in the file's header comment.
+- **Phase 2 row attachment guards.**
+  - **Send Market Study** (`requireAttachment="file"`, noun "Market Study") — rejects if no uploaded file on the row.
+  - **Send DD Folder** for the new "Share Marketing Due Diligence Folder" row (`requireAttachment="any"`, noun "DD folder link or file") — accepts a file or a Dropbox / SharePoint link.
+  - Both surface the inline bubble on rejection; network errors still go through sonner.
+  - New `SHARE_MARKETING_DD_TEMPLATE` email body.
+- **Sonner description text darkened globally** (`!text-gray-700`) so any toast that uses the description slot is readable on white instead of the default low-contrast muted gray.
+
+## Email pipeline follow-ups (2026-05-20)
+
+- **BCC the sender on every client-facing send.** Resend sends through its own SMTP and doesn't deposit in the sender's Outlook Sent Items, so without this Chris had no mailbox record of platform sends. `sendResolvedEmails` now adds `bcc: email.from.email` on each per-builder send, deduped when the sender is already in to/cc. `SendEmailInput` gained a `bcc` field; the feedback pipeline doesn't use it.
+- **`EMAIL_FROM` cutover** from `feedback@landadvisors.com` to `no-reply@landadvisors.com`. Signals that replies aren't monitored and avoids needing LAO IT to provision a monitored mailbox.
+
 ## Email pipeline live cutover (2026-05-20)
 
 DNS records for `landadvisors.com` are in. Resend consolidated to a single account (landadvisors.com domain verified); the older lakebridgecap.com Resend instance is being retired.

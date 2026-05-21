@@ -76,10 +76,39 @@ Thanks,
 {{senderName}}`,
 };
 
+// Phase 2 - Send Marketing Report to Owner Team (with co-brokers + any
+// always-CC users picked at compose time). The freshly-generated PDF is
+// attached server-side at send time.
+export const MARKETING_REPORT_DISTRIBUTION_TEMPLATE: EmailTemplate = {
+  subject: "Marketing Report, {{dealName}} ({{units}} {{type}}, {{city}})",
+  body: `Please find attached the current Marketing Report for {{dealName}}. It reflects the latest buyer interest and where each builder stands.
+
+Let me know if you want to walk through anything on a call.
+
+Thanks,
+{{senderName}}`,
+};
+
 // Phase 2 - Share Market Study.
 export const MARKET_STUDY_TEMPLATE: EmailTemplate = {
   subject: "Market Study, {{dealName}}",
   body: `Please find attached market study that was prepared for the Project. We hope this is helpful in determining pricing, absorption, and segmentation against communities.
+
+Thanks,
+{{senderName}}`,
+};
+
+// Phase 2 - Share Marketing Due Diligence Folder. Usually carries a
+// Dropbox / SharePoint folder URL (added to the checklist row's Link
+// affordance) and optionally an index file. The send button validates
+// file-or-link presence before opening the composer; when the user has
+// added a link, the URL is appended to the body at send time by the
+// blast pipeline's link-inlining behavior.
+export const SHARE_MARKETING_DD_TEMPLATE: EmailTemplate = {
+  subject: "Marketing Due Diligence folder, {{dealName}}",
+  body: `Please find the marketing due diligence folder for {{dealName}} in {{city}}.
+
+Let us know if you have any questions or need access to anything in particular.
 
 Thanks,
 {{senderName}}`,

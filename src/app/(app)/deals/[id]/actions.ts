@@ -2239,12 +2239,17 @@ export async function setDealTeamMemberIncluded(input: {
 // already edited them in the preview modal. The trust boundary is the
 // org check + attachment ownership check inside sendResolvedEmails: a
 // forged documentId from a sibling org can't pull a file.
+//
+// `dealId` is required when any attachment uses kind: "generated" —
+// generators render server-side from the deal's data and need to know
+// which deal. Optional otherwise (file / link attachments don't need it).
 export async function sendBlastEmails(
   emails: ResolvedEmail[],
+  opts?: { dealId?: string },
 ): Promise<BlastSendResult> {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
-  return sendResolvedEmails(emails, { orgId: org.id });
+  return sendResolvedEmails(emails, { orgId: org.id, dealId: opts?.dealId });
 }
 
 // Verifies that an item belongs to the active deal. Useful for any

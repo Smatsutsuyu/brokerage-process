@@ -115,6 +115,11 @@ When you close one, mark `~~done~~` rather than deleting so the running record s
 - **Fix**: one helper in `src/lib/pdf/` centralizes the cast and the response shape.
 - **Effort**: S
 
+### [Code Quality] Migrate DD Tracking PDF from kind: "link" to kind: "generated"
+- **What**: `src/app/(app)/deals/[id]/views/dd-tracking-row-actions.tsx` attaches the DD Tracking PDF as `kind: "link"`, which embeds the URL in the email body as text rather than attaching the bytes. Recipients have to click through and authenticate. Same gap the Marketing Report send had before it migrated to `kind: "generated"` (commit landed 2026-05-19).
+- **Fix**: extract `generateDdTrackingPdf({ dealId, orgId })` into `src/lib/pdf/generate-dd-tracking.ts` (mirror `src/lib/pdf/generate-marketing-report.ts`). Refactor the API route to call it. Wire `dd-tracking` into the generator registry in `src/lib/email/generators.ts` (currently throws "not yet implemented"). Switch `dd-tracking-row-actions.tsx` to pass `{ kind: "generated", generator: "dd-tracking", filename: ... }`. Update the `DealTeamSendButton` call site to forward `dealId` through.
+- **Effort**: M
+
 ### [Code Quality] Extract the "builder has contacts on deal" EXISTS subquery
 - **What**: Same EXISTS subquery hand-written in `src/app/(app)/builders/page.tsx`, `src/app/api/deals/[id]/marketing-report.pdf/route.ts`, and `src/app/(app)/builders/actions.ts`. Will be used in more PDF routes once the Compiled Package lands.
 - **Fix**: `hasVisibleContactsOnDeal(dealIdExpr, builderIdExpr)` helper returning a Drizzle `sql` fragment.

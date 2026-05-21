@@ -31,6 +31,7 @@ import { DdTrackingRowActions } from "./dd-tracking-row-actions";
 import { MarketingReportPdfButton } from "./marketing-report-pdf-button";
 import { OmBlastButton } from "./om-blast-button";
 import { QaFilePdfButton } from "./qa-file-pdf-button";
+import { SendMarketingReportButton } from "./send-marketing-report-button";
 import { ShareDdMaterialRowActions } from "./share-dd-material-row-actions";
 
 import {
@@ -42,6 +43,7 @@ import {
   OFFERS_FOLLOWUP_TEMPLATE,
   QA_FILE_TEMPLATE,
   SCHEDULE_SOO_REVIEW_TEMPLATE,
+  SHARE_MARKETING_DD_TEMPLATE,
 } from "@/lib/email-templates";
 import { Send } from "lucide-react";
 import { PsaAttorneyInline, type PsaAttorneyState } from "./psa-attorney";
@@ -107,6 +109,13 @@ function isQaFileItem(name: string): boolean {
 function isShareMarketStudyItem(name: string): boolean {
   return name.toLowerCase().includes("share market study");
 }
+// Phase 2 "Share Marketing Due Diligence Folder" row. Usually shared
+// as a Dropbox / SharePoint folder URL (per the row's universal Link
+// affordance), occasionally an index file. Validation accepts either
+// before opening the composer.
+function isShareMarketingDdItem(name: string): boolean {
+  return name.toLowerCase().includes("marketing due diligence");
+}
 function isOffersDueNoticeItem(name: string): boolean {
   const n = name.toLowerCase();
   return n.includes("offer due date") || n.includes("offers due");
@@ -116,6 +125,13 @@ function isDayOfReminderItem(name: string): boolean {
 }
 function isFollowUpMissingOffersItem(name: string): boolean {
   return name.toLowerCase().includes("follow up missing");
+}
+// Phase 2 "Send Marketing Report" row. Two-step modal: preview the
+// freshly-generated PDF, then compose email to Owner Team with CC
+// picker pre-stocked with org users (Sean picks Loan + co-brokers).
+function isSendMarketingReportItem(name: string): boolean {
+  const n = name.trim().toLowerCase();
+  return n === "send marketing report";
 }
 // Phase 3 Schedule Summary of Offer Review row -> DealTeamSendButton
 // to Owner + Broker teams.
@@ -427,6 +443,21 @@ export function PhaseSection({
                                 template={MARKET_STUDY_TEMPLATE}
                                 defaultTiers={["green", "yellow"]}
                                 attachmentSourceItemId={item.id}
+                                requireAttachment="file"
+                                attachmentNoun="Market Study"
+                              />
+                            )}
+                            {isShareMarketingDdItem(item.name) && (
+                              <BuyerBlastButton
+                                dealId={dealId}
+                                label="Send DD Folder"
+                                modalTitle="Marketing Due Diligence folder"
+                                title="Email the DD folder link / file (attached from this row) to green/yellow buyers."
+                                template={SHARE_MARKETING_DD_TEMPLATE}
+                                defaultTiers={["green", "yellow"]}
+                                attachmentSourceItemId={item.id}
+                                requireAttachment="any"
+                                attachmentNoun="DD folder link or file"
                               />
                             )}
                             {isOffersDueNoticeItem(item.name) && (
@@ -459,6 +490,13 @@ export function PhaseSection({
                                 defaultTiers={["green", "yellow"]}
                                 excludeOfferReceived
                               />
+                            )}
+                            {/* Phase 2 "Send Marketing Report" row -> two-step
+                                modal (PDF preview -> email composer). To: Owner
+                                Team. CC picker pre-stocked with org users for
+                                co-brokers + Loan + anyone else needed. */}
+                            {isSendMarketingReportItem(item.name) && (
+                              <SendMarketingReportButton dealId={dealId} />
                             )}
                             {/* Phase 3 Schedule SOO Review -> Deal Team
                                 send (Owner + Broker per Excel). */}

@@ -78,9 +78,24 @@ export type EmailCcInitialEntry = {
   userIds: string[];
 };
 
-// One possible attachment the user can pick from. "file" = a stored doc
-// we'll fetch from blob storage at send time. "link" = an external URL —
-// at send time we either link inline or attempt a fetch (host-dependent).
+// One possible attachment the user can pick from. Three kinds:
+//
+//   "file":      a stored document we fetch from Vercel Blob at send
+//                time and attach as bytes. Recipient gets a real
+//                attachment in their inbox.
+//
+//   "link":      an external URL (Dropbox folder, SharePoint, etc.)
+//                that we can't attach because it's access-gated by
+//                another system. The send handler appends the URL to
+//                the body as text. Do NOT use this for our own PDF
+//                routes — recipients without a session can't fetch.
+//
+//   "generated": a PDF we render server-side at send time and attach
+//                as bytes. The `generator` string keys into a registry
+//                in lib/email/blast.ts (marketing-report, dd-tracking,
+//                etc.). Use this for any in-app PDF that needs to ship
+//                to recipients without app accounts.
+//
 // `id` is opaque to the modal; caller derives stable IDs so the checkbox
 // state survives across re-renders.
 export type EmailAttachment =
@@ -92,7 +107,13 @@ export type EmailAttachment =
       mimeType?: string | null;
       sizeBytes?: number | null;
     }
-  | { id: string; kind: "link"; url: string; label: string | null };
+  | { id: string; kind: "link"; url: string; label: string | null }
+  | {
+      id: string;
+      kind: "generated";
+      generator: "marketing-report" | "dd-tracking";
+      filename: string;
+    };
 
 // Shared props between the standalone modal and the embeddable body.
 type EmailPreviewBaseProps = {
@@ -583,7 +604,7 @@ export function EmailPreviewBody({
                             onChange={() => toggleAttachment(c.id)}
                             className="h-3.5 w-3.5 rounded border-gray-300"
                           />
-                          {c.kind === "file" ? (
+                          {c.kind === "file" && (
                             <>
                               <Paperclip className="h-3 w-3 text-blue-700" />
                               <span
@@ -600,7 +621,24 @@ export function EmailPreviewBody({
                                 </span>
                               )}
                             </>
-                          ) : (
+                          )}
+                          {c.kind === "generated" && (
+                            <>
+                              <Paperclip className="h-3 w-3 text-emerald-700" />
+                              <span
+                                className={cn(
+                                  "font-medium",
+                                  checked ? "text-emerald-900" : "text-gray-700",
+                                )}
+                              >
+                                {c.filename}
+                              </span>
+                              <span className="ml-auto text-[10px] tracking-wider text-emerald-700/70 uppercase">
+                                generated at send
+                              </span>
+                            </>
+                          )}
+                          {c.kind === "link" && (
                             <>
                               <Paperclip className="h-3 w-3 text-amber-700" />
                               <span

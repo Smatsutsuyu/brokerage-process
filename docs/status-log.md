@@ -4,6 +4,32 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-21 — UI polish, attachment guards, DD folder send
+
+### Done
+- **LAO favicon.** Cropped the triangle icon from the LAO logo JPG, knocked out the white background to transparent, padded ~22% so it doesn't touch tab edges. Emits `src/app/icon.png` + `apple-icon.png` via Next.js App Router file conventions; old `favicon.ico` removed.
+- **Deal options menu** in the deal header replaced the muted 3-dots icon with a labeled "Edit" button (pencil + label + chevron, with a visible border at rest). Reads as a clickable affordance instead of a hint.
+- **Sidebar deal list now uses `@dnd-kit/sortable`** for drag-to-reorder. Thin always-present grip-handle gutter on the left; row title gets the full first row; phase chip moved to the end of row 2 next to the progress bar. New `reorderDeals(orderedIds[])` server action persists the full ordering in one round-trip.
+- **`InlineErrorBubble` + `useInlineError` hook** (new `src/components/inline-error-bubble.tsx`) — reusable rejection-bubble pattern for row-button click validation. Bubble is centered horizontally on the trigger, sized to content's natural width (`w-max` + 320px cap so it doesn't wrap word-by-word inside a narrow parent), and viewport-clamped via a `useLayoutEffect` measurement so it never overflows the screen edge when the trigger is near a viewport boundary. Documented in the file's header comment as the convention for any future "send a file and/or link in an email" row button.
+- **Phase 2 attachment pre-flight guards.** `BuyerBlastButton` gained `requireAttachment="file" | "any"` + `attachmentNoun`. Send Market Study uses `"file"`; new Send DD Folder (for the "Share Marketing Due Diligence Folder" row) uses `"any"` since these are usually shared as a Dropbox / SharePoint folder URL. Rejection surfaces an inline red bubble anchored under the button. Network errors during pre-flight still go through sonner.
+- **New `SHARE_MARKETING_DD_TEMPLATE`** email body for the DD folder share.
+- **Sonner description text globally darkened** to `!text-gray-700` so toast body copy is readable on white instead of the default near-invisible muted gray.
+- **Docs sweep.** CLAUDE.md Phase 2 callout, operations.md (Sender BCC + Attachment pre-flight subsections), build-progress.md (new daily entry + email pipeline follow-ups for BCC and the no-reply rename), features.md (attachment-gate section + sender/BCC explanation) all brought into sync with shipped behavior.
+
+### Decisions
+- **Inline bubble, not sonner toast, for row-button validation rejections.** Sonner stacks in a fixed corner and can't tell the user which lookalike "Send …" button failed. The inline bubble is anchored to the failing button — unmissable. Codified in the `InlineErrorBubble` header comment.
+- **Two-mode validation.** File-required vs file-or-link distinguishes "recipient needs the document attached" sends (Market Study, Q&A File) from "a folder URL is fine" sends (DD folder).
+- **Drop the old hover-arrow reorder UI.** Drag handle in a dedicated gutter is the clearer affordance; arrows were clipping the phase chip / priority star.
+
+### Deferred / Pending
+- Per-user `@landadvisors.com` sender addresses — would let the composer offer the signed-in user as a second "From" option.
+- Old `moveDealUp` / `moveDealDown` server actions still exist with no UI callers — keeping them around in case anything external depends on them; safe to delete later.
+
+### Blockers
+- None.
+
+---
+
 ## 2026-05-20 — Email pipeline live cutover (landadvisors.com)
 
 ### Done

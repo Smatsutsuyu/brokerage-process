@@ -1,16 +1,35 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Mail } from "lucide-react";
+import { Loader2, Mail } from "lucide-react";
+import { toast } from "sonner";
 
+import { useInlineError } from "@/components/inline-error-bubble";
 import { type EmailTemplate } from "@/lib/email-templates";
 import { cn } from "@/lib/utils";
 
-import { getLeadsOnDeal } from "../actions";
+import { getAttachmentsForItem, getLeadsOnDeal } from "../actions";
 import { BlastModal } from "./blast-modal";
 import type { LeadOption } from "./lead-picker";
 
 type Tier = "green" | "yellow" | "red" | "not_selected";
+
+// Validation mode for the pre-flight check on click.
+//
+//   "file" — at least one uploaded file must be on the source row. Use
+//            for sends where the recipient needs the document attached
+//            (Market Study, Q&A File). Links don't count because a URL
+//            in the body doesn't put the document in their inbox.
+//
+//   "any"  — at least one file OR link must be on the source row. Use
+//            for sends where a Dropbox / SharePoint folder URL is the
+//            common case (Share Marketing Due Diligence Folder).
+//
+// Inline-bubble rejection (not sonner toast) per the convention in
+// `src/components/inline-error-bubble.tsx`. See that file's header
+// comment for the broader pattern across "send a file and/or link"
+// row buttons.
+export type AttachmentRequirement = "file" | "any";
 
 type BuyerBlastButtonProps = {
   dealId: string;
@@ -31,6 +50,14 @@ type BuyerBlastButtonProps = {
   // Filter out builders who already submitted an offer. Used by the
   // "Follow up Missing Offers" send.
   excludeOfferReceived?: boolean;
+  // Pre-flight validation gate. When set, click is rejected with an
+  // inline error bubble if the source row doesn't satisfy the mode.
+  // See AttachmentRequirement above for semantics.
+  requireAttachment?: AttachmentRequirement;
+  // Human-friendly noun used in the rejection message. Falls back to a
+  // generic word grammatical to the mode ("file" / "file or link") so
+  // the message stays readable either way.
+  attachmentNoun?: string;
   compact?: boolean;
 };
 
@@ -49,11 +76,16 @@ export function BuyerBlastButton({
   defaultTiers,
   attachmentSourceItemId,
   excludeOfferReceived,
+  requireAttachment,
+  attachmentNoun,
   compact = true,
 }: BuyerBlastButtonProps) {
   const [open, setOpen] = useState(false);
   const [leadOptions, setLeadOptions] = useState<LeadOption[] | null>(null);
   const [, startLoad] = useTransition();
+  const [checking, startChecking] = useTransition();
+  const { error: inlineError, show: showInlineError, clear: clearInlineError, bubble } =
+    useInlineError();
 
   useEffect(() => {
     if (!open || leadOptions !== null) return;
@@ -68,21 +100,66 @@ export function BuyerBlastButton({
     });
   }, [open, leadOptions, dealId]);
 
+  // Pre-flight: when requireAttachment is set, verify the source row
+  // meets the requirement before opening the modal. Bails inline (small
+  // red bubble anchored under the button) so the user sees which row
+  // failed without scanning a corner toast.
+  function handleClick() {
+    clearInlineError();
+    if (requireAttachment && attachmentSourceItemId) {
+      startChecking(async () => {
+        try {
+          const att = await getAttachmentsForItem({ itemId: attachmentSourceItemId });
+          const hasFile = att.choices.some((c) => c.kind === "file");
+          const hasLink = att.choices.some((c) => c.kind === "link");
+          const satisfied =
+            requireAttachment === "file" ? hasFile : hasFile || hasLink;
+          if (!satisfied) {
+            const noun =
+              attachmentNoun ?? (requireAttachment === "file" ? "file" : "file or link");
+            showInlineError(
+              `No ${noun} attached. Add one to this row first, then send.`,
+            );
+            return;
+          }
+          setOpen(true);
+        } catch (err) {
+          console.error("[buyer-blast] attachment pre-flight failed", err);
+          // Network/server errors still go through sonner — they're not
+          // the user's fault and aren't tied to the row's data state.
+          toast.error("Couldn't check attachments. Try again.");
+        }
+      });
+      return;
+    }
+    setOpen(true);
+  }
+
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        title={title ?? label}
-        className={cn(
-          compact
-            ? "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-blue-50 hover:text-blue-700"
-            : "inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50",
-        )}
-      >
-        <Mail className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
-        {label}
-      </button>
+      <span className="relative inline-block">
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={checking}
+          title={title ?? label}
+          className={cn(
+            compact
+              ? "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-blue-50 hover:text-blue-700"
+              : "inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50",
+            checking && "opacity-60",
+            inlineError && "ring-1 ring-red-300",
+          )}
+        >
+          {checking ? (
+            <Loader2 className={cn("animate-spin", compact ? "h-3 w-3" : "h-3.5 w-3.5")} />
+          ) : (
+            <Mail className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
+          )}
+          {label}
+        </button>
+        {bubble}
+      </span>
 
       {leadOptions !== null && (
         <BlastModal

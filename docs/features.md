@@ -54,7 +54,7 @@ Some items have extra affordances:
 
 - Phase 4 milestone items (LOI Signed, PSA Effective, Cost to Complete drafts, Investment Committee Approval, Waive Feasibility, Closing Date) get a date chip on the row so you can record projected or actual dates.
 - Some items have an "Open [Tab]" jump button when their data lives in a sibling tab. "Create Consultant Roster" jumps to Consultants; "Complete Due Diligence" jumps to Issues.
-- Some items have inline action buttons that share behavior with the relevant tab. Wired and working today: Send OM Blast on the OM Blast row, Send Q&A File on the Q&A File row, Share Market Study on its row, Send to Deal Team on Share Due Diligence Material and on Complete Due Diligence, Marketing Report PDF on its row, and the inline PSA Attorney picker on Determine PSA Attorney. CFD Analysis, Premium Analysis, Valuation, Entitlement Schedule, Entitlement Summary, Custom Underwriting File, and Compiled Package still surface "Coming soon" placeholder toasts and are scoped for a future phase.
+- Some items have inline action buttons that share behavior with the relevant tab. Wired and working today: Send OM Blast on the OM Blast row, Send Q&A File on the Q&A File row, Share Market Study on its row, Send to Deal Team on Share Due Diligence Material and on Complete Due Diligence, Marketing Report PDF on its row, Send Marketing Report on the Phase 2 row of the same name (two-step modal: preview the freshly-generated PDF, then compose the email to the Owner Team with a CC picker), and the inline PSA Attorney picker on Determine PSA Attorney. CFD Analysis, Premium Analysis, Valuation, Entitlement Schedule, Entitlement Summary, Custom Underwriting File, and Compiled Package still surface "Coming soon" placeholder toasts and are scoped for a future phase.
 
 ### Contacts
 
@@ -112,16 +112,27 @@ The fonts and logo are baked in so the output matches Land Advisors brand standa
 
 ## Sending email blasts
 
-Launch a blast from two places: the toolbar on the Contacts tab, or the relevant Phase 2 checklist row (Send out OM Blast, Q&A File, Confidentiality Agreement, Share Market Study, 1-week notice, Day-of Reminder, Follow up Missing Offers).
+Launch a blast from two places: the toolbar on the Contacts tab, or the relevant Phase 2 checklist row (Send out OM Blast, Q&A File, Confidentiality Agreement, Share Market Study, Share Marketing Due Diligence Folder, 1-week notice, Day-of Reminder, Follow up Missing Offers).
 
 A two-step modal opens (both steps share one window — clicking Next swaps the body in place rather than stacking a second modal):
 
 - **Step 1, Recipients.** Filter by tier (Green / Yellow / Red) and by lead user. The recipient preview groups contacts under their builder and gives each emailable contact a checkbox (defaulted to checked). Uncheck any contact you want to skip, or use the builder-level select-all / none. Anyone toggled off via the Contacts-tab bell icon is already excluded; contacts without an email show but can't be selected. The "Next" button counts only checked emails.
 - **Step 2, Preview & send.** Review and edit the subject and body once and the change applies to every per-builder email. Pick which attachments to include (for OM blasts, the OM file pre-selected from the Phase 1 row). Per-builder CC selections persist across blasts. Click "Back" to return to Step 1 with all filter and checkbox state intact. Click Send to deliver.
 
-Emails go from a Lakebridge-verified sender domain configured in Resend, so recipients see them from your normal LAO address.
+### Attachment gates on document-share row buttons
 
-There is no in-app inbox or reply tracking. Recipients reply directly to your verified address; you read replies in Outlook as usual.
+Some row buttons exist solely to ship a document and refuse to open the composer if there's nothing to send. The check happens on click; if it fails, a red bubble drops below the button with a short explanation. Click the bubble or wait six seconds to dismiss.
+
+- **Send Market Study** requires an uploaded file on the row. A Dropbox link alone won't satisfy this gate — the recipient needs the actual document attached.
+- **Send DD Folder** (Share Marketing Due Diligence Folder row) accepts either a file or a link, since these are usually shared as a Dropbox / SharePoint folder URL.
+
+In both cases, drop the file or link onto the checklist row via its universal attachment / link affordance, then click Send again.
+
+### Sender + delivery
+
+Emails send through Resend on the verified `landadvisors.com` domain. The "From:" line is `Chris Shiota <cshiota@landadvisors.com>` for every client-facing send. Each send BCCs the sender's address so a copy lands in your Inbox — Resend doesn't post to Outlook Sent Items, so the BCC is how you keep a mailbox record. An Outlook rule can route these BCC copies into a "Platform sends" folder if you want a Sent-Items-style view.
+
+There is no in-app inbox or reply tracking. Recipients reply directly to `cshiota@landadvisors.com`; replies land in Chris's Outlook as usual.
 
 ---
 

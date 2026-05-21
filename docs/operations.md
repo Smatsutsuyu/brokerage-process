@@ -150,6 +150,19 @@ If an email fails after the API key is set:
 3. For client-facing sends (OM blast, Deal Team), the composer toast surfaces a per-builder failure summary so the user knows which sends to retry or send manually.
 4. The Resend dashboard Logs tab shows the underlying delivery failure with the SMTP / API error.
 
+### Sender BCC
+
+Every client-facing send (OM blast, Deal Team Send, Phase 2 buyer blasts) BCCs the selected sender's address. Resend sends mail through its own SMTP, not through the sender's Outlook mailbox, so without this step the sender has no record of platform sends in their inbox at all. With the BCC, a copy of every outbound message lands in the sender's Inbox (an Outlook rule can route them into a "Platform sends" folder for a Sent-Items-style view). The BCC is suppressed when the sender is already in the To or CC list to avoid duplicate delivery. Feedback-pipeline notifications do not BCC because the recipient list is already the audience.
+
+### Attachment pre-flight on Phase 2 row sends
+
+Phase 2 "Send …" buttons that exist solely to ship a document (Market Study, DD folder, etc.) validate the source row's attachments before opening the composer. If the requirement isn't met, the click is rejected with an inline red bubble anchored under the button (see `src/components/inline-error-bubble.tsx`). Two modes:
+
+- **`requireAttachment="file"`** — at least one uploaded file must be on the row. Use when the recipient needs the document attached to their email (Market Study, Q&A File). Links don't count.
+- **`requireAttachment="any"`** — at least one file or link on the row. Use when a Dropbox / SharePoint folder URL is the normal case (Share Marketing Due Diligence Folder).
+
+Network errors during the pre-flight check still surface as a sonner toast since they aren't tied to row data state.
+
 ## Storage
 
 All uploaded files live in **Vercel Blob**, private store. Files are never publicly served by URL; every read goes through `/api/documents/[id]` (or the analogous banner / feedback-attachment routes), which checks the requesting user's auth before streaming the blob back. This gives a full audit trail at the cost of a small compute hit per download.

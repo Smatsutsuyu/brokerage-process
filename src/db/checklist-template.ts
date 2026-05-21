@@ -247,6 +247,15 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
           "Email Notification of Offer Due Date - 1 week before",
           "Day-of Reminder",
           "Follow up Missing Offers",
+          // Milestone date for when offers are due. Surfaces the date
+          // chip via dateField: true (same affordance as the Phase 4
+          // milestone dates).
+          { name: "Offering Date", dateField: true },
+          // Send the Marketing Report PDF to the Owner Team with
+          // co-brokers CC'd. Two-step flow: preview the freshly-rendered
+          // PDF, then opens the email composer. Wired in phase-section
+          // via isSendMarketingReportItem.
+          "Send Marketing Report",
         ],
       },
     ],

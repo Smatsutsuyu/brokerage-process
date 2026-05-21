@@ -35,6 +35,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast: "cn-toast",
+          // Sonner's default description color is a low-contrast muted
+          // gray that disappears on white. Bump to gray-700 so the body
+          // copy is actually readable. `!` because Sonner sets the
+          // color inline with higher specificity.
+          description: "!text-gray-700",
         },
       }}
       {...props}
