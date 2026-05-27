@@ -93,11 +93,22 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     };
     const result = await client.emails.send(payload);
     if (result.error) {
-      console.error("[email:api-error]", { subject: input.subject, error: result.error });
+      // Surface name + statusCode (not just message) so rate-limit
+      // failures are unmistakable in the logs: Resend returns
+      // name "rate_limit_exceeded" / statusCode 429 when sends exceed
+      // the account's per-second cap.
+      const err = result.error as { name?: string; message?: string; statusCode?: number };
+      console.error("[email:api-error]", {
+        subject: input.subject,
+        name: err.name,
+        statusCode: err.statusCode,
+        message: err.message,
+      });
+      const prefix = err.name === "rate_limit_exceeded" ? "[rate-limited] " : "";
       return {
         ok: false,
         reason: "api",
-        error: result.error.message ?? String(result.error),
+        error: `${prefix}${err.message ?? String(result.error)}`,
       };
     }
     return { ok: true, id: result.data?.id ?? "" };

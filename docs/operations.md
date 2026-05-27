@@ -150,6 +150,10 @@ If an email fails after the API key is set:
 3. For client-facing sends (OM blast, Deal Team), the composer toast surfaces a per-builder failure summary so the user knows which sends to retry or send manually.
 4. The Resend dashboard Logs tab shows the underlying delivery failure with the SMTP / API error.
 
+### Send throttle + rate-limit retry
+
+Resend caps requests per second per account. A blast to many builders is one outbound message per builder, so a large blast can burst past that cap. The blast pipeline (`src/lib/email/blast.ts`) throttles sends to a minimum gap between starts (`SEND_INTERVAL_MS` env var, default 250ms ≈ 4/sec) and retries any send that still comes back rate-limited with linear backoff (up to 3 retries). If blasts ever start failing with `rate_limit_exceeded` in the Resend logs, raise `SEND_INTERVAL_MS` in Vercel env and redeploy. A 30-builder blast takes roughly 7.5 seconds at the default interval; that wait is expected, not a hang.
+
 ### Sender BCC
 
 Every client-facing send (OM blast, Deal Team Send, Phase 2 buyer blasts) BCCs the selected sender's address. Resend sends mail through its own SMTP, not through the sender's Outlook mailbox, so without this step the sender has no record of platform sends in their inbox at all. With the BCC, a copy of every outbound message lands in the sender's Inbox (an Outlook rule can route them into a "Platform sends" folder for a Sent-Items-style view). The BCC is suppressed when the sender is already in the To or CC list to avoid duplicate delivery. Feedback-pipeline notifications do not BCC because the recipient list is already the audience.
@@ -244,6 +248,7 @@ Canonical list of expected env vars (from `src/lib/env.ts`):
 - `BETTER_AUTH_URL` (required): the public URL of the app (production: `https://brokerage.lakebridgecap.com`).
 - `RESEND_API_KEY` (Sensitive, optional): Resend API key. When unset, email sends are no-ops.
 - `EMAIL_FROM` (optional): from-address for the feedback-notification pipeline (currently `no-reply@landadvisors.com`). Client-facing sends override this per call.
+- `SEND_INTERVAL_MS` (optional): minimum gap in milliseconds between outbound blast sends. Throttles a blast under Resend's per-second rate limit. When unset, the code default (250ms ≈ 4 sends/sec) applies. Raise it if Resend lowers the cap or blasts still hit rate limits; set to `0` to disable throttling.
 - `NEXT_PUBLIC_FEEDBACK_ENABLED` (optional, defaults to `true`): set to `false` to disable the in-app feedback widget in production.
 - `NEXT_PUBLIC_COMMIT_SHA` (auto-injected by Vercel from the build commit; do not set manually).
 - `NEXT_PUBLIC_APP_URL` (optional): used to build absolute URLs in emails. Set to the production URL.

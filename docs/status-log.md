@@ -4,6 +4,32 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-21 — Blast send throttle + rate-limit retry
+
+### Context
+- Feedback that something limits sending to ~5 emails/sec. Confirmed the cause: the blast loop in `src/lib/email/blast.ts` was sequential but unthrottled, so fast Resend responses could burst past the account's per-second cap on a large blast (one email per builder). The "5/sec" is Resend's server-side rate limit (429 `rate_limit_exceeded`), not our code.
+- Tried to reproduce locally with a 6-builder seed; 6 sequential sends at normal latency didn't pile up fast enough to trip it. Decided to ship the throttle anyway since a production OM blast hits 20-30+ builders and the feedback was real.
+
+### Done
+- **Throttle**: minimum gap between send starts, `SEND_INTERVAL_MS` (default 250ms ≈ 4/sec). Shipped as a constant (`DEFAULT_SEND_INTERVAL_MS`) with an env-var override (`SEND_INTERVAL_MS`, added to `src/lib/env.ts`); `0` disables.
+- **429 retry**: `sendWithRateLimitRetry` retries rate-limited sends up to 3× with linear backoff; other failures return immediately.
+- **Diagnostics**: `sendEmail` logs `name` + `statusCode` and prefixes rate-limit errors with `[rate-limited]`; blast loop logs `[blast:send]` per send + `[blast:rate-limit-retry]` on backoff.
+- **Local repro harness**: additive `src/db/seed-email-test.ts` + `npm run db:seed:email-test` ("RL Test — Rate Limit" deal, `BUILDER_COUNT` builders, `seanesparza+rlN@gmail.com` contacts). Documented in `docs/local-development.md`.
+- **BCC restored** after a temporary removal during testing (see Decisions).
+
+### Decisions
+- **Throttle + retry, not Resend's Batch API.** Batch sends up to 100 in one request (one rate-limit unit) but doesn't support attachments, which most blasts carry. Throttling handles attachment and non-attachment sends uniformly.
+- **Env-overridable interval.** Ship a sane constant default, let ops tune via `SEND_INTERVAL_MS` without a deploy if Resend's cap changes.
+- **BCC stays.** Removed it briefly to keep test runs out of Chris's inbox, then restored — it's how the sender gets a mailbox copy (Resend doesn't post to Outlook Sent Items).
+
+### Deferred / Pending
+- Couldn't reproduce the 429 at 6 builders locally; if it needs confirming, bump `BUILDER_COUNT` or drop `SEND_INTERVAL_MS` to 0 in the seed/env and re-run.
+
+### Blockers
+- None.
+
+---
+
 ## 2026-05-21 — UI polish, attachment guards, DD folder send
 
 ### Done

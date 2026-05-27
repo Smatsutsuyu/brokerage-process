@@ -48,6 +48,23 @@ When you're done, `npm run db:down` stops the container (keeps data on disk).
 | `npm run db:migrate` | Apply pending migrations to the DB pointed at by `DATABASE_URL`             |
 | `npm run db:push`    | Push schema directly to DB without a migration file (dev shortcut, careful) |
 | `npm run db:studio`  | Open Drizzle Studio (browser UI for inspecting the DB)                      |
+| `npm run db:seed`    | Wipe + seed the full demo dataset (org, users, builders, deals, checklist)  |
+| `npm run db:seed:email-test` | Additively layer in a rate-limit test deal (does NOT wipe)          |
+
+### Testing email blasts locally (Resend rate limit)
+
+`npm run db:seed:email-test` adds a deal named **"RL Test — Rate Limit"** with 6 builders (bump `BUILDER_COUNT` in `src/db/seed-email-test.ts` for more). Every contact uses a Gmail subaddress — `seanesparza+rl1@gmail.com` … `+rl6@gmail.com` — which all deliver to `seanesparza@gmail.com`, so one inbox receives the whole blast. Each builder is one outbound email, so the builder count equals the number of Resend requests a single blast fires.
+
+To exercise a real send (and reproduce Resend's per-second rate limit):
+
+1. Put a real `RESEND_API_KEY` in `.env.local`. Without it, `sendEmail` no-ops (logs only) and you never reach Resend's limiter.
+2. `npm run db:seed:email-test` (run `npm run db:seed` first on a fresh DB).
+3. Open the "RL Test — Rate Limit" deal, Phase 2 → Confidentiality Agreement → **Send CA**, pick the recipients, and send.
+4. Watch the dev server console:
+   - `[blast:send]` logs each send's index, elapsed-from-start, and gap since the previous send (the effective requests/sec).
+   - `[email:api-error] … name: "rate_limit_exceeded", statusCode: 429` appears on any send that exceeds the account's per-second cap. The composer toast reports these as per-builder failures.
+
+The send loop in `src/lib/email/blast.ts` throttles to a minimum gap between send starts (`SEND_INTERVAL_MS`, 250ms ≈ 4/sec) and retries rate-limited sends with backoff (`sendWithRateLimitRetry`). With the throttle in place, `[blast:send]` `sincePrevMs` should hold at ≥250ms. To re-stress the limiter, lower `SEND_INTERVAL_MS` or raise `BUILDER_COUNT` in the seed.
 
 ### Schema changes
 

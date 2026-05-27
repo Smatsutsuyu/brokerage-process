@@ -7,8 +7,49 @@ import { db } from "@/db";
 import { documents } from "@/db/schema";
 import type { ResolvedEmail } from "@/components/email/email-preview-modal";
 import { renderGeneratedAttachment } from "@/lib/email/generators";
+import { env } from "@/lib/env";
 
-import { sendEmail, type SendEmailAttachment } from "./send";
+import { sendEmail, type SendEmailAttachment, type SendEmailInput } from "./send";
+
+// Throttle: minimum gap between send STARTS. Resend caps requests per
+// second per account (observed ~5/sec); a sequential await loop only
+// paces itself by Resend's response latency, so fast responses can burst
+// past the cap on a large blast. 250ms ≈ 4 sends/sec keeps us under it
+// with margin. A 30-builder blast then takes ~7.5s — fine for a
+// deliberate bulk action.
+//
+// Shipped as a constant default; the SEND_INTERVAL_MS env var overrides
+// it when present (tune the rate without a deploy). 0 disables throttling.
+const DEFAULT_SEND_INTERVAL_MS = 250;
+const SEND_INTERVAL_MS = env.SEND_INTERVAL_MS ?? DEFAULT_SEND_INTERVAL_MS;
+// 429 safety net: if a send is still rate-limited (concurrent sends on
+// the same key, a lower cap on some accounts), back off and retry rather
+// than failing the builder outright.
+const MAX_RATE_LIMIT_RETRIES = 3;
+const RATE_LIMIT_BACKOFF_MS = 1000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Wrap sendEmail with a retry that only fires on Resend rate-limit
+// rejections (sendEmail prefixes those errors with "[rate-limited]").
+// Other failures (bad address, etc.) return immediately — retrying them
+// would just waste time. Backoff grows linearly with the attempt number.
+async function sendWithRateLimitRetry(input: SendEmailInput) {
+  let attempt = 0;
+  // First try + up to MAX_RATE_LIMIT_RETRIES additional attempts.
+  for (;;) {
+    const result = await sendEmail(input);
+    const rateLimited =
+      !result.ok && result.reason === "api" && result.error?.startsWith("[rate-limited]");
+    if (!rateLimited || attempt >= MAX_RATE_LIMIT_RETRIES) return result;
+    attempt++;
+    const backoff = RATE_LIMIT_BACKOFF_MS * attempt;
+    console.warn("[blast:rate-limit-retry]", { attempt, backoffMs: backoff });
+    await sleep(backoff);
+  }
+}
 
 // Per-builder result. Mirrors the ResolvedEmail unit so the UI can render
 // success/failure per builder without re-deriving identity.
@@ -80,10 +121,11 @@ function appendLinksToBody(body: string, links: { url: string; label: string | n
 
 // Send a batch of ResolvedEmails — one outbound message per builder. Each
 // call fetches its attachments once and reuses them across per-builder
-// sends. Sends are sequential (not parallel) so we respect Resend's free-
-// tier rate limit (2/sec) without bursting. Per-email failures are
-// recorded but do not abort the batch — partial success is reported back
-// so the UI can show "20 sent, 3 failed" with details.
+// sends. Sends are sequential AND throttled (min SEND_INTERVAL_MS between
+// starts) so we stay under Resend's per-second rate limit on large
+// blasts; rate-limited sends are retried with backoff. Per-email failures
+// are recorded but do not abort the batch — partial success is reported
+// back so the UI can show "20 sent, 3 failed" with details.
 export async function sendResolvedEmails(
   emails: ResolvedEmail[],
   opts: { orgId: string; dealId?: string },
@@ -135,6 +177,16 @@ export async function sendResolvedEmails(
 
   const outcomes: BlastSendOutcome[] = [];
 
+  // Diagnostic timing: log the elapsed-from-start of each send + the gap
+  // since the previous one so the effective requests/sec is visible in
+  // the dev console. This is what surfaces the Resend rate-limit issue —
+  // when sends fire faster than the account's per-second cap, the failing
+  // ones come back as `rate_limit_exceeded` (logged by sendEmail). Cheap
+  // enough to keep in prod; correlates with the Resend dashboard.
+  const batchStart = Date.now();
+  let lastSendAt = batchStart;
+  let sendIndex = 0;
+
   for (const email of emails) {
     if (email.to.length === 0) {
       outcomes.push({
@@ -179,7 +231,27 @@ export async function sendResolvedEmails(
       (e) => e.toLowerCase() === senderAddr,
     );
 
-    const result = await sendEmail({
+    // Throttle: hold each send start at least SEND_INTERVAL_MS after the
+    // previous one. The natural send latency usually covers most of this,
+    // so we only sleep the remainder (often 0). Keeps the batch under the
+    // per-second cap without an explicit per-request token bucket.
+    const sinceLast = Date.now() - lastSendAt;
+    if (sendIndex > 0 && sinceLast < SEND_INTERVAL_MS) {
+      await sleep(SEND_INTERVAL_MS - sinceLast);
+    }
+
+    const now = Date.now();
+    sendIndex++;
+    console.log("[blast:send]", {
+      index: sendIndex,
+      total: emails.length,
+      builder: email.builderName,
+      elapsedMs: now - batchStart,
+      sincePrevMs: now - lastSendAt,
+    });
+    lastSendAt = now;
+
+    const result = await sendWithRateLimitRetry({
       from: email.from.email,
       to: toEmails,
       cc: ccEmails.length > 0 ? ccEmails : undefined,

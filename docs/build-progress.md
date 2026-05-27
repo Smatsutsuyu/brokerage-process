@@ -102,6 +102,14 @@ Major reconciliation pass against Chris's `Marketing Process Checklist.xlsx` v2 
 - Member-remove flow: hard delete with cascade, last-owner guardrail, fix for inviting a member signing the owner out (`12685c5`).
 - Auto-clean orphan `deal_buyers` rows on builder delete (`1434e4d`, `85e7747`).
 
+## Blast send throttle + rate-limit retry (2026-05-21)
+
+- **Throttle.** The per-builder send loop in `src/lib/email/blast.ts` was sequential-but-unthrottled, so on a large blast (one email per builder, 20-30+ on a real OM blast) fast Resend responses could burst past the account's per-second rate limit, returning `429 rate_limit_exceeded`. Added a minimum gap between send starts (`SEND_INTERVAL_MS`, default 250ms ≈ 4/sec). Natural send latency usually covers most of the gap, so the added sleep is small.
+- **Env override.** `SEND_INTERVAL_MS` shipped as a code constant (`DEFAULT_SEND_INTERVAL_MS = 250`) but overridable via the `SEND_INTERVAL_MS` env var (`src/lib/env.ts`, `z.coerce.number().int().nonnegative().optional()`) so the rate can be tuned without a deploy; `0` disables throttling.
+- **429 retry.** `sendWithRateLimitRetry` retries only on rate-limit rejections (detected via the `[rate-limited]` prefix `sendEmail` now adds to the error string), up to 3 times with linear backoff (1s/2s/3s). Other failures return immediately.
+- **Diagnostics.** `sendEmail` now logs `name` + `statusCode` on API errors and prefixes rate-limit errors with `[rate-limited]`. The blast loop logs `[blast:send]` per send (index, elapsed, gap-since-previous) so the effective req/sec is visible; `[blast:rate-limit-retry]` logs any backoff.
+- **Local repro harness.** New `src/db/seed-email-test.ts` + `npm run db:seed:email-test` — additive (no wipe) seed of a "RL Test — Rate Limit" deal with `BUILDER_COUNT` (default 6) builders, each contact at `seanesparza+rlN@gmail.com` (one inbox via Gmail subaddressing), green tier, on-deal. Documented in `docs/local-development.md`.
+
 ## Favicon, deal menu, sidebar drag-and-drop, attachment guards (2026-05-21)
 
 - **LAO favicon** replaces the default Next.js mark. Cropped the triangle icon from `public/lao-logo.jpg`, knocked out the white background to transparent, padded ~22% so it doesn't touch tab edges. Emits `src/app/icon.png` (32) and `src/app/apple-icon.png` (180) via the App Router file convention; old `favicon.ico` removed.
