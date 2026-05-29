@@ -313,13 +313,12 @@ export function OptionDCompact({ dealId, groups, leadOptions, orgContacts }: Opt
                       <span
                         key={label}
                         className={cn(
-                          "inline-flex items-center gap-1 rounded px-1.5 py-0.5",
+                          "rounded px-1.5 py-0.5",
                           checked
                             ? "bg-green-50 text-green-700"
                             : "bg-gray-50 text-gray-400",
                         )}
                       >
-                        {checked && <Check className="h-3 w-3" />}
                         {label}
                       </span>
                     ))}
