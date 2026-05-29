@@ -1,19 +1,32 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import { ChevronDown, Loader2, Mail } from "lucide-react";
 
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+// Optional grouping for the dropdown. Items in the same group render
+// together; a section divider + label appears when the group changes.
+// Used by the blast composer to separate the deal's Owner Team from the
+// broader Org Members list.
+export type CcGroup = "owner" | "org";
+
+const GROUP_LABEL: Record<CcGroup, string> = {
+  owner: "Owner Team",
+  org: "Org Members",
+};
+
 export type CcOption = {
   id: string;
   name: string;
+  group?: CcGroup;
 };
 
 type CcPickerProps = {
@@ -69,6 +82,26 @@ export function CcPicker({
     });
   }
 
+  // Bucket options into groups, preserving the order of first
+  // appearance. Items without a `group` go under a sentinel "_default"
+  // bucket which renders without a label. Each bucket becomes a
+  // <DropdownMenuGroup> so DropdownMenuLabel renders correctly (Base
+  // UI's GroupLabel primitive expects to live inside a Group), and
+  // separators sit between buckets.
+  const grouped = useMemo(() => {
+    const map = new Map<string, CcOption[]>();
+    for (const opt of options) {
+      const key = opt.group ?? "_default";
+      let arr = map.get(key);
+      if (!arr) {
+        arr = [];
+        map.set(key, arr);
+      }
+      arr.push(opt);
+    }
+    return Array.from(map.entries()) as [string, CcOption[]][];
+  }, [options]);
+
   // Trigger label: empty state vs 1-2 names listed vs N+ collapsed.
   // Stays compact even with a long org roster.
   const selectedNames = options
@@ -107,19 +140,35 @@ export function CcPicker({
             No org members to CC.
           </div>
         ) : (
-          options.map((opt) => {
-            const isSelected = optimistic.has(opt.id);
-            return (
-              <DropdownMenuCheckboxItem
-                key={opt.id}
-                checked={isSelected}
-                onCheckedChange={() => toggle(opt.id)}
-                className="text-[13px]"
-              >
-                {opt.name}
-              </DropdownMenuCheckboxItem>
-            );
-          })
+          grouped.map(([groupKey, items], groupIdx) => (
+            <Fragment key={groupKey}>
+              {groupIdx > 0 && <DropdownMenuSeparator />}
+              {/* Plain div for the section header — Base UI's
+                  DropdownMenuLabel didn't reliably render visible
+                  output as a child of DropdownMenuContent in this
+                  context (group + label requires a specific
+                  parent setup), so we render the heading as a
+                  styled div directly. */}
+              {groupKey !== "_default" && (
+                <div className="px-2 pt-1.5 pb-0.5 text-[10px] font-semibold tracking-wider text-gray-500 uppercase">
+                  {GROUP_LABEL[groupKey as CcGroup]}
+                </div>
+              )}
+              {items.map((opt) => {
+                const isSelected = optimistic.has(opt.id);
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={opt.id}
+                    checked={isSelected}
+                    onCheckedChange={() => toggle(opt.id)}
+                    className="text-[13px]"
+                  >
+                    {opt.name}
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
+            </Fragment>
+          ))
         )}
       </DropdownMenuContent>
     </DropdownMenu>

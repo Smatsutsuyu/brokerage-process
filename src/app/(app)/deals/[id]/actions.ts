@@ -1643,6 +1643,69 @@ export async function getOrgCcOptions(): Promise<CcUserOption[]> {
   return rows.map((r) => ({ id: r.id, name: r.name || r.email, email: r.email }));
 }
 
+// Owner Team CC options for a deal. Surfaces every owner-team member
+// (sellers / principals) that has an email address so the user can
+// CC them on a buyer blast without leaving the composer.
+//
+// IDs use the `owner:` sentinel prefix so the BlastModal's persistence
+// layer can tell user-derived CCs (uuid → cc_user_ids) apart from
+// owner CCs (sentinel → per-send only). Owner CCs aren't persisted
+// because cc_user_ids is a uuid array; persisting them would require a
+// schema change for what's currently a low-frequency use case.
+export async function getOwnerTeamCcOptions(input: {
+  dealId: string;
+}): Promise<CcUserOption[]> {
+  const org = await getCurrentOrg();
+  if (!org) return [];
+
+  const rows = await db
+    .select({
+      id: dealTeamMembers.id,
+      userId: dealTeamMembers.userId,
+      contactId: dealTeamMembers.contactId,
+      freeName: dealTeamMembers.name,
+      freeEmail: dealTeamMembers.email,
+      userName: authUser.name,
+      userEmail: authUser.email,
+      contactFirst: contacts.firstName,
+      contactLast: contacts.lastName,
+      contactEmail: contacts.email,
+    })
+    .from(dealTeamMembers)
+    .leftJoin(users, eq(users.id, dealTeamMembers.userId))
+    .leftJoin(authUser, eq(authUser.id, users.authUserId))
+    .leftJoin(contacts, eq(contacts.id, dealTeamMembers.contactId))
+    .where(
+      and(
+        eq(dealTeamMembers.dealId, input.dealId),
+        eq(dealTeamMembers.orgId, org.id),
+        eq(dealTeamMembers.team, "owner"),
+      ),
+    )
+    .orderBy(dealTeamMembers.sortOrder, dealTeamMembers.createdAt);
+
+  const opts: CcUserOption[] = [];
+  for (const r of rows) {
+    let name: string | null = null;
+    let email: string | null = null;
+    if (r.userId && (r.userName || r.userEmail)) {
+      name = r.userName || r.userEmail;
+      email = r.userEmail;
+    } else if (r.contactId && (r.contactFirst || r.contactLast)) {
+      name = `${r.contactFirst ?? ""} ${r.contactLast ?? ""}`.trim();
+      email = r.contactEmail;
+    } else if (r.freeName) {
+      name = r.freeName;
+      email = r.freeEmail;
+    }
+    // No email = can't CC. Skip so the picker doesn't show an
+    // unusable row.
+    if (!email || !name) continue;
+    opts.push({ id: `owner:${r.id}`, name, email });
+  }
+  return opts;
+}
+
 // Existing per-builder CC selections — Map-of-builderId-to-userIds shape
 // expected by the EmailPreviewModal. Empty array for builders with no
 // CCs configured. Stale ids in cc_user_ids (e.g. a deleted user) are

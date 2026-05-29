@@ -65,10 +65,16 @@ export type EmailSenderChoice = {
 
 // One pickable CC user. Email is included so the modal can render the
 // CC chip with both name and address (matches the To: chip style).
+//
+// `group` lets the picker render a section divider between groups —
+// used by the blast composer to separate the deal's Owner Team from
+// the broader Org Members list. Items without a group render in a
+// default (unbranded) section at the top.
 export type EmailCcUserOption = {
   id: string;
   name: string;
   email: string;
+  group?: "owner" | "org";
 };
 
 // Initial per-builder CC selection passed in by the caller. The modal
@@ -573,7 +579,11 @@ export function EmailPreviewBody({
                     selectedUserIds={Array.from(
                       ccByBuilder.get(active.builderId) ?? new Set<string>(),
                     )}
-                    options={ccOpts.map((o) => ({ id: o.id, name: o.name }))}
+                    options={ccOpts.map((o) => ({
+                      id: o.id,
+                      name: o.name,
+                      group: o.group,
+                    }))}
                     onChange={(ids) => applyCcChange(active.builderId, ids)}
                     emptyLabel="+ Add CC"
                   />

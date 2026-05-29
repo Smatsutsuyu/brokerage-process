@@ -37,6 +37,7 @@ import {
   getCcSelectionsForBuilders,
   getOmBlastTemplateContext,
   getOrgCcOptions,
+  getOwnerTeamCcOptions,
   markBuildersSent,
   previewBlastRecipients,
   sendBlastEmails,
@@ -354,7 +355,7 @@ export function BlastModal({
     const builderIds = Array.from(new Set(checkedWithEmail.map((r) => r.builderId)));
     startPreviewLoading(async () => {
       try {
-        const [ctx, att, ccOpts, ccSelections] = await Promise.all([
+        const [ctx, att, orgCcOpts, ownerCcOpts, ccSelections] = await Promise.all([
           getOmBlastTemplateContext({ dealId }),
           // Optional attachment source. When the caller didn't provide
           // one, skip the load and pass empty arrays to the modal so
@@ -363,16 +364,30 @@ export function BlastModal({
             ? getAttachmentsForItem({ itemId: attachmentSourceItemId })
             : Promise.resolve({ choices: [], recommendedIds: [] }),
           getOrgCcOptions(),
+          // Owner Team CC options (sellers / principals on this deal).
+          // Surfaced in the picker under a separate "Owner Team" section
+          // so the user can CC ownership on the blast. Owner picks are
+          // per-send (not persisted to deal_buyers.cc_user_ids) — see
+          // the onCcChange filter below.
+          getOwnerTeamCcOptions({ dealId }),
           builderIds.length > 0
             ? getCcSelectionsForBuilders({ dealId, builderIds })
             : Promise.resolve([] as EmailCcInitialEntry[]),
         ]);
+        // Tag each option with its source group so the picker can render
+        // a section divider between Owners and Org Members. Owners come
+        // first so they're the first thing the user sees on open — most
+        // common "CC ownership" pattern.
+        const mergedCcOpts = [
+          ...ownerCcOpts.map((o) => ({ ...o, group: "owner" as const })),
+          ...orgCcOpts.map((o) => ({ ...o, group: "org" as const })),
+        ];
         setPreviewVars(ctx.vars);
         setAttachmentChoices(att.choices);
         setDefaultAttachmentIds(att.recommendedIds);
         setSenderOptions(ctx.senderOptions);
         setDefaultSenderId(ctx.defaultSenderId);
-        setCcOptions(ccOpts);
+        setCcOptions(mergedCcOpts);
         setCcInitial(ccSelections);
         setStep("preview");
       } catch (err) {
@@ -666,7 +681,13 @@ export function BlastModal({
             ccInitial={ccInitial}
             priorSendNotes={priorSendNotes}
             onCcChange={async ({ builderId, userIds }) => {
-              await setBuilderCcUsers({ dealId, builderId, userIds });
+              // deal_buyers.cc_user_ids is a uuid[] — only org-user
+              // picks persist there. Owner Team picks use the
+              // `owner:<dealTeamMemberId>` sentinel, which we strip
+              // here so they stay per-send (per the trade-off in
+              // getOwnerTeamCcOptions's comment).
+              const orgOnly = userIds.filter((id) => !id.startsWith("owner:"));
+              await setBuilderCcUsers({ dealId, builderId, userIds: orgOnly });
             }}
             onSend={async (emails) => {
               const result = await sendBlastEmails(emails);
