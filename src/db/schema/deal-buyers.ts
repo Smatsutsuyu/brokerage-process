@@ -35,6 +35,13 @@ export const dealBuyers = pgTable(
     // recipients.
     confiSignedAt: timestamp("confi_signed_at", { withTimezone: true }),
     omSentAt: timestamp("om_sent_at", { withTimezone: true }),
+    // Set when the Phase 2 Share Marketing Due Diligence Folder send
+    // has reached this builder. Mirror of om_sent_at: auto-flipped by
+    // the DD blast after a successful send and used to default-uncheck
+    // previously-sent builders on the next DD blast. Phase 4's "Share
+    // DD Material" goes to the deal team, not buyers, and doesn't
+    // touch this column.
+    ddSentAt: timestamp("dd_sent_at", { withTimezone: true }),
     // Set when this builder has submitted their offer. Used by the
     // Phase 2 "Follow up Missing Offers" blast to filter out builders
     // who already responded; surfaced as a checkbox on the buyer card

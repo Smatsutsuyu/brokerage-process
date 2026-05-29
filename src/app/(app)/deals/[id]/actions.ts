@@ -264,6 +264,25 @@ export async function setBuyerOmSent(input: {
   revalidatePath(`/deals/${input.dealId}`);
 }
 
+// Mirror of setBuyerOmSent for the Phase 2 Share Marketing Due Diligence
+// Folder send. Auto-flipped by the DD blast composer (markBuildersSent
+// with field "dd") and surfaced as a "DD" checkbox on the buyer card.
+export async function setBuyerDdSent(input: {
+  dealBuyerId: string;
+  dealId: string;
+  ddSent: boolean;
+}) {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  await db
+    .update(dealBuyers)
+    .set({ ddSentAt: input.ddSent ? new Date() : null })
+    .where(and(eq(dealBuyers.id, input.dealBuyerId), eq(dealBuyers.orgId, org.id)));
+
+  revalidatePath(`/deals/${input.dealId}`);
+}
+
 export async function setBuyerConfiSigned(input: {
   dealBuyerId: string;
   dealId: string;
@@ -1209,6 +1228,8 @@ export type BlastPreviewRow = {
   // OM to a builder they already hit. Null when nothing has been sent
   // yet. Same value across every contact in a given builder group.
   omSentAt: Date | null;
+  // Mirror of omSentAt for the Phase 2 "Share DD Folder" send.
+  ddSentAt: Date | null;
 };
 
 export async function previewBlastRecipients(input: {
@@ -1242,6 +1263,7 @@ export async function previewBlastRecipients(input: {
       leadUserId: dealBuyers.leadUserId,
       leadName: authUser.name,
       omSentAt: dealBuyers.omSentAt,
+      ddSentAt: dealBuyers.ddSentAt,
     })
     .from(dealContacts)
     .innerJoin(contacts, eq(contacts.id, dealContacts.contactId))
@@ -1281,6 +1303,7 @@ export async function previewBlastRecipients(input: {
     leadUserId: r.leadUserId,
     leadName: r.leadName,
     omSentAt: r.omSentAt,
+    ddSentAt: r.ddSentAt,
   }));
 }
 
@@ -2268,22 +2291,33 @@ export async function sendBlastEmails(
   return sendResolvedEmails(emails, { orgId: org.id, dealId: opts?.dealId });
 }
 
-// Bulk-mark deal_buyers.om_sent_at = now() for the given builders on a
-// deal. Called by the OM-blast composer after a successful send so the
-// "OM Sent" tracking flag flips automatically, and the next OM blast
-// defaults that builder to unchecked in the recipient list. Calling
-// setBuyerOmSent per-builder would be N round-trips; this is one.
-export async function markBuildersOmSent(input: {
+// Bulk-mark a per-buyer "sent" timestamp = now() for the given builders
+// on a deal. Called by the blast composer after a successful send so
+// the corresponding tracking flag on the buyer card flips automatically,
+// and the next send of the same kind defaults those builders to
+// unchecked in the recipient list. One UPDATE vs N setBuyer* calls.
+//
+// `field` selects which column gets stamped:
+//   - "om" → om_sent_at, driven by the OM blast
+//   - "dd" → dd_sent_at, driven by the Phase 2 Share DD Folder send
+//
+// Phase 4's "Share DD Material" goes to the deal team, not to buyers,
+// and does NOT call this helper.
+export async function markBuildersSent(input: {
   dealId: string;
   builderIds: string[];
+  field: "om" | "dd";
 }): Promise<void> {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
   if (input.builderIds.length === 0) return;
 
+  const now = new Date();
+  const patch = input.field === "om" ? { omSentAt: now } : { ddSentAt: now };
+
   await db
     .update(dealBuyers)
-    .set({ omSentAt: new Date() })
+    .set(patch)
     .where(
       and(
         eq(dealBuyers.dealId, input.dealId),

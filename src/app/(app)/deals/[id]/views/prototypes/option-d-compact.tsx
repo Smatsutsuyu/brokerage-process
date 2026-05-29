@@ -309,6 +309,7 @@ export function OptionDCompact({ dealId, groups, leadOptions, orgContacts }: Opt
                         ["Called", g.called],
                         ["Confi", g.confiSigned],
                         ["OM", g.omSent],
+                        ["DD", g.ddSent],
                         ["Offer", g.offerReceived],
                       ] as const
                     ).map(([label, checked]) => (
@@ -374,6 +375,15 @@ export function OptionDCompact({ dealId, groups, leadOptions, orgContacts }: Opt
                           checked={g.omSent}
                         />
                         <span className="text-gray-600">OM Sent</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <BuyerCheckbox
+                          dealBuyerId={g.dealBuyerId}
+                          dealId={dealId}
+                          field="ddSent"
+                          checked={g.ddSent}
+                        />
+                        <span className="text-gray-600">DD Sent</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <BuyerCheckbox

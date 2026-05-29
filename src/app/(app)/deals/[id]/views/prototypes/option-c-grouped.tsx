@@ -311,6 +311,15 @@ export function OptionCGrouped({ dealId, groups, leadOptions, orgContacts }: Opt
                               <BuyerCheckbox
                                 dealBuyerId={g.dealBuyerId}
                                 dealId={dealId}
+                                field="ddSent"
+                                checked={g.ddSent}
+                              />
+                              <span className="text-gray-600">DD</span>
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <BuyerCheckbox
+                                dealBuyerId={g.dealBuyerId}
+                                dealId={dealId}
                                 field="offerReceived"
                                 checked={g.offerReceived}
                               />

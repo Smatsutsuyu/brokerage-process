@@ -1,0 +1,1 @@
+ALTER TABLE "deal_buyers" ADD COLUMN "dd_sent_at" timestamp with time zone;

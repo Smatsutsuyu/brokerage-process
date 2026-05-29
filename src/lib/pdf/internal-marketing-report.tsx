@@ -56,6 +56,7 @@ export type InternalMarketingBuilder = {
   called: boolean;
   confiSigned: boolean;
   omSent: boolean;
+  ddSent: boolean;
   offerReceived: boolean;
   comments: string;
   contacts: InternalMarketingContact[];
@@ -318,6 +319,7 @@ function BuilderBlock({ b }: { b: InternalMarketingBuilder }) {
               <StatusPill label="Called" checked={b.called} />
               <StatusPill label="Confi" checked={b.confiSigned} />
               <StatusPill label="OM" checked={b.omSent} />
+              <StatusPill label="DD" checked={b.ddSent} />
               <StatusPill label="Offer" checked={b.offerReceived} />
             </View>
           </View>

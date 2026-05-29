@@ -182,7 +182,7 @@ export function OmBlastButton({
           title="OM blast"
           defaultTiers={["green", "yellow"]}
           attachmentSourceItemId={effectiveItemId}
-          omSentTracking
+          sentTracking="om"
         />
       )}
     </>

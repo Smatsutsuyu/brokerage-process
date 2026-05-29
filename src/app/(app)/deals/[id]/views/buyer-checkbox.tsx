@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import {
   setBuyerCalled,
   setBuyerConfiSigned,
+  setBuyerDdSent,
   setBuyerOfferReceived,
   setBuyerOmSent,
 } from "../actions";
@@ -15,7 +16,7 @@ import {
 type BuyerCheckboxProps = {
   dealBuyerId: string;
   dealId: string;
-  field: "called" | "confiSigned" | "omSent" | "offerReceived";
+  field: "called" | "confiSigned" | "omSent" | "ddSent" | "offerReceived";
   checked: boolean;
 };
 
@@ -30,6 +31,8 @@ export function BuyerCheckbox({ dealBuyerId, dealId, field, checked }: BuyerChec
         await setBuyerConfiSigned({ dealBuyerId, dealId, confiSigned: !checked });
       } else if (field === "omSent") {
         await setBuyerOmSent({ dealBuyerId, dealId, omSent: !checked });
+      } else if (field === "ddSent") {
+        await setBuyerDdSent({ dealBuyerId, dealId, ddSent: !checked });
       } else {
         await setBuyerOfferReceived({
           dealBuyerId,

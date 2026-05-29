@@ -321,7 +321,7 @@ export function OptionBPane({ dealId, groups, leadOptions, orgContacts }: Option
                 />
               </div>
 
-              <div className="grid grid-cols-5 gap-3 rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-3 text-xs">
+              <div className="grid grid-cols-6 gap-3 rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-3 text-xs">
                 <div>
                   <div className="mb-1 text-[10px] font-semibold tracking-wider text-gray-500 uppercase">
                     Lead
@@ -365,6 +365,17 @@ export function OptionBPane({ dealId, groups, leadOptions, orgContacts }: Option
                     dealId={dealId}
                     field="omSent"
                     checked={selected.omSent}
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 text-[10px] font-semibold tracking-wider text-gray-500 uppercase">
+                    DD
+                  </div>
+                  <BuyerCheckbox
+                    dealBuyerId={selected.dealBuyerId}
+                    dealId={dealId}
+                    field="ddSent"
+                    checked={selected.ddSent}
                   />
                 </div>
                 <div>

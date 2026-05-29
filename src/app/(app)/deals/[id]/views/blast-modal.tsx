@@ -37,7 +37,7 @@ import {
   getCcSelectionsForBuilders,
   getOmBlastTemplateContext,
   getOrgCcOptions,
-  markBuildersOmSent,
+  markBuildersSent,
   previewBlastRecipients,
   sendBlastEmails,
   setBuilderCcUsers,
@@ -115,18 +115,31 @@ type BlastModalProps = {
   // Filter recipients to exclude builders whose offer_received_at is
   // set. Used by the "Follow up Missing Offers" send.
   excludeOfferReceived?: boolean;
-  // OM-tracking mode. When true:
-  //   1. Step 1 builder header shows an amber "OM sent MMM D" chip for
-  //      builders whose deal_buyers.om_sent_at is already set.
+  // Prior-send tracking mode. When set:
+  //   1. Step 1 builder header shows an amber "<label> sent MMM D" chip
+  //      for builders whose corresponding deal_buyers timestamp is
+  //      already set (om_sent_at for "om"; dd_sent_at for "dd").
   //   2. Step 2 paginator shows a banner above the active builder's
-  //      preview when that builder was previously OM-sent.
-  //   3. Recipients in the "previously OM-sent" set are auto-UNCHECKED
-  //      on each open of the modal — defaults to "don't re-send", user
+  //      preview when that builder was previously sent the same thing.
+  //   3. Recipients in the "previously sent" set are auto-UNCHECKED
+  //      on each open of the modal — defaults to "don't re-send"; user
   //      can still override by checking them back on.
-  //   4. After a successful send, the OM Sent flag flips on each
-  //      builder the blast reached (via markBuildersOmSent).
-  // Used by the OM blast button.
-  omSentTracking?: boolean;
+  //   4. After a successful send, the corresponding flag flips on each
+  //      builder the blast reached (via markBuildersSent).
+  // Used by the OM blast button ("om") and the Phase 2 Share DD Folder
+  // send ("dd"). Phase 4's Share DD Material goes to the deal team and
+  // does NOT use this — it's buyer-tracking only.
+  sentTracking?: "om" | "dd";
+};
+
+// Display labels for the prior-send tracking mode. Kept colocated with
+// the prop type so the rendered text + the field key never drift.
+const SENT_TRACKING_META: Record<
+  "om" | "dd",
+  { short: string; long: string }
+> = {
+  om: { short: "OM", long: "OM" },
+  dd: { short: "DD", long: "DD folder" },
 };
 
 // Generic two-step blast composer. Step 1: tier filter + lead-assignee
@@ -148,7 +161,7 @@ export function BlastModal({
   defaultTiers,
   attachmentSourceItemId,
   excludeOfferReceived,
-  omSentTracking,
+  sentTracking,
 }: BlastModalProps) {
   const [step, setStep] = useState<"filter" | "preview">("filter");
   const [selectedTiers, setSelectedTiers] = useState<Set<Tier>>(
@@ -180,7 +193,7 @@ export function BlastModal({
   }, [open]);
 
   // Auto-exclude tracking: once per open, after recipients have loaded,
-  // pre-populate excludedContactIds with previously-OM-sent builders'
+  // pre-populate excludedContactIds with previously-sent builders'
   // contacts so the user doesn't accidentally re-send. The user can
   // still check them back on individually (the warning chip + step-2
   // banner make the prior state visible). Subsequent filter changes in
@@ -191,20 +204,20 @@ export function BlastModal({
     if (open) setAutoExcludeApplied(false);
   }, [open]);
   useEffect(() => {
-    if (!open || !omSentTracking || autoExcludeApplied) return;
+    if (!open || !sentTracking || autoExcludeApplied) return;
     if (recipients.length === 0) return;
-    const omSentContactIds = recipients
-      .filter((r) => r.omSentAt)
+    const priorSentIds = recipients
+      .filter((r) => (sentTracking === "om" ? r.omSentAt : r.ddSentAt))
       .map((r) => r.contactId);
-    if (omSentContactIds.length > 0) {
+    if (priorSentIds.length > 0) {
       setExcludedContactIds((prev) => {
         const next = new Set(prev);
-        for (const id of omSentContactIds) next.add(id);
+        for (const id of priorSentIds) next.add(id);
         return next;
       });
     }
     setAutoExcludeApplied(true);
-  }, [open, omSentTracking, recipients, autoExcludeApplied]);
+  }, [open, sentTracking, recipients, autoExcludeApplied]);
 
   // Recompute the preview whenever filters change OR the modal opens.
   // useEffect rather than onChange so the recompute is debounced naturally
@@ -277,9 +290,9 @@ export function BlastModal({
 
   // Group preview rows by builder for readability. Preserve the server's
   // sort order (alphabetical builder, alphabetical contact within).
-  // omSentAt is per-builder (lives on deal_buyers), so it's the same for
-  // every contact in a group — pull off the first row to surface in the
-  // header chip.
+  // omSentAt / ddSentAt are per-builder (live on deal_buyers), so they're
+  // the same for every contact in a group — pull off the first row to
+  // surface in the header chip.
   const grouped = useMemo(() => {
     const map = new Map<
       string,
@@ -288,6 +301,7 @@ export function BlastModal({
         builderName: string;
         contacts: BlastPreviewRow[];
         omSentAt: Date | null;
+        ddSentAt: Date | null;
         tier: Tier;
       }
     >();
@@ -299,6 +313,7 @@ export function BlastModal({
           builderName: r.builderName,
           contacts: [],
           omSentAt: r.omSentAt,
+          ddSentAt: r.ddSentAt,
           tier: r.tier,
         };
         map.set(r.builderId, g);
@@ -384,15 +399,18 @@ export function BlastModal({
   // as step 1 in the preview's banner. Empty record when the caller
   // didn't opt in, so EmailPreviewBody skips the banner entirely.
   const priorSendNotes = useMemo<Record<string, string>>(() => {
-    if (!omSentTracking) return {};
+    if (!sentTracking) return {};
+    const meta = SENT_TRACKING_META[sentTracking];
     const acc: Record<string, string> = {};
     for (const r of recipients) {
-      if (r.omSentAt && !acc[r.builderId]) {
-        acc[r.builderId] = `OM was previously sent to this builder on ${formatShortDate(r.omSentAt)}.`;
+      const trackedAt = sentTracking === "om" ? r.omSentAt : r.ddSentAt;
+      if (trackedAt && !acc[r.builderId]) {
+        acc[r.builderId] =
+          `${meta.long} was previously sent to this builder on ${formatShortDate(trackedAt)}.`;
       }
     }
     return acc;
-  }, [recipients, omSentTracking]);
+  }, [recipients, sentTracking]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -532,15 +550,22 @@ export function BlastModal({
                               <span className="text-[10px] tabular-nums text-gray-500">
                                 {g.contacts.length}
                               </span>
-                              {omSentTracking && g.omSentAt && (
-                                <span
-                                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-amber-800 uppercase"
-                                  title={`OM was previously sent to ${g.builderName} on ${formatShortDate(g.omSentAt)}`}
-                                >
-                                  <AlertTriangle className="h-2.5 w-2.5" />
-                                  OM sent {formatShortDate(g.omSentAt)}
-                                </span>
-                              )}
+                              {(() => {
+                                if (!sentTracking) return null;
+                                const meta = SENT_TRACKING_META[sentTracking];
+                                const trackedAt =
+                                  sentTracking === "om" ? g.omSentAt : g.ddSentAt;
+                                if (!trackedAt) return null;
+                                return (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-amber-800 uppercase"
+                                    title={`${meta.long} was previously sent to ${g.builderName} on ${formatShortDate(trackedAt)}`}
+                                  >
+                                    <AlertTriangle className="h-2.5 w-2.5" />
+                                    {meta.short} sent {formatShortDate(trackedAt)}
+                                  </span>
+                                );
+                              })()}
                             </label>
                             <ul className="ml-6 space-y-0.5">
                               {g.contacts.map((c) => {
@@ -645,13 +670,13 @@ export function BlastModal({
             }}
             onSend={async (emails) => {
               const result = await sendBlastEmails(emails);
-              // Mark each successfully-sent builder as OM Sent so the
-              // flag flips in the contacts tab and the next OM blast
-              // defaults them to unchecked. Only on the OM blast (the
-              // caller opted in via omSentTracking); other blasts don't
-              // touch om_sent_at. Fire-and-forget — the toast below
+              // Mark each successfully-sent builder as Sent (OM or DD)
+              // so the flag flips in the contacts tab and the next blast
+              // of the same kind defaults them to unchecked. Only when
+              // the caller opted in via sentTracking; other blasts don't
+              // touch the timestamps. Fire-and-forget — the toast below
               // doesn't wait on this.
-              if (omSentTracking) {
+              if (sentTracking) {
                 const sentBuilderIds = Array.from(
                   new Set(
                     result.outcomes
@@ -660,7 +685,11 @@ export function BlastModal({
                   ),
                 );
                 if (sentBuilderIds.length > 0) {
-                  void markBuildersOmSent({ dealId, builderIds: sentBuilderIds });
+                  void markBuildersSent({
+                    dealId,
+                    builderIds: sentBuilderIds,
+                    field: sentTracking,
+                  });
                 }
               }
               if (result.failed === 0) {

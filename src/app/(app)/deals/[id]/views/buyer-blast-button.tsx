@@ -58,6 +58,10 @@ type BuyerBlastButtonProps = {
   // generic word grammatical to the mode ("file" / "file or link") so
   // the message stays readable either way.
   attachmentNoun?: string;
+  // Pass-through to BlastModal's tracking mode. Set "dd" for the Phase 2
+  // Share DD Folder send so the modal warns / auto-unchecks / marks the
+  // dd_sent_at flag the same way the OM blast does for om_sent_at.
+  sentTracking?: "om" | "dd";
   compact?: boolean;
 };
 
@@ -78,6 +82,7 @@ export function BuyerBlastButton({
   excludeOfferReceived,
   requireAttachment,
   attachmentNoun,
+  sentTracking,
   compact = true,
 }: BuyerBlastButtonProps) {
   const [open, setOpen] = useState(false);
@@ -172,6 +177,7 @@ export function BuyerBlastButton({
           defaultTiers={defaultTiers}
           attachmentSourceItemId={attachmentSourceItemId}
           excludeOfferReceived={excludeOfferReceived}
+          sentTracking={sentTracking}
         />
       )}
     </>

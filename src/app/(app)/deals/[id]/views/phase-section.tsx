@@ -458,6 +458,7 @@ export function PhaseSection({
                                 attachmentSourceItemId={item.id}
                                 requireAttachment="any"
                                 attachmentNoun="DD folder link or file"
+                                sentTracking="dd"
                               />
                             )}
                             {isOffersDueNoticeItem(item.name) && (
