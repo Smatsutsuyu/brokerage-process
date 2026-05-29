@@ -89,8 +89,16 @@ type OptionACardsProps = {
   orgContacts: ExistingContactOption[];
 };
 
+// View mode for the cards layout. Detail = the working view (each card's
+// per-contact rows visible). Summary = the quick-scan view (per-contact
+// rows hidden; only the builder-level header + comments show). Picked
+// via the segmented control in the toolbar so users can flip between
+// "edit contacts" and "scan marketing status" without scrolling.
+type ViewMode = "detail" | "summary";
+
 export function OptionACards({ dealId, groups, leadOptions, orgContacts }: OptionACardsProps) {
   const [filter, setFilter] = useState<FilterValue>("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("detail");
 
   // Initial mount: expand every group with contacts so first-visit shows
   // populated cards open. Lazy init avoids touching refs during render
@@ -247,6 +255,40 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
             })}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Detail / Summary segmented control. Summary hides per-contact
+            rows on every card, leaving just the builder-level header +
+            comments so the user can scan marketing status (tier, lead,
+            called, confi, OM, offer) across all builders without the
+            contact noise. Sits next to the tier filter chip because
+            it's a sibling view-shape control. */}
+        <div
+          role="tablist"
+          aria-label="Card detail level"
+          className="inline-flex rounded-full border border-gray-200 bg-white p-0.5 text-xs font-semibold"
+        >
+          {(["detail", "summary"] as const).map((mode) => {
+            const active = viewMode === mode;
+            const label = mode === "detail" ? "Detail" : "Summary";
+            return (
+              <button
+                key={mode}
+                role="tab"
+                aria-selected={active}
+                type="button"
+                onClick={() => setViewMode(mode)}
+                className={cn(
+                  "rounded-full px-3 py-1 transition-colors",
+                  active
+                    ? "bg-brand-ink text-white"
+                    : "text-gray-600 hover:text-gray-900",
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
 
         <div className="ml-auto flex flex-wrap gap-2">
           <MarketingReportPdfButton dealId={dealId} />
@@ -455,7 +497,7 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
                       />
                     )}
 
-                    {g.contacts.length === 0 ? (
+                    {viewMode === "detail" && (g.contacts.length === 0 ? (
                       <div className="py-4 text-center text-xs text-gray-400 italic">
                         No contacts yet.
                       </div>
@@ -531,9 +573,9 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
                           </div>
                         ))}
                       </div>
-                    )}
+                    ))}
 
-                    {g.kind === "builder" && (
+                    {viewMode === "detail" && g.kind === "builder" && (
                       <button
                         type="button"
                         onClick={() =>
