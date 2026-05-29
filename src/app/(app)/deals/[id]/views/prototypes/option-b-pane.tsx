@@ -61,7 +61,7 @@ const FILTER_META: Record<
     dot: "bg-tier-yellow",
   },
   red: {
-    label: "Immediate Pass",
+    label: "Pass",
     chip: "bg-red-100 text-red-800 border-red-300",
     ribbon: "bg-tier-red",
     dot: "bg-tier-red",

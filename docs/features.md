@@ -58,7 +58,7 @@ Some items have extra affordances:
 
 ### Contacts
 
-Manage the buyer list for this deal in a card layout grouped by tier (Interested / Evaluating / Immediate Pass / Not Selected). Filter chips at the top narrow by tier.
+Manage the buyer list for this deal in a card layout grouped by tier (Interested / Evaluating / Pass / Not Selected). Filter chips at the top narrow by tier.
 
 For each builder card you can:
 

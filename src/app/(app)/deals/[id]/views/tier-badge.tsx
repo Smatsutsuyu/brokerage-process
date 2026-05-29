@@ -35,8 +35,8 @@ const TIER_META: Record<
     dot: "bg-tier-yellow",
   },
   red: {
-    label: "Immediate Pass",
-    descriptive: "Red — Immediate Pass",
+    label: "Pass",
+    descriptive: "Red — Pass",
     badge: "bg-red-100 text-red-800",
     dot: "bg-tier-red",
   },
