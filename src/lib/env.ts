@@ -20,6 +20,14 @@ export const env = createEnv({
     // lib/email/blast.ts. Set this to tune the rate without a code change
     // (e.g. raise it if Resend lowers the cap, drop it to 0 to disable).
     SEND_INTERVAL_MS: z.coerce.number().int().nonnegative().optional(),
+    // Dev override for the composer's "From:" sender on client-facing
+    // blast sends (OM blast, Deal Team, Phase 2 buyer blasts). When set,
+    // replaces the hardcoded cshiota@landadvisors.com so a local dev
+    // can test blasts against a different verified Resend domain (e.g.
+    // noreply@portal.lakebridgecap.com on the portal Resend account).
+    // Unset = production behavior (Chris). Display name stays "Chris
+    // Shiota" — only the address is overridden.
+    DEV_BLAST_SENDER_EMAIL: z.string().email().optional(),
   },
   client: {
     NEXT_PUBLIC_FEEDBACK_ENABLED: z
@@ -38,6 +46,7 @@ export const env = createEnv({
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     EMAIL_FROM: process.env.EMAIL_FROM,
     SEND_INTERVAL_MS: process.env.SEND_INTERVAL_MS,
+    DEV_BLAST_SENDER_EMAIL: process.env.DEV_BLAST_SENDER_EMAIL,
     NEXT_PUBLIC_FEEDBACK_ENABLED: process.env.NEXT_PUBLIC_FEEDBACK_ENABLED,
     NEXT_PUBLIC_COMMIT_SHA: process.env.NEXT_PUBLIC_COMMIT_SHA,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,

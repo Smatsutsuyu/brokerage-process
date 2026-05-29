@@ -25,6 +25,7 @@ import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { findBuilderByName } from "@/lib/builders";
 import { sendResolvedEmails, type BlastSendResult } from "@/lib/email/blast";
+import { env } from "@/lib/env";
 import { formatPhone } from "@/lib/phone";
 import type { ResolvedEmail } from "@/components/email/email-preview-modal";
 
@@ -1203,6 +1204,11 @@ export type BlastPreviewRow = {
   tier: "green" | "yellow" | "red" | "not_selected";
   leadUserId: string | null;
   leadName: string | null;
+  // Per-builder "OM already sent" timestamp from deal_buyers. Used by
+  // the OM-blast modal to warn the user before they send a duplicate
+  // OM to a builder they already hit. Null when nothing has been sent
+  // yet. Same value across every contact in a given builder group.
+  omSentAt: Date | null;
 };
 
 export async function previewBlastRecipients(input: {
@@ -1235,6 +1241,7 @@ export async function previewBlastRecipients(input: {
       tier: dealBuyers.tier,
       leadUserId: dealBuyers.leadUserId,
       leadName: authUser.name,
+      omSentAt: dealBuyers.omSentAt,
     })
     .from(dealContacts)
     .innerJoin(contacts, eq(contacts.id, dealContacts.contactId))
@@ -1273,6 +1280,7 @@ export async function previewBlastRecipients(input: {
     tier: r.tier,
     leadUserId: r.leadUserId,
     leadName: r.leadName,
+    omSentAt: r.omSentAt,
   }));
 }
 
@@ -1337,6 +1345,14 @@ const CHRIS_SENDER: EmailSenderOption = {
   firstName: "Chris",
 };
 
+// Effective composer sender = Chris by default; `DEV_BLAST_SENDER_EMAIL`
+// swaps just the address when set (display name + first name unchanged)
+// so a local dev can route blasts through a different verified Resend
+// domain without touching production behavior.
+const ACTIVE_BLAST_SENDER: EmailSenderOption = env.DEV_BLAST_SENDER_EMAIL
+  ? { ...CHRIS_SENDER, email: env.DEV_BLAST_SENDER_EMAIL }
+  : CHRIS_SENDER;
+
 // Template variables for the OM-blast email composer. Pulled from the deal
 // row. Returns sender options too so the preview modal can render the
 // "From:" dropdown without a second round-trip.
@@ -1367,8 +1383,8 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
     .limit(1);
   if (!deal) throw new Error("Deal not found");
 
-  const senderOptions: EmailSenderOption[] = [CHRIS_SENDER];
-  const defaultSenderId = CHRIS_SENDER.id;
+  const senderOptions: EmailSenderOption[] = [ACTIVE_BLAST_SENDER];
+  const defaultSenderId = ACTIVE_BLAST_SENDER.id;
 
   return {
     vars: {
@@ -1376,7 +1392,7 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
       city: deal.city ?? "",
       units: deal.units != null ? String(deal.units) : "",
       type: deal.type ?? "",
-      senderName: CHRIS_SENDER.firstName,
+      senderName: ACTIVE_BLAST_SENDER.firstName,
     },
     senderOptions,
     defaultSenderId,
@@ -2250,6 +2266,33 @@ export async function sendBlastEmails(
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
   return sendResolvedEmails(emails, { orgId: org.id, dealId: opts?.dealId });
+}
+
+// Bulk-mark deal_buyers.om_sent_at = now() for the given builders on a
+// deal. Called by the OM-blast composer after a successful send so the
+// "OM Sent" tracking flag flips automatically, and the next OM blast
+// defaults that builder to unchecked in the recipient list. Calling
+// setBuyerOmSent per-builder would be N round-trips; this is one.
+export async function markBuildersOmSent(input: {
+  dealId: string;
+  builderIds: string[];
+}): Promise<void> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+  if (input.builderIds.length === 0) return;
+
+  await db
+    .update(dealBuyers)
+    .set({ omSentAt: new Date() })
+    .where(
+      and(
+        eq(dealBuyers.dealId, input.dealId),
+        eq(dealBuyers.orgId, org.id),
+        inArray(dealBuyers.builderId, input.builderIds),
+      ),
+    );
+
+  revalidatePath(`/deals/${input.dealId}`);
 }
 
 // Verifies that an item belongs to the active deal. Useful for any

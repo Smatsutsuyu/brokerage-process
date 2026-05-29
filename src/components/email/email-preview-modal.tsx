@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   Building2,
   ChevronLeft,
@@ -164,6 +165,11 @@ type EmailPreviewBaseProps = {
   // Callers wire to the sendBlastEmails server action which handles
   // Blob-attachment fetch + per-builder Resend calls.
   onSend?: (emails: ResolvedEmail[]) => Promise<void> | void;
+  // Optional per-builder informational notes shown as an amber banner at
+  // the top of the step-2 preview when the active builder is keyed.
+  // Used by the OM blast to warn "OM was previously sent on …" so the
+  // sender notices before clicking Send. Doesn't block anything.
+  priorSendNotes?: Record<string, string>;
 };
 
 // The embeddable body component's props. Adds an explicit close callback
@@ -254,6 +260,7 @@ export function EmailPreviewBody({
   onSend,
   onClose,
   onBack,
+  priorSendNotes,
 }: EmailPreviewBodyProps) {
   const groups = useMemo(() => groupByBuilder(recipients), [recipients]);
   const choices = attachmentChoices ?? [];
@@ -459,6 +466,22 @@ export function EmailPreviewBody({
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
+
+            {/* Prior-send warning banner for the active builder. Used by
+                the OM blast to flag "OM was previously sent on …" so
+                the sender notices before clicking Send. Informational
+                only; doesn't block anything. */}
+            {active && priorSendNotes?.[active.builderId] && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] leading-snug text-amber-900"
+              >
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-700" />
+                <span className="flex-1 font-medium">
+                  {priorSendNotes[active.builderId]}
+                </span>
+              </div>
+            )}
 
             {/* From: dropdown — same sender for every per-builder email.
                 Sender choices come grouped via the `group` field; we

@@ -102,6 +102,18 @@ Major reconciliation pass against Chris's `Marketing Process Checklist.xlsx` v2 
 - Member-remove flow: hard delete with cascade, last-owner guardrail, fix for inviting a member signing the owner out (`12685c5`).
 - Auto-clean orphan `deal_buyers` rows on builder delete (`1434e4d`, `85e7747`).
 
+## OM blast tracking, dev sender override, tier-tinted recipient list (2026-05-21)
+
+- **`omSentTracking` mode on `BlastModal`.** Unified three behaviors under a single prop, opt-in by `OmBlastButton`:
+  - Step 1 builder header shows an amber "OM sent MMM D" chip for builders whose `deal_buyers.om_sent_at` is set; Step 2 paginator shows the same as a banner above the active builder's preview.
+  - Builders in the "previously OM-sent" set are auto-added to `excludedContactIds` on each open (once recipients load), so the default is "don't re-send." User check-overrides stick across in-session filter changes via an `autoExcludeApplied` flag.
+  - After `sendBlastEmails` returns, every builder with an `ok: true` outcome is bulk-marked via new server action `markBuildersOmSent(dealId, builderIds)` (single UPDATE, not N round-trips). `revalidatePath` refreshes the contacts tab toggle.
+- **`previewBlastRecipients` query + `BlastPreviewRow` type** gained `omSentAt: Date | null` from `deal_buyers`. `BlastModal`'s grouped builder map carries it (along with the existing `tier`) so the warning chip and tier color both come from the same memo.
+- **OM blast attachment pre-flight.** `OmBlastButton.onClick` now mirrors the `BuyerBlastButton` validation: resolves the OM item id (eagerly, vs the existing lazy-on-open lookup), fetches attachments, and refuses to open the composer if no `kind: "file"` is present. Inline red bubble anchored under the button (`useInlineError`); two distinct messages for "no OM row on this deal" vs "no file attached." Network errors still fall back to sonner.
+- **Tier-tinted recipient list.** Each builder group's `<li>` in Step 1 gets a `bg-{green|yellow|red|gray}-50` + matching border based on the builder's tier, so a multi-tier blast preview reads its groups at a glance. Hover state on individual contact rows stays `bg-white` to pop against the tint. `TIER_META` gained a `rowBg` field.
+- **`DEV_BLAST_SENDER_EMAIL` env var** (added to `src/lib/env.ts`). When set, swaps just the email on the composer's `ACTIVE_BLAST_SENDER` in `actions.ts`; display name + first name stay "Chris Shiota." Lets a local dev route blast sends through a verified Resend domain (e.g. `noreply@portal.lakebridgecap.com` on the portal account) without touching production behavior. Documented in `.env.example` and `docs/operations.md`.
+- **`EmailPreviewBody` gained an optional `priorSendNotes?: Record<string, string>` prop** (component-level addition for the Step 2 banner; kept generic so similar "X already happened" notes can be layered on other blasts later).
+
 ## Blast send throttle + rate-limit retry (2026-05-21)
 
 - **Throttle.** The per-builder send loop in `src/lib/email/blast.ts` was sequential-but-unthrottled, so on a large blast (one email per builder, 20-30+ on a real OM blast) fast Resend responses could burst past the account's per-second rate limit, returning `429 rate_limit_exceeded`. Added a minimum gap between send starts (`SEND_INTERVAL_MS`, default 250ms ≈ 4/sec). Natural send latency usually covers most of the gap, so the added sleep is small.

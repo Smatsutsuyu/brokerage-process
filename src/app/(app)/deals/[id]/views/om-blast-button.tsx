@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Mail } from "lucide-react";
+import { Loader2, Mail } from "lucide-react";
+import { toast } from "sonner";
 
+import { useInlineError } from "@/components/inline-error-bubble";
 import { cn } from "@/lib/utils";
 
 import { OM_BLAST_TEMPLATE } from "@/lib/email-templates";
 
-import { getLeadsOnDeal, getOmItemId } from "../actions";
+import { getAttachmentsForItem, getLeadsOnDeal, getOmItemId } from "../actions";
 import { AttachmentSourceLine } from "./attachment-source-line";
 import { BlastModal } from "./blast-modal";
 import type { LeadOption } from "./lead-picker";
@@ -43,6 +45,13 @@ export function OmBlastButton({
   const [hovered, setHovered] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [, startLoad] = useTransition();
+  const [checking, startChecking] = useTransition();
+  const {
+    error: inlineError,
+    show: showInlineError,
+    clear: clearInlineError,
+    bubble,
+  } = useInlineError();
 
   useEffect(() => {
     if (!open || leadOptions !== null) return;
@@ -80,30 +89,78 @@ export function OmBlastButton({
   // known (e.g., this deal has no OM row, or the lookup hasn't resolved).
   const showConnector = hovered && !open && Boolean(effectiveItemId);
 
+  // Pre-flight: refuse to open the composer if no Offering Memorandum
+  // file is attached to the OM row. Same inline-bubble pattern as the
+  // Market Study / DD Folder buttons. Network errors fall back to
+  // sonner — they aren't tied to row data state.
+  function handleClick() {
+    clearInlineError();
+    startChecking(async () => {
+      try {
+        // Resolve the OM item id if we don't have it yet (eager lookup
+        // for the pre-flight; the lazy useEffect would only run after
+        // setOpen, too late to gate).
+        let itemId = effectiveItemId;
+        if (itemId === null && resolvedItemId === undefined) {
+          itemId = await getOmItemId({ dealId });
+          setResolvedItemId(itemId);
+        }
+        if (!itemId) {
+          showInlineError(
+            "No Offering Memorandum row on this deal. Add the Phase 1 OM checklist item first.",
+          );
+          return;
+        }
+        const att = await getAttachmentsForItem({ itemId });
+        const hasFile = att.choices.some((c) => c.kind === "file");
+        if (!hasFile) {
+          showInlineError(
+            "No Offering Memorandum attached. Upload the OM file to the Phase 1 row first, then send.",
+          );
+          return;
+        }
+        setOpen(true);
+      } catch (err) {
+        console.error("[om-blast] pre-flight failed", err);
+        toast.error("Couldn't check the OM attachment. Try again.");
+      }
+    });
+  }
+
   return (
     <>
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setOpen(true)}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        onFocus={() => setHovered(true)}
-        onBlur={() => setHovered(false)}
-        title={
-          effectiveItemId
-            ? "Filter contacts by tier and assignment, preview the email, then send. Attaches the file from the Offering Memorandum task."
-            : "Filter contacts by tier and assignment, preview the email, then send"
-        }
-        className={cn(
-          compact
-            ? "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-blue-50 hover:text-blue-700"
-            : "inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50",
-        )}
-      >
-        <Mail className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
-        Send OM blast
-      </button>
+      <span className="relative inline-block">
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={handleClick}
+          disabled={checking}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          onFocus={() => setHovered(true)}
+          onBlur={() => setHovered(false)}
+          title={
+            effectiveItemId
+              ? "Filter contacts by tier and assignment, preview the email, then send. Attaches the file from the Offering Memorandum task."
+              : "Filter contacts by tier and assignment, preview the email, then send"
+          }
+          className={cn(
+            compact
+              ? "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-blue-50 hover:text-blue-700"
+              : "inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50",
+            checking && "opacity-60",
+            inlineError && "ring-1 ring-red-300",
+          )}
+        >
+          {checking ? (
+            <Loader2 className={cn("animate-spin", compact ? "h-3 w-3" : "h-3.5 w-3.5")} />
+          ) : (
+            <Mail className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
+          )}
+          Send OM blast
+        </button>
+        {bubble}
+      </span>
 
       {showConnector && effectiveItemId && (
         <AttachmentSourceLine
@@ -125,6 +182,7 @@ export function OmBlastButton({
           title="OM blast"
           defaultTiers={["green", "yellow"]}
           attachmentSourceItemId={effectiveItemId}
+          omSentTracking
         />
       )}
     </>

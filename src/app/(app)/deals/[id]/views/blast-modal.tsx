@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { ArrowRight, Building2, Loader2, Mail } from "lucide-react";
+import { AlertTriangle, ArrowRight, Building2, Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -37,6 +37,7 @@ import {
   getCcSelectionsForBuilders,
   getOmBlastTemplateContext,
   getOrgCcOptions,
+  markBuildersOmSent,
   previewBlastRecipients,
   sendBlastEmails,
   setBuilderCcUsers,
@@ -46,26 +47,35 @@ import type { LeadOption } from "./lead-picker";
 
 type Tier = "green" | "yellow" | "red" | "not_selected";
 
-const TIER_META: Record<Tier, { label: string; chip: string; dot: string }> = {
+const TIER_META: Record<
+  Tier,
+  { label: string; chip: string; dot: string; rowBg: string }
+> = {
   green: {
     label: "Interested (Green)",
     chip: "bg-green-100 text-green-800 border-green-300",
     dot: "bg-tier-green",
+    // Subtle tinted bg + border for the builder group block. Light enough
+    // that contact rows + the warning chip stay readable on top.
+    rowBg: "bg-green-50 border-green-200",
   },
   yellow: {
     label: "Evaluating (Yellow)",
     chip: "bg-yellow-100 text-yellow-800 border-yellow-300",
     dot: "bg-tier-yellow",
+    rowBg: "bg-yellow-50 border-yellow-200",
   },
   red: {
     label: "Passed (Red)",
     chip: "bg-red-100 text-red-800 border-red-300",
     dot: "bg-tier-red",
+    rowBg: "bg-red-50 border-red-200",
   },
   not_selected: {
     label: "Not Selected",
     chip: "bg-gray-100 text-gray-700 border-gray-300",
     dot: "bg-gray-400",
+    rowBg: "bg-gray-50 border-gray-200",
   },
 };
 
@@ -73,6 +83,14 @@ const TIERS: Tier[] = ["green", "yellow", "red", "not_selected"];
 
 // Sentinel for the "Anyone" assignee filter (no leadUser filter applied).
 const ANY_ASSIGNEE = "__any__";
+
+// Short, low-fluff date for the "OM sent" warning chip ("May 18").
+// Avoid Intl.DateTimeFormat's full locale to keep the chip compact.
+function formatShortDate(d: Date | string | null): string {
+  if (!d) return "";
+  const date = typeof d === "string" ? new Date(d) : d;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
 type BlastModalProps = {
   open: boolean;
@@ -97,6 +115,18 @@ type BlastModalProps = {
   // Filter recipients to exclude builders whose offer_received_at is
   // set. Used by the "Follow up Missing Offers" send.
   excludeOfferReceived?: boolean;
+  // OM-tracking mode. When true:
+  //   1. Step 1 builder header shows an amber "OM sent MMM D" chip for
+  //      builders whose deal_buyers.om_sent_at is already set.
+  //   2. Step 2 paginator shows a banner above the active builder's
+  //      preview when that builder was previously OM-sent.
+  //   3. Recipients in the "previously OM-sent" set are auto-UNCHECKED
+  //      on each open of the modal — defaults to "don't re-send", user
+  //      can still override by checking them back on.
+  //   4. After a successful send, the OM Sent flag flips on each
+  //      builder the blast reached (via markBuildersOmSent).
+  // Used by the OM blast button.
+  omSentTracking?: boolean;
 };
 
 // Generic two-step blast composer. Step 1: tier filter + lead-assignee
@@ -118,6 +148,7 @@ export function BlastModal({
   defaultTiers,
   attachmentSourceItemId,
   excludeOfferReceived,
+  omSentTracking,
 }: BlastModalProps) {
   const [step, setStep] = useState<"filter" | "preview">("filter");
   const [selectedTiers, setSelectedTiers] = useState<Set<Tier>>(
@@ -147,6 +178,33 @@ export function BlastModal({
   useEffect(() => {
     if (open) setStep("filter");
   }, [open]);
+
+  // Auto-exclude tracking: once per open, after recipients have loaded,
+  // pre-populate excludedContactIds with previously-OM-sent builders'
+  // contacts so the user doesn't accidentally re-send. The user can
+  // still check them back on individually (the warning chip + step-2
+  // banner make the prior state visible). Subsequent filter changes in
+  // the same open session don't re-apply the auto-exclude, so manual
+  // overrides stick.
+  const [autoExcludeApplied, setAutoExcludeApplied] = useState(false);
+  useEffect(() => {
+    if (open) setAutoExcludeApplied(false);
+  }, [open]);
+  useEffect(() => {
+    if (!open || !omSentTracking || autoExcludeApplied) return;
+    if (recipients.length === 0) return;
+    const omSentContactIds = recipients
+      .filter((r) => r.omSentAt)
+      .map((r) => r.contactId);
+    if (omSentContactIds.length > 0) {
+      setExcludedContactIds((prev) => {
+        const next = new Set(prev);
+        for (const id of omSentContactIds) next.add(id);
+        return next;
+      });
+    }
+    setAutoExcludeApplied(true);
+  }, [open, omSentTracking, recipients, autoExcludeApplied]);
 
   // Recompute the preview whenever filters change OR the modal opens.
   // useEffect rather than onChange so the recompute is debounced naturally
@@ -219,12 +277,30 @@ export function BlastModal({
 
   // Group preview rows by builder for readability. Preserve the server's
   // sort order (alphabetical builder, alphabetical contact within).
+  // omSentAt is per-builder (lives on deal_buyers), so it's the same for
+  // every contact in a group — pull off the first row to surface in the
+  // header chip.
   const grouped = useMemo(() => {
-    const map = new Map<string, { builderName: string; contacts: BlastPreviewRow[] }>();
+    const map = new Map<
+      string,
+      {
+        builderId: string;
+        builderName: string;
+        contacts: BlastPreviewRow[];
+        omSentAt: Date | null;
+        tier: Tier;
+      }
+    >();
     for (const r of recipients) {
       let g = map.get(r.builderId);
       if (!g) {
-        g = { builderName: r.builderName, contacts: [] };
+        g = {
+          builderId: r.builderId,
+          builderName: r.builderName,
+          contacts: [],
+          omSentAt: r.omSentAt,
+          tier: r.tier,
+        };
         map.set(r.builderId, g);
       }
       g.contacts.push(r);
@@ -303,6 +379,20 @@ export function BlastModal({
       })),
     [checkedWithEmail],
   );
+
+  // Per-builder prior-send notes for step 2 — surfaces the same warning
+  // as step 1 in the preview's banner. Empty record when the caller
+  // didn't opt in, so EmailPreviewBody skips the banner entirely.
+  const priorSendNotes = useMemo<Record<string, string>>(() => {
+    if (!omSentTracking) return {};
+    const acc: Record<string, string> = {};
+    for (const r of recipients) {
+      if (r.omSentAt && !acc[r.builderId]) {
+        acc[r.builderId] = `OM was previously sent to this builder on ${formatShortDate(r.omSentAt)}.`;
+      }
+    }
+    return acc;
+  }, [recipients, omSentTracking]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -413,7 +503,13 @@ export function BlastModal({
                           emailableIds.length > 0 &&
                           emailableIds.some((id) => !excludedContactIds.has(id));
                         return (
-                          <li key={g.builderName}>
+                          <li
+                            key={g.builderName}
+                            className={cn(
+                              "rounded-md border px-2 py-1.5",
+                              TIER_META[g.tier].rowBg,
+                            )}
+                          >
                             <label className="mb-1 flex cursor-pointer items-center gap-1.5 text-[11px] font-semibold text-gray-700 select-none">
                               <input
                                 type="checkbox"
@@ -436,6 +532,15 @@ export function BlastModal({
                               <span className="text-[10px] tabular-nums text-gray-500">
                                 {g.contacts.length}
                               </span>
+                              {omSentTracking && g.omSentAt && (
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-amber-800 uppercase"
+                                  title={`OM was previously sent to ${g.builderName} on ${formatShortDate(g.omSentAt)}`}
+                                >
+                                  <AlertTriangle className="h-2.5 w-2.5" />
+                                  OM sent {formatShortDate(g.omSentAt)}
+                                </span>
+                              )}
                             </label>
                             <ul className="ml-6 space-y-0.5">
                               {g.contacts.map((c) => {
@@ -534,11 +639,30 @@ export function BlastModal({
             defaultSenderId={defaultSenderId}
             ccOptions={ccOptions}
             ccInitial={ccInitial}
+            priorSendNotes={priorSendNotes}
             onCcChange={async ({ builderId, userIds }) => {
               await setBuilderCcUsers({ dealId, builderId, userIds });
             }}
             onSend={async (emails) => {
               const result = await sendBlastEmails(emails);
+              // Mark each successfully-sent builder as OM Sent so the
+              // flag flips in the contacts tab and the next OM blast
+              // defaults them to unchecked. Only on the OM blast (the
+              // caller opted in via omSentTracking); other blasts don't
+              // touch om_sent_at. Fire-and-forget — the toast below
+              // doesn't wait on this.
+              if (omSentTracking) {
+                const sentBuilderIds = Array.from(
+                  new Set(
+                    result.outcomes
+                      .filter((o) => o.ok)
+                      .map((o) => o.builderId),
+                  ),
+                );
+                if (sentBuilderIds.length > 0) {
+                  void markBuildersOmSent({ dealId, builderIds: sentBuilderIds });
+                }
+              }
               if (result.failed === 0) {
                 toast.success(
                   `Sent ${result.sent} ${result.sent === 1 ? "email" : "emails"}`,

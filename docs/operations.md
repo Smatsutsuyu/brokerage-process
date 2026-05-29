@@ -249,6 +249,7 @@ Canonical list of expected env vars (from `src/lib/env.ts`):
 - `RESEND_API_KEY` (Sensitive, optional): Resend API key. When unset, email sends are no-ops.
 - `EMAIL_FROM` (optional): from-address for the feedback-notification pipeline (currently `no-reply@landadvisors.com`). Client-facing sends override this per call.
 - `SEND_INTERVAL_MS` (optional): minimum gap in milliseconds between outbound blast sends. Throttles a blast under Resend's per-second rate limit. When unset, the code default (250ms ≈ 4 sends/sec) applies. Raise it if Resend lowers the cap or blasts still hit rate limits; set to `0` to disable throttling.
+- `DEV_BLAST_SENDER_EMAIL` (optional, dev): replaces the blast composer's "From:" address (`cshiota@landadvisors.com` by default). Used in local dev to route blasts through a different verified Resend domain. Leave unset in production deploys.
 - `NEXT_PUBLIC_FEEDBACK_ENABLED` (optional, defaults to `true`): set to `false` to disable the in-app feedback widget in production.
 - `NEXT_PUBLIC_COMMIT_SHA` (auto-injected by Vercel from the build commit; do not set manually).
 - `NEXT_PUBLIC_APP_URL` (optional): used to build absolute URLs in emails. Set to the production URL.

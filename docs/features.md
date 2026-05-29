@@ -116,17 +116,27 @@ Launch a blast from two places: the toolbar on the Contacts tab, or the relevant
 
 A two-step modal opens (both steps share one window — clicking Next swaps the body in place rather than stacking a second modal):
 
-- **Step 1, Recipients.** Filter by tier (Green / Yellow / Red) and by lead user. The recipient preview groups contacts under their builder and gives each emailable contact a checkbox (defaulted to checked). Uncheck any contact you want to skip, or use the builder-level select-all / none. Anyone toggled off via the Contacts-tab bell icon is already excluded; contacts without an email show but can't be selected. The "Next" button counts only checked emails.
+- **Step 1, Recipients.** Filter by tier (Green / Yellow / Red) and by lead user. The recipient preview groups contacts under their builder and tints each group's background with the builder's tier color (green / yellow / red / gray) so you can see at a glance which tier each builder belongs to when several tiers are selected. Each emailable contact has a checkbox (defaulted to checked) — uncheck any to skip, or use the builder-level select-all / none. Anyone toggled off via the Contacts-tab bell icon is already excluded; contacts without an email show but can't be selected. The "Next" button counts only checked emails.
 - **Step 2, Preview & send.** Review and edit the subject and body once and the change applies to every per-builder email. Pick which attachments to include (for OM blasts, the OM file pre-selected from the Phase 1 row). Per-builder CC selections persist across blasts. Click "Back" to return to Step 1 with all filter and checkbox state intact. Click Send to deliver.
+
+### OM blast tracking
+
+The "Send OM blast" button has additional safeguards because the OM is the largest single piece of buyer-facing content and re-sending it accidentally looks sloppy. Three behaviors fire only on the OM blast (other blasts are unaffected):
+
+- **No OM, no blast.** Clicking "Send OM blast" first verifies an OM file is uploaded to the Phase 1 Offering Memorandum row. If the file is missing (or the OM row itself doesn't exist on this deal), a red bubble drops below the button with the next step ("Upload the OM file to the Phase 1 row first, then send") and the composer does not open.
+- **Warn on prior sends.** Step 1's recipient list shows an amber "OM sent MMM D" chip next to any builder you've already OM-blasted on this deal, and Step 2's per-builder preview shows the same warning as a banner above the email body. The flag comes from each builder's "OM Sent" checkbox on the Contacts tab.
+- **Auto-uncheck + override.** Builders with the "OM Sent" flag set are unchecked by default in the recipient list every time you reopen the modal, so you don't re-send by accident. You can still check them back on individually to override; that override holds while the modal stays open (filter changes don't wipe it).
+- **Auto-mark after send.** After a successful blast, every builder the OM actually reached gets their "OM Sent" checkbox flipped to checked automatically (with the timestamp from this moment). The contacts tab and the next OM blast both pick up the new state right away.
 
 ### Attachment gates on document-share row buttons
 
 Some row buttons exist solely to ship a document and refuse to open the composer if there's nothing to send. The check happens on click; if it fails, a red bubble drops below the button with a short explanation. Click the bubble or wait six seconds to dismiss.
 
+- **Send OM blast** requires an uploaded OM file on the Phase 1 Offering Memorandum row (see "OM blast tracking" above for the full set of guardrails).
 - **Send Market Study** requires an uploaded file on the row. A Dropbox link alone won't satisfy this gate — the recipient needs the actual document attached.
 - **Send DD Folder** (Share Marketing Due Diligence Folder row) accepts either a file or a link, since these are usually shared as a Dropbox / SharePoint folder URL.
 
-In both cases, drop the file or link onto the checklist row via its universal attachment / link affordance, then click Send again.
+In all three cases, drop the file or link onto the checklist row via its universal attachment / link affordance, then click Send again.
 
 ### Sender + delivery
 

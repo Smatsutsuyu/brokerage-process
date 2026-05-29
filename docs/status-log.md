@@ -4,6 +4,34 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-21 — OM blast tracking, dev sender override, tier-tinted recipient list
+
+### Done
+- **OM blast tracking** unified under a single `omSentTracking` prop on `BlastModal`, opt-in by `OmBlastButton`. Four behaviors:
+  1. Step 1 builder header shows an amber "OM sent MMM D" chip for builders whose `deal_buyers.om_sent_at` is set.
+  2. Step 2 paginator shows the same as a banner above the active builder's preview.
+  3. Builders in the "previously OM-sent" set are auto-unchecked on each open (once recipients load). User can re-check individuals to override; the override sticks across in-session filter changes.
+  4. After a successful blast, every `ok: true` builder gets their `om_sent_at` flipped to now via new server action `markBuildersOmSent` (single UPDATE, plus `revalidatePath` so the contacts tab toggle updates).
+- **OM blast attachment pre-flight.** Clicking "Send OM blast" now resolves the OM item id eagerly, fetches attachments, and refuses to open the composer if no uploaded file is present. Two messages: "No OM row on this deal. Add the Phase 1 OM checklist item first." vs "No Offering Memorandum attached. Upload the OM file to the Phase 1 row first, then send." Same inline-bubble pattern as Market Study / DD Folder.
+- **Tier-tinted recipient list.** Each builder group in Step 1 gets a `bg-{green|yellow|red|gray}-50` + matching border based on tier so multi-tier blasts read their groups at a glance.
+- **`DEV_BLAST_SENDER_EMAIL` env var** added to `src/lib/env.ts`. Swaps just the email on the composer's hardcoded Chris sender; display name stays. Lets local dev route blasts through a verified Resend domain (e.g. `noreply@portal.lakebridgecap.com` on the portal account) without touching production. Documented in `.env.example` and operations.md.
+- **`previewBlastRecipients` + `BlastPreviewRow`** gained `omSentAt: Date | null` from `deal_buyers`; `BlastModal`'s grouped map carries it alongside tier so the chip and color come from the same memo.
+- **`EmailPreviewBody`** gained an optional `priorSendNotes?: Record<string, string>` prop — the Step 2 banner driver. Kept generic so similar "X already happened" notes can be layered on other blasts later.
+- **Docs swept**: features.md ("OM blast tracking" section + tier-tinted recipient note + Send OM blast added to attachment-gate list), build-progress.md (new entry), operations.md (DEV_BLAST_SENDER_EMAIL env), status-log.md (this entry).
+
+### Decisions
+- **One prop, three behaviors.** `omSentTracking` collapses the warn chip + auto-uncheck + mark-after-send into a single switch. Other blasts (CA, Q&A, Market Study, DD Folder) don't opt in, so their flows are unchanged.
+- **Auto-exclude is per-open, not per-load.** `autoExcludeApplied` flag fires the auto-uncheck once after the first recipient load on each modal open. Subsequent filter changes don't re-apply, so manual check-overrides don't get wiped when the user widens or narrows the tier filter mid-session.
+- **`DEV_BLAST_SENDER_EMAIL` overrides email only, not display name.** Keeps "Chris Shiota" as the visible sender even in dev — fewer surprises if someone opens a sandbox-sent message.
+
+### Deferred / Pending
+- Similar "prior action" tracking for other blasts (e.g. "CA already signed" for the Confidentiality Agreement blast) is structurally ready — `priorSendNotes` is generic. Wire on demand.
+
+### Blockers
+- None.
+
+---
+
 ## 2026-05-21 — Blast send throttle + rate-limit retry
 
 ### Context
