@@ -115,7 +115,17 @@ export function SidebarDealsList({ deals, activeDealId }: SidebarDealsListProps)
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    // Explicit `id` so dnd-kit's accessibility describedby IDs
+    // (DndDescribedBy-N) are deterministic across SSR/hydration. Without
+    // this, dnd-kit's internal module-level counter assigns different
+    // values server-side vs client-side, triggering a hydration mismatch
+    // warning on every render of the sidebar.
+    <DndContext
+      id="sidebar-deals-dnd"
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
       <SortableContext items={order} strategy={verticalListSortingStrategy}>
         {order.map((id) => {
           const d = dealsById.get(id);
