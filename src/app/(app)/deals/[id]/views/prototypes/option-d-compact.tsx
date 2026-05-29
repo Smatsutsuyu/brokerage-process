@@ -28,6 +28,7 @@ import { deleteContact } from "../../actions";
 import { AddContactModal, type EditingContact } from "../add-contact-modal";
 import { BuyerCheckbox } from "../buyer-checkbox";
 import { LeadPicker, type LeadOption } from "../lead-picker";
+import { MarketingReportPdfButton } from "../marketing-report-pdf-button";
 import {
   PickExistingContactModal,
   type ExistingContactOption,
@@ -178,6 +179,7 @@ export function OptionDCompact({ dealId, groups, leadOptions, orgContacts }: Opt
           </DropdownMenuContent>
         </DropdownMenu>
         <div className="ml-auto flex flex-wrap gap-2">
+          <MarketingReportPdfButton dealId={dealId} />
           <PlannedAction
             label="Send OM blast"
             icon={Mail}
@@ -289,22 +291,38 @@ export function OptionDCompact({ dealId, groups, leadOptions, orgContacts }: Opt
                       : `${g.contacts.length} contact${g.contacts.length === 1 ? "" : "s"}`}
                   </span>
 
-                  <div className="ml-auto flex items-center gap-2 text-[11px] text-gray-500">
+                  <div className="ml-auto flex flex-wrap items-center justify-end gap-2 text-[11px] text-gray-500">
                     {g.leadName && (
                       <span className="rounded bg-gray-100 px-1.5 py-0.5">
-                        {g.leadName.split(" ")[0]}
+                        {g.leadName}
                       </span>
                     )}
-                    {g.called && (
-                      <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">
-                        Called
+                    {/* Status pills always render so the row reads as a
+                        consistent four-column status. Checked = green
+                        with a check mark; unchecked = muted gray so the
+                        user can see which flags are open vs closed at a
+                        glance. */}
+                    {(
+                      [
+                        ["Called", g.called],
+                        ["Confi", g.confiSigned],
+                        ["OM", g.omSent],
+                        ["Offer", g.offerReceived],
+                      ] as const
+                    ).map(([label, checked]) => (
+                      <span
+                        key={label}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded px-1.5 py-0.5",
+                          checked
+                            ? "bg-green-50 text-green-700"
+                            : "bg-gray-50 text-gray-400",
+                        )}
+                      >
+                        {checked && <Check className="h-3 w-3" />}
+                        {label}
                       </span>
-                    )}
-                    {g.omSent && (
-                      <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">
-                        OM
-                      </span>
-                    )}
+                    ))}
                   </div>
                 </button>
 
@@ -342,10 +360,28 @@ export function OptionDCompact({ dealId, groups, leadOptions, orgContacts }: Opt
                         <BuyerCheckbox
                           dealBuyerId={g.dealBuyerId}
                           dealId={dealId}
+                          field="confiSigned"
+                          checked={g.confiSigned}
+                        />
+                        <span className="text-gray-600">Confi</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <BuyerCheckbox
+                          dealBuyerId={g.dealBuyerId}
+                          dealId={dealId}
                           field="omSent"
                           checked={g.omSent}
                         />
                         <span className="text-gray-600">OM Sent</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <BuyerCheckbox
+                          dealBuyerId={g.dealBuyerId}
+                          dealId={dealId}
+                          field="offerReceived"
+                          checked={g.offerReceived}
+                        />
+                        <span className="text-gray-600">Offer</span>
                       </div>
                     </div>
 

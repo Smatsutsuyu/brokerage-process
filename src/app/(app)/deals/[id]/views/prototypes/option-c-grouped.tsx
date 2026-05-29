@@ -19,6 +19,7 @@ import { deleteContact } from "../../actions";
 import { AddContactModal, type EditingContact } from "../add-contact-modal";
 import { BuyerCheckbox } from "../buyer-checkbox";
 import { LeadPicker, type LeadOption } from "../lead-picker";
+import { MarketingReportPdfButton } from "../marketing-report-pdf-button";
 import {
   PickExistingContactModal,
   type ExistingContactOption,
@@ -156,6 +157,7 @@ export function OptionCGrouped({ dealId, groups, leadOptions, orgContacts }: Opt
           </DropdownMenuContent>
         </DropdownMenu>
         <div className="ml-auto flex flex-wrap gap-2">
+          <MarketingReportPdfButton dealId={dealId} />
           <PlannedAction
             label="Send OM blast"
             icon={Mail}
@@ -289,10 +291,28 @@ export function OptionCGrouped({ dealId, groups, leadOptions, orgContacts }: Opt
                               <BuyerCheckbox
                                 dealBuyerId={g.dealBuyerId}
                                 dealId={dealId}
+                                field="confiSigned"
+                                checked={g.confiSigned}
+                              />
+                              <span className="text-gray-600">Confi</span>
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <BuyerCheckbox
+                                dealBuyerId={g.dealBuyerId}
+                                dealId={dealId}
                                 field="omSent"
                                 checked={g.omSent}
                               />
                               <span className="text-gray-600">OM</span>
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <BuyerCheckbox
+                                dealBuyerId={g.dealBuyerId}
+                                dealId={dealId}
+                                field="offerReceived"
+                                checked={g.offerReceived}
+                              />
+                              <span className="text-gray-600">Offer</span>
                             </span>
                           </div>
                         </div>

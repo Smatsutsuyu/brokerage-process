@@ -28,6 +28,7 @@ import { deleteContact } from "../../actions";
 import { AddContactModal, type EditingContact } from "../add-contact-modal";
 import { BuyerCheckbox } from "../buyer-checkbox";
 import { LeadPicker, type LeadOption } from "../lead-picker";
+import { MarketingReportPdfButton } from "../marketing-report-pdf-button";
 import {
   PickExistingContactModal,
   type ExistingContactOption,
@@ -181,6 +182,7 @@ export function OptionBPane({ dealId, groups, leadOptions, orgContacts }: Option
           </DropdownMenuContent>
         </DropdownMenu>
         <div className="ml-auto flex flex-wrap gap-2">
+          <MarketingReportPdfButton dealId={dealId} />
           <PlannedAction
             label="Send OM blast"
             icon={Mail}
@@ -317,7 +319,7 @@ export function OptionBPane({ dealId, groups, leadOptions, orgContacts }: Option
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-3 rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-3 text-xs">
+              <div className="grid grid-cols-5 gap-3 rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-3 text-xs">
                 <div>
                   <div className="mb-1 text-[10px] font-semibold tracking-wider text-gray-500 uppercase">
                     Lead
@@ -343,6 +345,17 @@ export function OptionBPane({ dealId, groups, leadOptions, orgContacts }: Option
                 </div>
                 <div>
                   <div className="mb-1 text-[10px] font-semibold tracking-wider text-gray-500 uppercase">
+                    Confi
+                  </div>
+                  <BuyerCheckbox
+                    dealBuyerId={selected.dealBuyerId}
+                    dealId={dealId}
+                    field="confiSigned"
+                    checked={selected.confiSigned}
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 text-[10px] font-semibold tracking-wider text-gray-500 uppercase">
                     OM Sent
                   </div>
                   <BuyerCheckbox
@@ -350,6 +363,17 @@ export function OptionBPane({ dealId, groups, leadOptions, orgContacts }: Option
                     dealId={dealId}
                     field="omSent"
                     checked={selected.omSent}
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 text-[10px] font-semibold tracking-wider text-gray-500 uppercase">
+                    Offer
+                  </div>
+                  <BuyerCheckbox
+                    dealBuyerId={selected.dealBuyerId}
+                    dealId={dealId}
+                    field="offerReceived"
+                    checked={selected.offerReceived}
                   />
                 </div>
               </div>
