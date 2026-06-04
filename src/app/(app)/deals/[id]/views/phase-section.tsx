@@ -466,9 +466,10 @@ export function PhaseSection({
                                 dealId={dealId}
                                 label="Send 1-week notice"
                                 modalTitle="Offers due (1-week notice)"
-                                title="Send the 1-week offers-due notice. The {{dueDate}} placeholder in the body needs to be filled in at preview time until the date source is wired up."
+                                title="Send the 1-week offers-due notice. {{dueDate}} in the body resolves to the Offering Date milestone."
                                 template={OFFERS_DUE_NOTICE_TEMPLATE}
                                 defaultTiers={["green", "yellow"]}
+                                requireOfferingDate
                               />
                             )}
                             {isDayOfReminderItem(item.name) && (

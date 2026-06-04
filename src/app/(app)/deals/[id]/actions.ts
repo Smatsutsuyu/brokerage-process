@@ -1406,6 +1406,27 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
     .limit(1);
   if (!deal) throw new Error("Deal not found");
 
+  // Pull the deal's "Offering Date" milestone tracked-date for the
+  // {{dueDate}} placeholder used by the Phase 2 offers-due reminder
+  // templates (1-week-before today). Loose substring match so a
+  // rename like "Offering Date (target)" still resolves. Empty string
+  // when the row isn't set — interpolate leaves {{dueDate}} in place
+  // so the user notices.
+  const offeringDateItems = await db
+    .select({ name: checklistItems.name, trackedDate: checklistItems.trackedDate })
+    .from(checklistItems)
+    .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
+    .where(
+      and(
+        eq(checklistCategories.dealId, input.dealId),
+        eq(checklistItems.orgId, org.id),
+      ),
+    );
+  const offeringDateRow = offeringDateItems.find((r) =>
+    r.name.toLowerCase().includes("offering date"),
+  );
+  const dueDate = formatOfferingDate(offeringDateRow?.trackedDate ?? null);
+
   const senderOptions: EmailSenderOption[] = [ACTIVE_BLAST_SENDER];
   const defaultSenderId = ACTIVE_BLAST_SENDER.id;
 
@@ -1416,10 +1437,51 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
       units: deal.units != null ? String(deal.units) : "",
       type: deal.type ?? "",
       senderName: ACTIVE_BLAST_SENDER.firstName,
+      dueDate,
     },
     senderOptions,
     defaultSenderId,
   };
+}
+
+// "Friday, May 29, 2026" from a date column's YYYY-MM-DD string. Built
+// against a local-time Date so the formatted day matches the date the
+// user picked (passing the string straight to new Date() treats it as
+// UTC midnight, which can roll back a day in negative-offset zones).
+function formatOfferingDate(trackedDate: string | null): string {
+  if (!trackedDate) return "";
+  const [y, m, d] = trackedDate.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+// Standalone lookup for the deal's Offering Date tracked-date. Returns
+// the raw YYYY-MM-DD string or null. Used by the 1-week notice button's
+// pre-flight check so we can refuse to open the composer when the
+// Offering Date isn't set.
+export async function getOfferingDate(input: {
+  dealId: string;
+}): Promise<string | null> {
+  const org = await getCurrentOrg();
+  if (!org) return null;
+  const rows = await db
+    .select({ name: checklistItems.name, trackedDate: checklistItems.trackedDate })
+    .from(checklistItems)
+    .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
+    .where(
+      and(
+        eq(checklistCategories.dealId, input.dealId),
+        eq(checklistItems.orgId, org.id),
+      ),
+    );
+  const row = rows.find((r) => r.name.toLowerCase().includes("offering date"));
+  return row?.trackedDate ?? null;
 }
 
 // All possible attachments for the OM-blast email — every uploaded file

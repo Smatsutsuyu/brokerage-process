@@ -8,7 +8,7 @@ import { useInlineError } from "@/components/inline-error-bubble";
 import { type EmailTemplate } from "@/lib/email-templates";
 import { cn } from "@/lib/utils";
 
-import { getAttachmentsForItem, getLeadsOnDeal } from "../actions";
+import { getAttachmentsForItem, getLeadsOnDeal, getOfferingDate } from "../actions";
 import { BlastModal } from "./blast-modal";
 import type { LeadOption } from "./lead-picker";
 
@@ -62,6 +62,10 @@ type BuyerBlastButtonProps = {
   // Share DD Folder send so the modal warns / auto-unchecks / marks the
   // dd_sent_at flag the same way the OM blast does for om_sent_at.
   sentTracking?: "om" | "dd";
+  // Pre-flight: refuse to open the composer if the deal's Offering Date
+  // milestone isn't set. Used by the 1-week offers-due notice button so
+  // we don't ship an email body with an unsubstituted {{dueDate}}.
+  requireOfferingDate?: boolean;
   compact?: boolean;
 };
 
@@ -83,6 +87,7 @@ export function BuyerBlastButton({
   requireAttachment,
   attachmentNoun,
   sentTracking,
+  requireOfferingDate,
   compact = true,
 }: BuyerBlastButtonProps) {
   const [open, setOpen] = useState(false);
@@ -105,15 +110,30 @@ export function BuyerBlastButton({
     });
   }, [open, leadOptions, dealId]);
 
-  // Pre-flight: when requireAttachment is set, verify the source row
-  // meets the requirement before opening the modal. Bails inline (small
+  // Pre-flight: when requireAttachment and/or requireOfferingDate are
+  // set, verify each gate before opening the modal. Bails inline (small
   // red bubble anchored under the button) so the user sees which row
   // failed without scanning a corner toast.
   function handleClick() {
     clearInlineError();
-    if (requireAttachment && attachmentSourceItemId) {
-      startChecking(async () => {
-        try {
+    const needsAttachmentCheck = Boolean(requireAttachment && attachmentSourceItemId);
+    const needsOfferingDateCheck = Boolean(requireOfferingDate);
+    if (!needsAttachmentCheck && !needsOfferingDateCheck) {
+      setOpen(true);
+      return;
+    }
+    startChecking(async () => {
+      try {
+        if (needsOfferingDateCheck) {
+          const offeringDate = await getOfferingDate({ dealId });
+          if (!offeringDate) {
+            showInlineError(
+              "Set the Offering Date on the Phase 2 row first, then send. The reminder body uses it.",
+            );
+            return;
+          }
+        }
+        if (needsAttachmentCheck && attachmentSourceItemId) {
           const att = await getAttachmentsForItem({ itemId: attachmentSourceItemId });
           const hasFile = att.choices.some((c) => c.kind === "file");
           const hasLink = att.choices.some((c) => c.kind === "link");
@@ -127,17 +147,15 @@ export function BuyerBlastButton({
             );
             return;
           }
-          setOpen(true);
-        } catch (err) {
-          console.error("[buyer-blast] attachment pre-flight failed", err);
-          // Network/server errors still go through sonner — they're not
-          // the user's fault and aren't tied to the row's data state.
-          toast.error("Couldn't check attachments. Try again.");
         }
-      });
-      return;
-    }
-    setOpen(true);
+        setOpen(true);
+      } catch (err) {
+        console.error("[buyer-blast] pre-flight failed", err);
+        // Network/server errors still go through sonner — they're not
+        // the user's fault and aren't tied to the row's data state.
+        toast.error("Couldn't check the row state. Try again.");
+      }
+    });
   }
 
   return (
