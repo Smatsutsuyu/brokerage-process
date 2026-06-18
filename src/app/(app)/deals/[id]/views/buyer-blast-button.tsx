@@ -66,12 +66,13 @@ type BuyerBlastButtonProps = {
   // milestone isn't set. Used by the 1-week offers-due notice button so
   // we don't ship an email body with an unsubstituted {{dueDate}}.
   requireOfferingDate?: boolean;
-  // Greys the button out and shows `disabledReason` in the tooltip. Used
-  // for in-progress / skeleton rows (e.g. the Phase 3 B&F invite) where
-  // the row should be visible so it's not forgotten, but the send path
-  // isn't ready to fire yet.
-  disabled?: boolean;
-  disabledReason?: string;
+  // Disables the final "Send" button inside the modal but leaves the
+  // composer fully usable (recipient pick, preview, body edit). Used for
+  // skeleton rows (e.g. Phase 3 B&F invite) where the row's draft can
+  // be exercised but the actual send isn't wired yet. Tooltip on the
+  // disabled Send button uses `disableSendReason` when provided.
+  disableSend?: boolean;
+  disableSendReason?: string;
   compact?: boolean;
 };
 
@@ -94,8 +95,8 @@ export function BuyerBlastButton({
   attachmentNoun,
   sentTracking,
   requireOfferingDate,
-  disabled,
-  disabledReason,
+  disableSend,
+  disableSendReason,
   compact = true,
 }: BuyerBlastButtonProps) {
   const [open, setOpen] = useState(false);
@@ -172,14 +173,13 @@ export function BuyerBlastButton({
         <button
           type="button"
           onClick={handleClick}
-          disabled={checking || disabled}
-          title={disabled ? (disabledReason ?? title ?? label) : (title ?? label)}
+          disabled={checking}
+          title={title ?? label}
           className={cn(
             compact
               ? "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-blue-50 hover:text-blue-700"
               : "inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50",
             checking && "opacity-60",
-            disabled && "cursor-not-allowed opacity-50 hover:bg-transparent hover:text-gray-500",
             inlineError && "ring-1 ring-red-300",
           )}
         >
@@ -205,6 +205,8 @@ export function BuyerBlastButton({
           attachmentSourceItemId={attachmentSourceItemId}
           excludeOfferReceived={excludeOfferReceived}
           sentTracking={sentTracking}
+          disableSend={disableSend}
+          disableSendReason={disableSendReason}
         />
       )}
     </>

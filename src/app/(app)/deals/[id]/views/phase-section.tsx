@@ -525,13 +525,13 @@ export function PhaseSection({
                             {isSendBnfItem(item.name) && (
                               <BuyerBlastButton
                                 dealId={dealId}
-                                label="Send B&F invite"
+                                label="Send B&F"
                                 modalTitle="Best & Final invitation"
-                                title="Send the Best & Final invitation to finalists."
+                                title="Open the Best & Final invitation composer (send disabled until the template is finalized)."
                                 template={BEST_AND_FINAL_INVITATION_TEMPLATE}
                                 defaultTiers={["green"]}
-                                disabled
-                                disabledReason="B&F invite skeleton wired but disabled. Pending: B&F due date source + Close-of-Escrow and Closing-Conditions language."
+                                disableSend
+                                disableSendReason="B&F invite send is disabled. Pending: B&F due date source + Close-of-Escrow and Closing-Conditions language."
                               />
                             )}
                             {itemActions.map((a) => (

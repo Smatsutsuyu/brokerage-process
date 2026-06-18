@@ -176,6 +176,12 @@ type EmailPreviewBaseProps = {
   // Used by the OM blast to warn "OM was previously sent on …" so the
   // sender notices before clicking Send. Doesn't block anything.
   priorSendNotes?: Record<string, string>;
+  // Disables the final "Send" button so the composer can be exercised
+  // without firing the transport. Used for skeleton rows whose draft is
+  // wired but whose send path isn't ready yet. `disableSendReason` is
+  // shown in the button's tooltip on hover.
+  disableSend?: boolean;
+  disableSendReason?: string;
 };
 
 // The embeddable body component's props. Adds an explicit close callback
@@ -267,6 +273,8 @@ export function EmailPreviewBody({
   onClose,
   onBack,
   priorSendNotes,
+  disableSend,
+  disableSendReason,
 }: EmailPreviewBodyProps) {
   const groups = useMemo(() => groupByBuilder(recipients), [recipients]);
   const choices = attachmentChoices ?? [];
@@ -755,7 +763,16 @@ export function EmailPreviewBody({
             Cancel
           </Button>
         )}
-        <Button type="button" disabled={total === 0 || sending} onClick={handleSend}>
+        <Button
+          type="button"
+          disabled={total === 0 || sending || disableSend}
+          onClick={handleSend}
+          title={
+            disableSend
+              ? (disableSendReason ?? "Sending is disabled for this composer.")
+              : undefined
+          }
+        >
           {sending ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (

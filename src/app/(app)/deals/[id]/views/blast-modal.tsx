@@ -116,6 +116,11 @@ type BlastModalProps = {
   // Filter recipients to exclude builders whose offer_received_at is
   // set. Used by the "Follow up Missing Offers" send.
   excludeOfferReceived?: boolean;
+  // Disables the final "Send" button in step 2 so the composer can be
+  // exercised without actually sending. Used for skeleton rows where
+  // the draft is wired but the send path isn't ready.
+  disableSend?: boolean;
+  disableSendReason?: string;
   // Prior-send tracking mode. When set:
   //   1. Step 1 builder header shows an amber "<label> sent MMM D" chip
   //      for builders whose corresponding deal_buyers timestamp is
@@ -163,6 +168,8 @@ export function BlastModal({
   attachmentSourceItemId,
   excludeOfferReceived,
   sentTracking,
+  disableSend,
+  disableSendReason,
 }: BlastModalProps) {
   const [step, setStep] = useState<"filter" | "preview">("filter");
   const [selectedTiers, setSelectedTiers] = useState<Set<Tier>>(
@@ -680,6 +687,8 @@ export function BlastModal({
             ccOptions={ccOptions}
             ccInitial={ccInitial}
             priorSendNotes={priorSendNotes}
+            disableSend={disableSend}
+            disableSendReason={disableSendReason}
             onCcChange={async ({ builderId, userIds }) => {
               // deal_buyers.cc_user_ids is a uuid[] — only org-user
               // picks persist there. Owner Team picks use the
