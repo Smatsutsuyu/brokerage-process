@@ -102,6 +102,14 @@ Major reconciliation pass against Chris's `Marketing Process Checklist.xlsx` v2 
 - Member-remove flow: hard delete with cascade, last-owner guardrail, fix for inviting a member signing the owner out (`12685c5`).
 - Auto-clean orphan `deal_buyers` rows on builder delete (`1434e4d`, `85e7747`).
 
+## Offering Date wiring, B&F skeleton, Send Marketing Report on Contacts tab (2026-05-29)
+
+- **Offering Date wired into the `{{dueDate}}` placeholder.** New `getOfferingDate({ dealId })` server action returns the deal's Offering Date Phase 2 milestone row trackedDate (loose substring match so a rename still resolves). `getOmBlastTemplateContext` now also fetches it and exposes `dueDate` in the vars dictionary, formatted as `"Friday, May 29, 2026"` (built from local-time Date parts so the YYYY-MM-DD string doesn't get pulled back a day by UTC interpretation).
+- **OM blast template** now includes "Offers on this Project are due on {{dueDate}}." between the OM intro and the close. When the Offering Date isn't set, `OmBlastButton`'s click triggers a confirmation dialog ("Send without date" / "Set date first") and swaps to a `OM_BLAST_TEMPLATE_NO_DATE` variant that drops the line entirely on confirm. Soft check rather than hard gate because the OM often goes out before the deadline is finalized.
+- **1-week offers-due notice** gets a hard gate. `BuyerBlastButton` gained a `requireOfferingDate?: boolean` prop; when set, the pre-flight check refuses to open the composer if the Offering Date is empty and surfaces the existing inline red bubble pointing the user at the Phase 2 row.
+- **Send Marketing Report** button (the existing two-step PDF-preview-then-email flow) added to the Contacts tab toolbars (all four prototypes) next to the existing Marketing Report PDF and Internal Report buttons. Uses `compact={false}` so it matches the other toolbar buttons' chrome.
+- **B&F invite skeleton.** New `BEST_AND_FINAL_INVITATION_TEMPLATE` in email-templates.ts (Subject: "Best & Final invitation, {{dealName}}"; body matches Chris's stock prose with `{{units}}`, `{{dealName}}`, `{{bnfDueDate}}`, `{{senderName}}` placeholders). Phase 3 "Send out B&F" row matcher `isSendBnfItem` and a `BuyerBlastButton` render with `defaultTiers={["green"]}`. Button is `disabled` with a tooltip pending: B&F due date source + Close-of-Escrow and Closing-Conditions language. New `disabled` + `disabledReason` props on `BuyerBlastButton` for skeleton-row use.
+
 ## OM blast tracking, dev sender override, tier-tinted recipient list (2026-05-21)
 
 - **`omSentTracking` mode on `BlastModal`.** Unified three behaviors under a single prop, opt-in by `OmBlastButton`:

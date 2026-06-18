@@ -4,12 +4,22 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/confirm/confirm-provider";
 import { useInlineError } from "@/components/inline-error-bubble";
 import { cn } from "@/lib/utils";
 
-import { OM_BLAST_TEMPLATE } from "@/lib/email-templates";
+import {
+  OM_BLAST_TEMPLATE,
+  OM_BLAST_TEMPLATE_NO_DATE,
+  type EmailTemplate,
+} from "@/lib/email-templates";
 
-import { getAttachmentsForItem, getLeadsOnDeal, getOmItemId } from "../actions";
+import {
+  getAttachmentsForItem,
+  getLeadsOnDeal,
+  getOfferingDate,
+  getOmItemId,
+} from "../actions";
 import { AttachmentSourceLine } from "./attachment-source-line";
 import { BlastModal } from "./blast-modal";
 import type { LeadOption } from "./lead-picker";
@@ -46,6 +56,13 @@ export function OmBlastButton({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [, startLoad] = useTransition();
   const [checking, startChecking] = useTransition();
+  // Template gets swapped to the no-date variant when the user confirms
+  // they want to send without an Offering Date set. Defaults back to the
+  // dated variant on each click that finds a set Offering Date, so a
+  // mid-deal "I went and set the date" works on the next click without a
+  // page reload.
+  const [activeTemplate, setActiveTemplate] = useState<EmailTemplate>(OM_BLAST_TEMPLATE);
+  const confirm = useConfirm();
   const {
     error: inlineError,
     show: showInlineError,
@@ -119,6 +136,26 @@ export function OmBlastButton({
           );
           return;
         }
+
+        // Offering Date soft check. When set, send with the offers-due
+        // line included; when unset, ask the user whether to send the
+        // OM blast anyway with the line stripped. The OM often goes out
+        // before the deadline is finalized, so we don't hard-gate it.
+        const offeringDate = await getOfferingDate({ dealId });
+        if (offeringDate) {
+          setActiveTemplate(OM_BLAST_TEMPLATE);
+        } else {
+          const ok = await confirm({
+            title: "No Offering Date set",
+            description:
+              "The OM blast normally tells buyers when offers are due. Without an Offering Date set on the Phase 2 row, that line is dropped from the body. Send anyway?",
+            confirmLabel: "Send without date",
+            cancelLabel: "Set date first",
+          });
+          if (!ok) return;
+          setActiveTemplate(OM_BLAST_TEMPLATE_NO_DATE);
+        }
+
         setOpen(true);
       } catch (err) {
         console.error("[om-blast] pre-flight failed", err);
@@ -178,7 +215,7 @@ export function OmBlastButton({
           onOpenChange={setOpen}
           dealId={dealId}
           leadOptions={leadOptions}
-          template={OM_BLAST_TEMPLATE}
+          template={activeTemplate}
           title="OM blast"
           defaultTiers={["green", "yellow"]}
           attachmentSourceItemId={effectiveItemId}

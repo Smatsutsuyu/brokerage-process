@@ -102,7 +102,7 @@ Each member has an Include in emails toggle. Inclusion drives the recipient list
 
 Three Land-Advisors-branded PDFs are built into the app. All three open in a new browser tab as inline PDFs so you can preview before forwarding.
 
-- Marketing Report. Builder list grouped by tier with per-builder comments. Generated from the Contacts tab toolbar or the Marketing Report row on the Phase 1 checklist. This is what you send to ownership for status updates.
+- Marketing Report. Builder list grouped by tier with per-builder comments. Generated from the Contacts tab toolbar (button labeled "Marketing Report") or the Marketing Report row on the Phase 1 checklist. This is what you send to ownership for status updates. The Contacts tab also has a "Send Marketing Report" button next to it that runs the same two-step PDF-preview-then-email flow as the Phase 2 checklist row (delivers to the Owner Team with co-brokers CC'd).
 - Q&A File. Approved Q&A items rendered as a clean branded document. Generated from the Q&A tab or the Phase 2 "Q&A File" checklist row.
 - Due Diligence Tracking. Combined PDF for the bi-weekly DD call: the 7 milestone dates from the Phase 4 checklist, current issues grouped by status (no summary stats), the full Deal Team (Owner / Broker / Buyer subteams), and the consultant roster. Generated from the Issues tab toolbar or the Phase 4 "Complete Due Diligence" row.
 
@@ -121,12 +121,17 @@ A two-step modal opens (both steps share one window — clicking Next swaps the 
 
 ### OM blast tracking
 
-The "Send OM blast" button has additional safeguards because the OM is the largest single piece of buyer-facing content and re-sending it accidentally looks sloppy. Three behaviors fire only on the OM blast (other blasts are unaffected):
+The "Send OM blast" button has additional safeguards because the OM is the largest single piece of buyer-facing content and re-sending it accidentally looks sloppy. Several behaviors fire only on the OM blast (other blasts are unaffected):
 
 - **No OM, no blast.** Clicking "Send OM blast" first verifies an OM file is uploaded to the Phase 1 Offering Memorandum row. If the file is missing (or the OM row itself doesn't exist on this deal), a red bubble drops below the button with the next step ("Upload the OM file to the Phase 1 row first, then send") and the composer does not open.
+- **Offering Date soft check.** Once the OM file check passes, the platform looks for the deal's Offering Date milestone. If it's set, the body includes a line: "Offers on this Project are due on Friday, May 29, 2026." If it's not set, a confirmation dialog asks whether to send anyway with that line dropped. Pick "Set date first" to cancel and go set the Phase 2 Offering Date row; pick "Send without date" to proceed with the no-date template.
 - **Warn on prior sends.** Step 1's recipient list shows an amber "OM sent MMM D" chip next to any builder you've already OM-blasted on this deal, and Step 2's per-builder preview shows the same warning as a banner above the email body. The flag comes from each builder's "OM Sent" checkbox on the Contacts tab.
 - **Auto-uncheck + override.** Builders with the "OM Sent" flag set are unchecked by default in the recipient list every time you reopen the modal, so you don't re-send by accident. You can still check them back on individually to override; that override holds while the modal stays open (filter changes don't wipe it).
 - **Auto-mark after send.** After a successful blast, every builder the OM actually reached gets their "OM Sent" checkbox flipped to checked automatically (with the timestamp from this moment). The contacts tab and the next OM blast both pick up the new state right away.
+
+### 1-week offers-due notice gate
+
+The Phase 2 "Send 1-week notice" button uses the Offering Date milestone too, but as a hard gate rather than a soft confirm: the body contains "Offers are due in a week on {{dueDate}}", which makes no sense without a date. Clicking the button before the Offering Date is set surfaces an inline red bubble pointing at the Phase 2 row; once the date is set, click again and the composer opens with the date substituted in.
 
 ### Attachment gates on document-share row buttons
 

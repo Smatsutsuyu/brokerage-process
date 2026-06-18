@@ -33,6 +33,7 @@ import { BuyerCommentsEditor } from "../buyer-comments-editor";
 import { LeadPicker, type LeadOption } from "../lead-picker";
 import { InternalMarketingReportPdfButton } from "../internal-marketing-report-pdf-button";
 import { MarketingReportPdfButton } from "../marketing-report-pdf-button";
+import { SendMarketingReportButton } from "../send-marketing-report-button";
 import { OmBlastButton } from "../om-blast-button";
 import { ReceivesCommunicationToggle } from "../receives-communication-toggle";
 import {
@@ -294,6 +295,7 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
         <div className="ml-auto flex flex-wrap gap-2">
           <MarketingReportPdfButton dealId={dealId} />
           <InternalMarketingReportPdfButton dealId={dealId} />
+          <SendMarketingReportButton dealId={dealId} compact={false} />
           <OmBlastButton dealId={dealId} compact={false} />
           <PlannedAction
             label="Send follow-up"

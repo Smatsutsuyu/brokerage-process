@@ -46,7 +46,28 @@ Thanks,
 };
 
 // Phase 2 - Send out OM Blast.
+//
+// Two variants:
+//   - OM_BLAST_TEMPLATE includes the offers-due line and is used when
+//     the deal's Offering Date milestone row is set. {{dueDate}} is
+//     sourced from that row via getOmBlastTemplateContext.
+//   - OM_BLAST_TEMPLATE_NO_DATE drops the offers-due line entirely. The
+//     OmBlastButton swaps to this variant when the user confirms they
+//     want to send without an Offering Date set (the OM often goes out
+//     before the deadline is finalized).
 export const OM_BLAST_TEMPLATE: EmailTemplate = {
+  subject: "Offering Memorandum, {{dealName}} ({{units}} {{type}}, {{city}})",
+  body: `Please find offering memorandum for {{dealName}} in {{city}}. The Project includes {{units}} {{type}}.
+
+Offers on this Project are due on {{dueDate}}.
+
+Let's schedule a time to connect in the next week.
+
+Thanks,
+{{senderName}}`,
+};
+
+export const OM_BLAST_TEMPLATE_NO_DATE: EmailTemplate = {
   subject: "Offering Memorandum, {{dealName}} ({{units}} {{type}}, {{city}})",
   body: `Please find offering memorandum for {{dealName}} in {{city}}. The Project includes {{units}} {{type}}.
 
@@ -143,6 +164,33 @@ export const OFFERS_FOLLOWUP_TEMPLATE: EmailTemplate = {
   body: `Following up on the offer for {{dealName}}. We haven't received an offer yet and wanted to check in before we wrap up the offer window.
 
 Let us know if you're still planning to submit, or if you've decided to pass.
+
+Thanks,
+{{senderName}}`,
+};
+
+// Phase 3 - Send out Best & Final invitation. Skeleton: structure is
+// fixed but `{{bnfDueDate}}` is unsubstituted at compose time (the date
+// source is being followed up on; for now the placeholder is left
+// visible so the user notices and fills it in before sending). Two
+// section bodies (Close of Escrow, Closing Conditions) are deliberately
+// blank pending Chris's final language.
+export const BEST_AND_FINAL_INVITATION_TEMPLATE: EmailTemplate = {
+  subject: "Best & Final invitation, {{dealName}}",
+  body: `Thank you for submitting your offer for the {{units}} lots at {{dealName}}. We are pleased to inform you that your firm is invited to participate in the Best and Final round. Best and Final offers must be submitted by 12:00 p.m. on {{bnfDueDate}}. The following represents the minimum terms under which the Seller is willing to negotiate a formal Purchase and Sale Agreement.
+
+Purchase Price:
+- Submit Best & Final
+
+Due Diligence Period:
+- The due diligence period shall continue for a period of 60 days following mutual execution of the Letter of Intent ("LOI").
+
+Close of Escrow:
+
+Deposits:
+- The total non-refundable deposit at the end of feasibility shall be no less than TEN PERCENT (10%) of the Purchase Price of the property.
+
+Closing Conditions:
 
 Thanks,
 {{senderName}}`,

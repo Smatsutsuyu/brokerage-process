@@ -44,6 +44,7 @@ import {
   QA_FILE_TEMPLATE,
   SCHEDULE_SOO_REVIEW_TEMPLATE,
   SHARE_MARKETING_DD_TEMPLATE,
+  BEST_AND_FINAL_INVITATION_TEMPLATE,
 } from "@/lib/email-templates";
 import { Send } from "lucide-react";
 import { PsaAttorneyInline, type PsaAttorneyState } from "./psa-attorney";
@@ -137,6 +138,13 @@ function isSendMarketingReportItem(name: string): boolean {
 // to Owner + Broker teams.
 function isScheduleSooReviewItem(name: string): boolean {
   return name.toLowerCase().includes("schedule summary of offer review");
+}
+// Phase 3 "Send out B&F" row. Invites finalists to submit a Best &
+// Final offer. Skeleton wiring; the {{bnfDueDate}} placeholder in the
+// body stays visible at compose time until the date source is wired.
+function isSendBnfItem(name: string): boolean {
+  const n = name.toLowerCase();
+  return n.includes("send out b&f") || n.includes("send out b & f");
 }
 
 const KIND_ICON: Record<ItemActionKind, typeof FileText> = {
@@ -512,6 +520,18 @@ export function PhaseSection({
                                 template={SCHEDULE_SOO_REVIEW_TEMPLATE}
                                 teams={["owner", "broker"]}
                                 attachments={[]}
+                              />
+                            )}
+                            {isSendBnfItem(item.name) && (
+                              <BuyerBlastButton
+                                dealId={dealId}
+                                label="Send B&F invite"
+                                modalTitle="Best & Final invitation"
+                                title="Send the Best & Final invitation to finalists."
+                                template={BEST_AND_FINAL_INVITATION_TEMPLATE}
+                                defaultTiers={["green"]}
+                                disabled
+                                disabledReason="B&F invite skeleton wired but disabled. Pending: B&F due date source + Close-of-Escrow and Closing-Conditions language."
                               />
                             )}
                             {itemActions.map((a) => (

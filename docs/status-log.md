@@ -4,6 +4,29 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-05-29 — Offering Date wiring, B&F skeleton, Send Marketing Report on Contacts tab
+
+### Done
+- **`{{dueDate}}` is now resolved.** New `getOfferingDate({ dealId })` server action returns the deal's Offering Date Phase 2 milestone trackedDate (loose substring match). `getOmBlastTemplateContext` includes `dueDate` in its vars, formatted as `"Friday, May 29, 2026"` (built via local-time Date parts to avoid the YYYY-MM-DD UTC-midnight shift).
+- **OM blast template** now carries the offers-due line in the body. `OmBlastButton` runs an Offering Date soft check after the attachment check: if set, the dated body goes through; if unset, a confirm dialog ("Set date first" / "Send without date") asks whether to proceed with `OM_BLAST_TEMPLATE_NO_DATE` which drops the line entirely.
+- **1-week offers-due notice button** gets a hard pre-flight. `BuyerBlastButton.requireOfferingDate` refuses to open the composer if the Offering Date isn't set, using the existing inline red bubble pattern.
+- **Send Marketing Report on the Contacts tab toolbar.** Added the existing two-step PDF-preview-then-email flow as a `compact={false}` button next to Marketing Report and Internal Report on all four prototype toolbars (A live, B/C/D preserved).
+- **B&F invite skeleton.** New `BEST_AND_FINAL_INVITATION_TEMPLATE` matching Chris's stock B&F prose with `{{units}}`, `{{dealName}}`, `{{bnfDueDate}}` (placeholder, awaiting date source), `{{senderName}}`. New `isSendBnfItem` matcher in phase-section.tsx renders a `BuyerBlastButton` on the Phase 3 "Send out B&F" row, currently `disabled` with the tooltip "B&F invite skeleton wired but disabled. Pending: B&F due date source + Close-of-Escrow and Closing-Conditions language."
+- **BuyerBlastButton gained `disabled` + `disabledReason` props** for skeleton-row UX. Disabled button is greyed out with `cursor-not-allowed` and surfaces the reason in the tooltip.
+
+### Decisions
+- **OM blast Offering Date check is soft; 1-week notice is hard.** OM blasts often go out before the offers-due deadline is finalized, so blocking would be too restrictive. The 1-week notice template body says "Offers are due in a week on (date)" which makes no sense without a date, so blocking is correct.
+- **No B&F due date source yet.** Chris is following up on where the B&F deadline lives (it's not currently a checklist milestone). For now `{{bnfDueDate}}` stays unsubstituted; the button stays disabled until both the date source and the empty section language are sorted.
+
+### Deferred / Pending
+- B&F due date source + Close-of-Escrow and Closing-Conditions language (blocking the B&F invite send).
+- Other Phase 4 milestones (Investment Committee, Feasibility, Closing) might benefit from the same date-substitution treatment when their reminder templates exist.
+
+### Blockers
+- None.
+
+---
+
 ## 2026-05-21 — OM blast tracking, dev sender override, tier-tinted recipient list
 
 ### Done

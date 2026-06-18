@@ -30,6 +30,7 @@ import { BuyerCheckbox } from "../buyer-checkbox";
 import { LeadPicker, type LeadOption } from "../lead-picker";
 import { InternalMarketingReportPdfButton } from "../internal-marketing-report-pdf-button";
 import { MarketingReportPdfButton } from "../marketing-report-pdf-button";
+import { SendMarketingReportButton } from "../send-marketing-report-button";
 import {
   PickExistingContactModal,
   type ExistingContactOption,
@@ -185,6 +186,7 @@ export function OptionBPane({ dealId, groups, leadOptions, orgContacts }: Option
         <div className="ml-auto flex flex-wrap gap-2">
           <MarketingReportPdfButton dealId={dealId} />
           <InternalMarketingReportPdfButton dealId={dealId} />
+          <SendMarketingReportButton dealId={dealId} compact={false} />
           <PlannedAction
             label="Send OM blast"
             icon={Mail}
