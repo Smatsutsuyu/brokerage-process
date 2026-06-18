@@ -8,7 +8,12 @@ import { useInlineError } from "@/components/inline-error-bubble";
 import { type EmailTemplate } from "@/lib/email-templates";
 import { cn } from "@/lib/utils";
 
-import { getAttachmentsForItem, getLeadsOnDeal, getOfferingDate } from "../actions";
+import {
+  getAttachmentsForItem,
+  getBnfDueDate,
+  getLeadsOnDeal,
+  getOfferingDate,
+} from "../actions";
 import { BlastModal } from "./blast-modal";
 import type { LeadOption } from "./lead-picker";
 
@@ -66,6 +71,10 @@ type BuyerBlastButtonProps = {
   // milestone isn't set. Used by the 1-week offers-due notice button so
   // we don't ship an email body with an unsubstituted {{dueDate}}.
   requireOfferingDate?: boolean;
+  // Pre-flight: refuse to open the composer if the deal's "Send out B&F"
+  // row trackedDate isn't set. Used by the Phase 3 B&F invite button so
+  // {{bnfDueDate}} is always resolved when the email goes out.
+  requireBnfDate?: boolean;
   // Disables the final "Send" button inside the modal but leaves the
   // composer fully usable (recipient pick, preview, body edit). Used for
   // skeleton rows (e.g. Phase 3 B&F invite) where the row's draft can
@@ -95,6 +104,7 @@ export function BuyerBlastButton({
   attachmentNoun,
   sentTracking,
   requireOfferingDate,
+  requireBnfDate,
   disableSend,
   disableSendReason,
   compact = true,
@@ -127,7 +137,8 @@ export function BuyerBlastButton({
     clearInlineError();
     const needsAttachmentCheck = Boolean(requireAttachment && attachmentSourceItemId);
     const needsOfferingDateCheck = Boolean(requireOfferingDate);
-    if (!needsAttachmentCheck && !needsOfferingDateCheck) {
+    const needsBnfDateCheck = Boolean(requireBnfDate);
+    if (!needsAttachmentCheck && !needsOfferingDateCheck && !needsBnfDateCheck) {
       setOpen(true);
       return;
     }
@@ -138,6 +149,15 @@ export function BuyerBlastButton({
           if (!offeringDate) {
             showInlineError(
               "Set the Offering Date on the Phase 2 row first, then send. The reminder body uses it.",
+            );
+            return;
+          }
+        }
+        if (needsBnfDateCheck) {
+          const bnfDate = await getBnfDueDate({ dealId });
+          if (!bnfDate) {
+            showInlineError(
+              "Set the B&F due date on this row first, then send. The invite body uses it.",
             );
             return;
           }

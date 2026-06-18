@@ -4,6 +4,27 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-06-17 — B&F invite hard-gated on row date
+
+### Done
+- **`{{bnfDueDate}}` now resolves from the row itself.** Added `dateField: true` to the Phase 3 "Send out B&F" item in `CHECKLIST_TEMPLATE` so it gets the same milestone-date affordance as Offering Date / LOI Signed / Closing Date. No migration needed — `isItemDateField` reads from the template at runtime, so every existing deal's row picks up the date chip on next render.
+- **New `getBnfDueDate({ dealId })` server action** reads the "Send out B&F" row's `trackedDate`. `getOmBlastTemplateContext` now adds `bnfDueDate` to the vars dictionary alongside `dueDate`, formatted via the same local-time `formatOfferingDate` helper (no extra round-trip — both pulled from the same checklist query).
+- **`BuyerBlastButton.requireBnfDate` prop** — sister of `requireOfferingDate`. When set, the click pre-flight refuses to open the composer if the B&F date isn't set and surfaces the existing inline red bubble with "Set the B&F due date on this row first, then send."
+- **Phase 3 B&F row** swapped from `disableSend` to `requireBnfDate`. The composer's final Send button is enabled now (since the date gate prevents an empty-`{{bnfDueDate}}` send), and the row's date chip is the single source of truth for the invite due date.
+
+### Decisions
+- **Hard gate, not soft confirm.** The B&F invite body says "Best and Final offers must be submitted by 12:00 p.m. on (date)" — that's nonsense without a date, so blocking is correct. Same rationale as the 1-week notice.
+- **Empty Close-of-Escrow and Closing-Conditions sections stay empty in the template.** Per Chris: those are filled in inline at compose time, deal by deal. The composer's `<textarea>` accepts whatever bullet character the user types (`-`, `•`).
+- **No rich-text editor.** Plain-text bodies have better deliverability and simpler reply handling. ASCII / Unicode bullet characters render in every email client.
+
+### Deferred / Pending
+- Logging the 2026-06-04 Offering Date wiring work in the time-log (committed but not yet recorded).
+
+### Blockers
+- None.
+
+---
+
 ## 2026-05-29 — Offering Date wiring, B&F skeleton, Send Marketing Report on Contacts tab
 
 ### Done

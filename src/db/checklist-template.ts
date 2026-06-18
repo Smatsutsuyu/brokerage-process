@@ -300,7 +300,10 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
           },
           "Create Recommendation memo (Pro/Con of each offer)",
           "Finalize B&F Group and Counter Terms",
-          "Send out B&F",
+          // dateField stores the B&F due date; the Phase 3 Send out B&F
+          // button reads it for {{bnfDueDate}} substitution and hard-
+          // gates the send until it's set.
+          { name: "Send out B&F", dateField: true },
           "Buyer Interviews",
           "Create B&F Recommendation, Pro Con of each Offer",
           "Select Buyer",

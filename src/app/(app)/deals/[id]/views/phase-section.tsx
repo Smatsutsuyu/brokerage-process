@@ -527,11 +527,10 @@ export function PhaseSection({
                                 dealId={dealId}
                                 label="Send B&F"
                                 modalTitle="Best & Final invitation"
-                                title="Open the Best & Final invitation composer (send disabled until the template is finalized)."
+                                title="Send the Best & Final invitation to finalists. {{bnfDueDate}} pulls from the date on this row; fill Close of Escrow and Closing Conditions inline at compose time."
                                 template={BEST_AND_FINAL_INVITATION_TEMPLATE}
                                 defaultTiers={["green"]}
-                                disableSend
-                                disableSendReason="B&F invite send is disabled. Pending: B&F due date source + Close-of-Escrow and Closing-Conditions language."
+                                requireBnfDate
                               />
                             )}
                             {itemActions.map((a) => (

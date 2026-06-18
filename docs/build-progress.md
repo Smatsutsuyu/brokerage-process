@@ -102,6 +102,13 @@ Major reconciliation pass against Chris's `Marketing Process Checklist.xlsx` v2 
 - Member-remove flow: hard delete with cascade, last-owner guardrail, fix for inviting a member signing the owner out (`12685c5`).
 - Auto-clean orphan `deal_buyers` rows on builder delete (`1434e4d`, `85e7747`).
 
+## B&F invite hard-gated on row date (2026-06-17)
+
+- **B&F due date now lives on the "Send out B&F" row.** Added `dateField: true` to the Phase 3 item in `CHECKLIST_TEMPLATE` so the row gets the standard milestone-date affordance (date chip + native picker, same as Offering Date / LOI Signed / Closing Date). No migration: `isItemDateField` is a runtime template lookup, so existing deals pick up the chip on next render.
+- **New `getBnfDueDate({ dealId })` server action** reads the row's `trackedDate`. `getOmBlastTemplateContext` now also includes `bnfDueDate` in the vars dictionary (formatted via the existing `formatOfferingDate` local-time helper), pulled from the same checklist-items query that already loads Offering Date so there's no extra DB round-trip.
+- **`BuyerBlastButton.requireBnfDate` prop** — sister of `requireOfferingDate`. Hard gate: pre-flight refuses to open the composer if the B&F date isn't set, surfacing the inline red bubble with "Set the B&F due date on this row first, then send."
+- **Phase 3 B&F row** swapped from the disableSend skeleton (composer-opens-but-Send-greyed) to a real `requireBnfDate` hard gate. The final Send button is enabled once the date is set, because at that point `{{bnfDueDate}}` resolves cleanly and the user just needs to fill the Close-of-Escrow and Closing-Conditions sections inline at compose time.
+
 ## Offering Date wiring, B&F skeleton, Send Marketing Report on Contacts tab (2026-05-29)
 
 - **Offering Date wired into the `{{dueDate}}` placeholder.** New `getOfferingDate({ dealId })` server action returns the deal's Offering Date Phase 2 milestone row trackedDate (loose substring match so a rename still resolves). `getOmBlastTemplateContext` now also fetches it and exposes `dueDate` in the vars dictionary, formatted as `"Friday, May 29, 2026"` (built from local-time Date parts so the YYYY-MM-DD string doesn't get pulled back a day by UTC interpretation).

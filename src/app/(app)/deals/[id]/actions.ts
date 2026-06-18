@@ -1426,6 +1426,13 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
     r.name.toLowerCase().includes("offering date"),
   );
   const dueDate = formatOfferingDate(offeringDateRow?.trackedDate ?? null);
+  // Same query already loaded every checklist item for this deal, so
+  // the B&F due date is found inline without another round-trip.
+  const bnfRow = offeringDateItems.find((r) => {
+    const n = r.name.toLowerCase();
+    return n.includes("send out b&f") || n.includes("send out b & f");
+  });
+  const bnfDueDate = formatOfferingDate(bnfRow?.trackedDate ?? null);
 
   const senderOptions: EmailSenderOption[] = [ACTIVE_BLAST_SENDER];
   const defaultSenderId = ACTIVE_BLAST_SENDER.id;
@@ -1438,6 +1445,7 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
       type: deal.type ?? "",
       senderName: ACTIVE_BLAST_SENDER.firstName,
       dueDate,
+      bnfDueDate,
     },
     senderOptions,
     defaultSenderId,
@@ -1481,6 +1489,31 @@ export async function getOfferingDate(input: {
       ),
     );
   const row = rows.find((r) => r.name.toLowerCase().includes("offering date"));
+  return row?.trackedDate ?? null;
+}
+
+// Sister of getOfferingDate for the B&F due date. Reads the trackedDate
+// off the Phase 3 "Send out B&F" row. The B&F button gates the composer
+// on this and substitutes the formatted date into the template body.
+export async function getBnfDueDate(input: {
+  dealId: string;
+}): Promise<string | null> {
+  const org = await getCurrentOrg();
+  if (!org) return null;
+  const rows = await db
+    .select({ name: checklistItems.name, trackedDate: checklistItems.trackedDate })
+    .from(checklistItems)
+    .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
+    .where(
+      and(
+        eq(checklistCategories.dealId, input.dealId),
+        eq(checklistItems.orgId, org.id),
+      ),
+    );
+  const row = rows.find((r) => {
+    const n = r.name.toLowerCase();
+    return n.includes("send out b&f") || n.includes("send out b & f");
+  });
   return row?.trackedDate ?? null;
 }
 
