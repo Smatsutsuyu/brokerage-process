@@ -82,6 +82,10 @@ type BuyerBlastButtonProps = {
   // disabled Send button uses `disableSendReason` when provided.
   disableSend?: boolean;
   disableSendReason?: string;
+  // Deal-team sub-teams whose members should be pre-checked in the CC
+  // picker for every builder when the composer opens. Used by the OM
+  // blast button to default-CC the Broker Team.
+  defaultCcTeams?: Array<"owner" | "broker">;
   compact?: boolean;
 };
 
@@ -107,6 +111,7 @@ export function BuyerBlastButton({
   requireBnfDate,
   disableSend,
   disableSendReason,
+  defaultCcTeams,
   compact = true,
 }: BuyerBlastButtonProps) {
   const [open, setOpen] = useState(false);
@@ -227,6 +232,7 @@ export function BuyerBlastButton({
           sentTracking={sentTracking}
           disableSend={disableSend}
           disableSendReason={disableSendReason}
+          defaultCcTeams={defaultCcTeams}
         />
       )}
     </>

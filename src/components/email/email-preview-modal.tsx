@@ -74,7 +74,7 @@ export type EmailCcUserOption = {
   id: string;
   name: string;
   email: string;
-  group?: "owner" | "org";
+  group?: "owner" | "broker" | "org";
 };
 
 // Initial per-builder CC selection passed in by the caller. The modal

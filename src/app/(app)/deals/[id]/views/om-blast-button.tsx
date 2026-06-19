@@ -220,6 +220,7 @@ export function OmBlastButton({
           defaultTiers={["green", "yellow"]}
           attachmentSourceItemId={effectiveItemId}
           sentTracking="om"
+          defaultCcTeams={["broker"]}
         />
       )}
     </>

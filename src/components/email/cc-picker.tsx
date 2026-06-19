@@ -16,10 +16,11 @@ import { cn } from "@/lib/utils";
 // together; a section divider + label appears when the group changes.
 // Used by the blast composer to separate the deal's Owner Team from the
 // broader Org Members list.
-export type CcGroup = "owner" | "org";
+export type CcGroup = "owner" | "broker" | "org";
 
 const GROUP_LABEL: Record<CcGroup, string> = {
   owner: "Owner Team",
+  broker: "Broker Team",
   org: "Org Members",
 };
 

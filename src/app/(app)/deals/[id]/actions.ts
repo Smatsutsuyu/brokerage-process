@@ -1738,17 +1738,19 @@ export async function getOrgCcOptions(): Promise<CcUserOption[]> {
   return rows.map((r) => ({ id: r.id, name: r.name || r.email, email: r.email }));
 }
 
-// Owner Team CC options for a deal. Surfaces every owner-team member
-// (sellers / principals) that has an email address so the user can
-// CC them on a buyer blast without leaving the composer.
+// Deal-team CC options for a deal. Surfaces every member of the picked
+// sub-team that has an email address so the user can CC them on a
+// buyer blast without leaving the composer.
 //
-// IDs use the `owner:` sentinel prefix so the BlastModal's persistence
-// layer can tell user-derived CCs (uuid → cc_user_ids) apart from
-// owner CCs (sentinel → per-send only). Owner CCs aren't persisted
-// because cc_user_ids is a uuid array; persisting them would require a
-// schema change for what's currently a low-frequency use case.
-export async function getOwnerTeamCcOptions(input: {
+// IDs use the `${team}:` sentinel prefix (e.g. `owner:`, `broker:`) so
+// the BlastModal's persistence layer can tell user-derived CCs (uuid →
+// cc_user_ids) apart from deal-team CCs (sentinel → per-send only).
+// Deal-team CCs aren't persisted because cc_user_ids is a uuid array;
+// persisting them would require a schema change for what's currently a
+// low-frequency use case.
+export async function getDealTeamCcOptions(input: {
   dealId: string;
+  team: "owner" | "broker";
 }): Promise<CcUserOption[]> {
   const org = await getCurrentOrg();
   if (!org) return [];
@@ -1774,7 +1776,7 @@ export async function getOwnerTeamCcOptions(input: {
       and(
         eq(dealTeamMembers.dealId, input.dealId),
         eq(dealTeamMembers.orgId, org.id),
-        eq(dealTeamMembers.team, "owner"),
+        eq(dealTeamMembers.team, input.team),
       ),
     )
     .orderBy(dealTeamMembers.sortOrder, dealTeamMembers.createdAt);
@@ -1796,7 +1798,7 @@ export async function getOwnerTeamCcOptions(input: {
     // No email = can't CC. Skip so the picker doesn't show an
     // unusable row.
     if (!email || !name) continue;
-    opts.push({ id: `owner:${r.id}`, name, email });
+    opts.push({ id: `${input.team}:${r.id}`, name, email });
   }
   return opts;
 }

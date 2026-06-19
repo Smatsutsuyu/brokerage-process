@@ -35,9 +35,9 @@ import { cn } from "@/lib/utils";
 import {
   getAttachmentsForItem,
   getCcSelectionsForBuilders,
+  getDealTeamCcOptions,
   getOmBlastTemplateContext,
   getOrgCcOptions,
-  getOwnerTeamCcOptions,
   markBuildersSent,
   previewBlastRecipients,
   sendBlastEmails,
@@ -121,6 +121,12 @@ type BlastModalProps = {
   // the draft is wired but the send path isn't ready.
   disableSend?: boolean;
   disableSendReason?: string;
+  // Deal-team sub-teams whose members should be pre-checked in the CC
+  // picker for every builder when the composer opens. Default-CC'd
+  // members can still be unchecked individually per send. Not
+  // persisted (deal-team sentinel IDs aren't uuids). Used by the OM
+  // blast button to default-CC the Broker Team.
+  defaultCcTeams?: Array<"owner" | "broker">;
   // Prior-send tracking mode. When set:
   //   1. Step 1 builder header shows an amber "<label> sent MMM D" chip
   //      for builders whose corresponding deal_buyers timestamp is
@@ -170,6 +176,7 @@ export function BlastModal({
   sentTracking,
   disableSend,
   disableSendReason,
+  defaultCcTeams,
 }: BlastModalProps) {
   const [step, setStep] = useState<"filter" | "preview">("filter");
   const [selectedTiers, setSelectedTiers] = useState<Set<Tier>>(
@@ -362,7 +369,7 @@ export function BlastModal({
     const builderIds = Array.from(new Set(checkedWithEmail.map((r) => r.builderId)));
     startPreviewLoading(async () => {
       try {
-        const [ctx, att, orgCcOpts, ownerCcOpts, ccSelections] = await Promise.all([
+        const [ctx, att, orgCcOpts, ownerCcOpts, brokerCcOpts, ccSelections] = await Promise.all([
           getOmBlastTemplateContext({ dealId }),
           // Optional attachment source. When the caller didn't provide
           // one, skip the load and pass empty arrays to the modal so
@@ -371,31 +378,54 @@ export function BlastModal({
             ? getAttachmentsForItem({ itemId: attachmentSourceItemId })
             : Promise.resolve({ choices: [], recommendedIds: [] }),
           getOrgCcOptions(),
-          // Owner Team CC options (sellers / principals on this deal).
-          // Surfaced in the picker under a separate "Owner Team" section
-          // so the user can CC ownership on the blast. Owner picks are
-          // per-send (not persisted to deal_buyers.cc_user_ids) — see
-          // the onCcChange filter below.
-          getOwnerTeamCcOptions({ dealId }),
+          // Deal-team CC options (sellers / principals + the firm's deal
+          // team). Surfaced in the picker under "Owner Team" and "Broker
+          // Team" sections respectively. Picks are per-send (not
+          // persisted to deal_buyers.cc_user_ids) — see the onCcChange
+          // filter below.
+          getDealTeamCcOptions({ dealId, team: "owner" }),
+          getDealTeamCcOptions({ dealId, team: "broker" }),
           builderIds.length > 0
             ? getCcSelectionsForBuilders({ dealId, builderIds })
             : Promise.resolve([] as EmailCcInitialEntry[]),
         ]);
         // Tag each option with its source group so the picker can render
-        // a section divider between Owners and Org Members. Owners come
-        // first so they're the first thing the user sees on open — most
-        // common "CC ownership" pattern.
+        // section dividers between groups. Order: Owner Team first (most
+        // common "CC ownership" pattern), Broker Team next (the firm's
+        // own deal team), then the broader Org Members list.
         const mergedCcOpts = [
           ...ownerCcOpts.map((o) => ({ ...o, group: "owner" as const })),
+          ...brokerCcOpts.map((o) => ({ ...o, group: "broker" as const })),
           ...orgCcOpts.map((o) => ({ ...o, group: "org" as const })),
         ];
+
+        // Default-CC any team the caller opted in for. Sentinel ids
+        // (`owner:`, `broker:`) get spliced into every builder's initial
+        // selection so they're pre-checked on open. User can still
+        // uncheck per-builder for the current send. Lookup keyed by
+        // option id so future team groups extend cleanly.
+        const optsByGroup = new Map<string, Array<{ id: string }>>();
+        if (ownerCcOpts.length > 0) optsByGroup.set("owner", ownerCcOpts);
+        if (brokerCcOpts.length > 0) optsByGroup.set("broker", brokerCcOpts);
+        const defaultIds = (defaultCcTeams ?? [])
+          .flatMap((t) => optsByGroup.get(t) ?? [])
+          .map((o) => o.id);
+        const augmentedSelections =
+          defaultIds.length > 0
+            ? builderIds.map((builderId) => {
+                const existing = ccSelections.find((s) => s.builderId === builderId);
+                const merged = new Set<string>(existing?.userIds ?? []);
+                for (const id of defaultIds) merged.add(id);
+                return { builderId, userIds: Array.from(merged) };
+              })
+            : ccSelections;
         setPreviewVars(ctx.vars);
         setAttachmentChoices(att.choices);
         setDefaultAttachmentIds(att.recommendedIds);
         setSenderOptions(ctx.senderOptions);
         setDefaultSenderId(ctx.defaultSenderId);
         setCcOptions(mergedCcOpts);
-        setCcInitial(ccSelections);
+        setCcInitial(augmentedSelections);
         setStep("preview");
       } catch (err) {
         console.error("[blast] preview context load failed", err);
@@ -691,11 +721,13 @@ export function BlastModal({
             disableSendReason={disableSendReason}
             onCcChange={async ({ builderId, userIds }) => {
               // deal_buyers.cc_user_ids is a uuid[] — only org-user
-              // picks persist there. Owner Team picks use the
-              // `owner:<dealTeamMemberId>` sentinel, which we strip
-              // here so they stay per-send (per the trade-off in
-              // getOwnerTeamCcOptions's comment).
-              const orgOnly = userIds.filter((id) => !id.startsWith("owner:"));
+              // picks persist there. Deal-team picks use `owner:` or
+              // `broker:` sentinel ids which we strip here so they stay
+              // per-send (per the trade-off in getDealTeamCcOptions's
+              // comment).
+              const orgOnly = userIds.filter(
+                (id) => !id.startsWith("owner:") && !id.startsWith("broker:"),
+              );
               await setBuilderCcUsers({ dealId, builderId, userIds: orgOnly });
             }}
             onSend={async (emails) => {
