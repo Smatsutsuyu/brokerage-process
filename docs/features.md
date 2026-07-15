@@ -54,7 +54,7 @@ Some items have extra affordances:
 
 - Phase 4 milestone items (LOI Signed, PSA Effective, Cost to Complete drafts, Investment Committee Approval, Waive Feasibility, Closing Date) get a date chip on the row so you can record projected or actual dates.
 - Some items have an "Open [Tab]" jump button when their data lives in a sibling tab. "Create Consultant Roster" jumps to Consultants; "Complete Due Diligence" jumps to Issues.
-- Some items have inline action buttons that share behavior with the relevant tab. Wired and working today: Send OM Blast on the OM Blast row, Send Q&A File on the Q&A File row, Share Market Study on its row, Send to Deal Team on Share Due Diligence Material and on Complete Due Diligence, Marketing Report PDF on its row, Send Marketing Report on the Phase 2 row of the same name (two-step modal: preview the freshly-generated PDF, then compose the email to the Owner Team with a CC picker), and the inline PSA Attorney picker on Determine PSA Attorney. CFD Analysis, Premium Analysis, Valuation, Entitlement Schedule, Entitlement Summary, Custom Underwriting File, and Compiled Package still surface "Coming soon" placeholder toasts and are scoped for a future phase.
+- Some items have inline action buttons that share behavior with the relevant tab. Wired and working today: Send OM Blast on the OM Blast row, Send Q&A File on the Q&A File row, Share Market Study on its row, Send CTC on the Phase 1 Cost to Complete (CTC) row, Send to Deal Team on Share Due Diligence Material and on Complete Due Diligence, Marketing Report PDF on its row, Send Marketing Report on the Phase 2 row of the same name (two-step modal: preview the freshly-generated PDF, then compose the email to the Owner Team with a CC picker), and the inline PSA Attorney picker on Determine PSA Attorney. CFD Analysis, Premium Analysis, Valuation, Entitlement Schedule, Entitlement Summary, Custom Underwriting File, and Compiled Package still surface "Coming soon" placeholder toasts and are scoped for a future phase.
 
 ### Contacts
 
@@ -139,6 +139,7 @@ Some row buttons exist solely to ship a document and refuse to open the composer
 
 - **Send OM blast** requires an uploaded OM file on the Phase 1 Offering Memorandum row (see "OM blast tracking" above for the full set of guardrails).
 - **Send Market Study** requires an uploaded file on the row. A Dropbox link alone won't satisfy this gate — the recipient needs the actual document attached.
+- **Send CTC** (Cost to Complete row) requires an uploaded file on the row, same as Send Market Study.
 - **Send DD Folder** (Share Marketing Due Diligence Folder row) accepts either a file or a link, since these are usually shared as a Dropbox / SharePoint folder URL.
 
 In all three cases, drop the file or link onto the checklist row via its universal attachment / link affordance, then click Send again.

@@ -36,6 +36,7 @@ import { ShareDdMaterialRowActions } from "./share-dd-material-row-actions";
 
 import {
   CA_DISTRIBUTION_TEMPLATE,
+  CTC_DISTRIBUTION_TEMPLATE,
   IN_PERSON_MEETING_TEMPLATE,
   MARKET_STUDY_TEMPLATE,
   OFFERS_DUE_DAY_OF_TEMPLATE,
@@ -109,6 +110,16 @@ function isQaFileItem(name: string): boolean {
 }
 function isShareMarketStudyItem(name: string): boolean {
   return name.toLowerCase().includes("share market study");
+}
+// Phase 1 "Cost to Complete (CTC)" row. Excludes the Phase 4 milestone
+// date-field rows "Receive 1st Draft Cost to Complete" and "Finalize
+// Cost to Complete / Final Purchase Price" so a Send button doesn't
+// land on rows that have no attachment concept.
+function isCtcItem(name: string): boolean {
+  const n = name.toLowerCase();
+  if (!n.includes("cost to complete")) return false;
+  if (n.includes("receive") || n.includes("finalize")) return false;
+  return true;
 }
 // Phase 2 "Share Marketing Due Diligence Folder" row. Usually shared
 // as a Dropbox / SharePoint folder URL (per the row's universal Link
@@ -453,6 +464,19 @@ export function PhaseSection({
                                 attachmentSourceItemId={item.id}
                                 requireAttachment="file"
                                 attachmentNoun="Market Study"
+                              />
+                            )}
+                            {isCtcItem(item.name) && (
+                              <BuyerBlastButton
+                                dealId={dealId}
+                                label="Send CTC"
+                                modalTitle="Cost to Complete distribution"
+                                title="Email the CTC report (attached from this row) to green/yellow buyers."
+                                template={CTC_DISTRIBUTION_TEMPLATE}
+                                defaultTiers={["green", "yellow"]}
+                                attachmentSourceItemId={item.id}
+                                requireAttachment="file"
+                                attachmentNoun="CTC report"
                               />
                             )}
                             {isShareMarketingDdItem(item.name) && (

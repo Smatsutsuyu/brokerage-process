@@ -119,6 +119,17 @@ Thanks,
 {{senderName}}`,
 };
 
+// Phase 1 - Distribute Cost to Complete (CTC) report to buyers. Mirrors
+// the Market Study flow: uploaded PDF attached from the checklist row,
+// green/yellow default audience, file pre-flight gate.
+export const CTC_DISTRIBUTION_TEMPLATE: EmailTemplate = {
+  subject: "Cost to Complete, {{dealName}}",
+  body: `Please find attached the Cost to Complete report for {{dealName}}. Let us know if you have questions on the assumptions or need any of the supporting backup.
+
+Thanks,
+{{senderName}}`,
+};
+
 // Phase 2 - Share Marketing Due Diligence Folder. Usually carries a
 // Dropbox / SharePoint folder URL (added to the checklist row's Link
 // affordance) and optionally an index file. The send button validates
