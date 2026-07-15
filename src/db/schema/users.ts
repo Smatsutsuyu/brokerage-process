@@ -24,6 +24,13 @@ export const users = pgTable("users", {
   // Owner can disable a member without deleting them; disabled users can't
   // sign in (getCurrentUser returns null for them).
   disabledAt: timestamp("disabled_at", { withTimezone: true }),
+  // Set by resetMemberPassword when an owner resets a member's password.
+  // While true, the (app) layout gate redirects any request through
+  // /set-password and blocks all other routes until the user picks a new
+  // password of their own. Cleared inside setOwnPassword once a valid new
+  // one lands. The reset action also revokes existing sessions so a stale
+  // browser tab can't slip past the gate.
+  mustSetPassword: boolean("must_set_password").notNull().default(false),
   // Per-channel feedback notification preferences. All four are
   // owner-only (the /profile section is gated on role === "owner" and the
   // recipient queries in lib/email/notify.ts filter by role too).

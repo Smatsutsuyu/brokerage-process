@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
+import { hashPassword } from "better-auth/crypto";
 
 import { db } from "@/db";
 import { authAccount, authSession, authUser, dealTeamMembers, users } from "@/db/schema";
@@ -183,6 +184,66 @@ export async function setMemberDisabled(input: {
     .update(users)
     .set({ disabledAt: input.disabled ? new Date() : null })
     .where(and(eq(users.id, input.userId), eq(users.orgId, me.orgId)));
+
+  revalidatePath("/admin/members");
+}
+
+// Owner-triggered password reset. Overwrites the target's credential-account
+// password with the provided temp string, flips users.must_set_password so
+// the (app) layout gate forces a /set-password redirect on their next
+// request, and invalidates all their existing sessions so a stale browser
+// tab can't slip past the gate. Returns nothing — the modal already knows
+// the temp password it just sent in.
+//
+// Owner can't reset their own account: use the Better Auth changePassword
+// flow via a profile-page control (not built yet). Owner can't reset
+// another owner unless they'd also be able to remove them (skip the
+// last-owner floor here because reset doesn't destroy access — the target
+// can still recover as long as one owner remains — but leave the block on
+// self-reset to keep the "prove identity via sign-in" invariant intact).
+export async function resetMemberPassword(input: {
+  userId: string;
+  newPassword: string;
+}): Promise<void> {
+  const me = await requireOwner();
+  if (input.userId === me.id) {
+    throw new Error("You can't reset your own password from this flow");
+  }
+  if (input.newPassword.length < 8) {
+    throw new Error("New password must be at least 8 characters");
+  }
+
+  const [target] = await db
+    .select({
+      id: users.id,
+      authUserId: users.authUserId,
+    })
+    .from(users)
+    .where(and(eq(users.id, input.userId), eq(users.orgId, me.orgId)))
+    .limit(1);
+  if (!target) throw new Error("Member not found");
+  if (!target.authUserId) throw new Error("Member has no auth identity");
+
+  const hashed = await hashPassword(input.newPassword);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(authAccount)
+      .set({ password: hashed })
+      .where(
+        and(
+          eq(authAccount.userId, target.authUserId!),
+          eq(authAccount.providerId, "credential"),
+        ),
+      );
+    await tx
+      .update(users)
+      .set({ mustSetPassword: true })
+      .where(eq(users.id, target.id));
+    // Kick them out of any active session — a stale browser tab shouldn't
+    // outlast a reset.
+    await tx.delete(authSession).where(eq(authSession.userId, target.authUserId!));
+  });
 
   revalidatePath("/admin/members");
 }

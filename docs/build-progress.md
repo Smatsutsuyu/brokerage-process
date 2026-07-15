@@ -102,6 +102,14 @@ Major reconciliation pass against Chris's `Marketing Process Checklist.xlsx` v2 
 - Member-remove flow: hard delete with cascade, last-owner guardrail, fix for inviting a member signing the owner out (`12685c5`).
 - Auto-clean orphan `deal_buyers` rows on builder delete (`1434e4d`, `85e7747`).
 
+## Owner-triggered password reset + first-login set-password (2026-07-03)
+
+- **New `users.must_set_password` column** (migration `0030_cooing_shotgun.sql`). Default false; flipped true by an owner reset, cleared by the user's own `setOwnPassword`. `getCurrentUser` returns it as part of the shape.
+- **`(app)/layout.tsx` async gate** — layout is now async and calls `getCurrentUser`; if `mustSetPassword` is set, redirects to `/set-password` before rendering children. Extra DB round-trip is free thanks to `React.cache()`.
+- **`/set-password` route (new).** Server page + client form + `setOwnPassword` server action. Server page redirects to `/sign-in` when unauthenticated and to `/` when the flag is already cleared. Action hashes via `hashPassword` from `better-auth/crypto`, writes to `auth_account.password` for `providerId = "credential"`, clears the flag, `revalidatePath("/", "layout")`.
+- **`resetMemberPassword({ userId, newPassword })` server action** in `admin/actions.ts`. Owner-gated, refuses self-reset. Wraps the credential-row password update, the `must_set_password` flip, and a full `auth_session` sweep for the target in one transaction — a stale browser tab can't outlast a reset.
+- **Reset PW button on every row** in `/admin/members` next to Disable / Remove. Opens `ResetPasswordModal`: same adjective-noun-### generator as invite, Regen button, success view with the temp password on screen + a Copy button so the owner can share it out-of-band. Modal notes that active sessions were signed out and the user will be prompted to pick their own password on next sign-in.
+
 ## B&F invite hard-gated on row date (2026-06-17)
 
 - **B&F due date now lives on the "Send out B&F" row.** Added `dateField: true` to the Phase 3 item in `CHECKLIST_TEMPLATE` so the row gets the standard milestone-date affordance (date chip + native picker, same as Offering Date / LOI Signed / Closing Date). No migration: `isItemDateField` is a runtime template lookup, so existing deals pick up the chip on next render.

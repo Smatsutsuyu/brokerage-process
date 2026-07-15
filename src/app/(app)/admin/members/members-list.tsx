@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader2, ShieldOff, Trash2, UserPlus } from "lucide-react";
+import { KeyRound, Loader2, ShieldOff, Trash2, UserPlus } from "lucide-react";
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
 } from "../actions";
 
 import { InviteMemberModal } from "./invite-member-modal";
+import { ResetPasswordModal } from "./reset-password-modal";
 
 export type MemberRow = {
   id: string;
@@ -54,6 +55,7 @@ const ROLES: Role[] = ["owner", "broker", "analyst", "viewer"];
 
 export function MembersList({ currentUserId, members }: MembersListProps) {
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [resetTarget, setResetTarget] = useState<MemberRow | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const confirm = useConfirm();
@@ -203,6 +205,18 @@ export function MembersList({ currentUserId, members }: MembersListProps) {
                       <div className="inline-flex items-center gap-3">
                         <button
                           type="button"
+                          onClick={() => setResetTarget(member)}
+                          disabled={isPending}
+                          title="Force a password reset — they'll pick a new one on next sign-in"
+                          className="text-xs font-medium text-gray-500 hover:text-gray-900 disabled:opacity-50"
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            <KeyRound className="h-3 w-3" />
+                            Reset PW
+                          </span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleToggleDisabled(member)}
                           disabled={isPending}
                           className="text-xs font-medium text-gray-500 hover:text-gray-900 disabled:opacity-50"
@@ -239,6 +253,21 @@ export function MembersList({ currentUserId, members }: MembersListProps) {
       </div>
 
       <InviteMemberModal open={inviteOpen} onOpenChange={setInviteOpen} />
+      <ResetPasswordModal
+        open={resetTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setResetTarget(null);
+        }}
+        member={
+          resetTarget
+            ? {
+                id: resetTarget.id,
+                name: resetTarget.name,
+                email: resetTarget.email,
+              }
+            : null
+        }
+      />
     </div>
   );
 }

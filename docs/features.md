@@ -8,7 +8,7 @@ What this app does not do: no in-app notifications (alerts go to your email inbo
 
 ## Sign in and your profile
 
-Sign in with email and password at `/sign-in`. There is no self-service "forgot password" flow yet, so if you lock yourself out, ask an owner to reset you from Admin > Members.
+Sign in with email and password at `/sign-in`. There is no self-service "forgot password" flow yet, so if you lock yourself out, ask an owner to reset you from Admin > Members. An owner-triggered reset hands you a fresh temporary password and forces you to pick your own on next sign-in via a `/set-password` prompt before you can enter the app.
 
 Your profile lives at `/profile`. From there you can edit your display name and phone, change your password (minimum 8 characters; you stay signed in on this device), and sign out.
 
@@ -177,6 +177,8 @@ Owners get two extra sidebar links under Admin.
 ### Members (`/admin/members`)
 
 Invite users, change their role (Owner / Broker / Analyst / Viewer), and disable or remove access. Disabling a user keeps the historical record (their name still shows on past completed checklist items, comments, etc.) but blocks sign-in. This is where outside cobrokers get added before the Teams tab can include them.
+
+Each row also has a **Reset PW** button. Click it, pick (or regen) a temporary password, and confirm. The modal shows the temp password once with a Copy button so you can share it out-of-band. On the target's next sign-in, the app intercepts them at `/set-password` and forces them to pick their own new password before any other route loads. Any active session that member had at the moment of reset is invalidated too, so a stale browser tab can't slip past the gate. Useful for the "we set up a broker account for the deal team but never handed the credentials over" case: reset gives you a fresh password to hand out, and the new user still ends up choosing something you never see.
 
 ### Feedback (`/admin/feedback`)
 

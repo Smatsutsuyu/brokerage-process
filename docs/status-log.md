@@ -4,6 +4,31 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-07-03 — Owner-triggered password reset + first-login set-password
+
+### Done
+- **New `mustSetPassword` boolean column on `users`** (migration `0030_cooing_shotgun.sql`). Default false. Flipped true by an owner-triggered reset, cleared by the user's next `setOwnPassword` call. `getCurrentUser` returns it as part of the shape so every consumer sees the flag.
+- **`(app)/layout.tsx` is now async** and gates on `mustSetPassword`: if the flag is set, the layout redirects to `/set-password` before rendering children. Individual page components still handle their own sign-in redirects; the layout only intercepts signed-in-mid-reset users. The extra DB call is free thanks to `React.cache()` inside `getCurrentUser`.
+- **New `/set-password` route** (server page + client form + `setOwnPassword` server action). Server page redirects to `/sign-in` when not authenticated and to `/` when the flag is already cleared, so it can never sit as a dead-end. Client form asks for new password + confirm (no current-password prompt — the user just proved identity by signing in with the temp). Action hashes via `hashPassword` from `better-auth/crypto`, writes to `auth_account.password` for the `providerId = "credential"` row, clears `users.must_set_password`, and calls `revalidatePath("/", "layout")` so the layout gate re-reads on the next navigation.
+- **New `resetMemberPassword({ userId, newPassword })` server action** in `admin/actions.ts`. Owner-gated. Refuses to reset self (owner still needs an invariant "prove identity via sign-in" path for their own account, currently unbuilt). Hashes the temp password, updates the target's credential-account row, flips `must_set_password`, and — inside the same transaction — deletes every one of the target's `auth_session` rows so any stale browser tab gets kicked out.
+- **New Reset PW button on every member row** in `/admin/members` next to Disable and Remove. Opens `ResetPasswordModal` (new component next to `InviteMemberModal`, same shape: adjective-noun-### generator, Regen button, error surface, then a success view with the temp password on screen and a Copy button). Same generator function as invite so both flows produce identical-looking credentials.
+
+### Decisions
+- **Temp password, not one-time link.** The invite flow already hands the owner a temp password to share out-of-band; reset mirrors that. A signed one-time link would need a Resend template plus a new tokens table plus expiry logic, none of which pays off at Lakebridge's team size. Documented tradeoff in the design proposal.
+- **Force a fresh password on first sign-in after reset, not just accept the temp.** The whole point of the flow is the owner never learns the user's real password. If the temp were acceptable long-term, the owner could keep using it, which defeats the reset. So the `must_set_password` gate is unconditional.
+- **Session invalidation is part of the reset transaction.** Not a separate step, not a follow-up call. If we skipped it, a browser tab still authenticated with the OLD password's session would silently keep working until it expired.
+- **Reset uses `hashPassword` from `better-auth/crypto`, not `auth.api.updatePassword`.** The Better Auth admin-triggered update path expects a session for the target user, which we don't have when doing this owner-to-target. Direct hash + Drizzle write is cleaner and matches what Better Auth's own `update-user` route does internally (`ctx.context.password.hash` under the hood is the same scrypt implementation).
+- **Invite flow left unchanged.** New invitees still get the owner-picked temp password without the `must_set_password` gate — the same behavior as before. Consideration to force set-password on invitees too was noted as a possible follow-up, not shipped here.
+
+### Deferred / Pending
+- Owner cannot reset their own password from this flow. The Better Auth `changePassword` client method already exists but there's no profile-page control to expose it yet. Track as a small follow-up.
+- Invite flow doesn't currently flip `must_set_password = true` for new invitees. Could be a two-line change if we want the same first-login prompt for new users; leaving it out until Chris asks so scope stays tight.
+
+### Blockers
+- None.
+
+---
+
 ## 2026-06-17 — B&F invite hard-gated on row date
 
 ### Done

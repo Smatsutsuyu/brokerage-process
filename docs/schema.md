@@ -29,7 +29,7 @@ Grouped by domain. One line of purpose, then notable columns and FK relationship
 ### Identity and tenancy
 
 - **`organizations`** (`src/db/schema/organizations.ts`) — top-level tenant. Columns: `id`, `clerk_org_id` (vestigial unique field, kept for migration continuity after the Better Auth swap), `name`, `slug`. Every domain table cascades from here.
-- **`users`** (`src/db/schema/users.ts`) — app-level membership row. One row per (org, person) pair. Columns: `org_id`, `auth_user_id` (text FK to `auth_user.id`, nullable for pre-created memberships), `role` (`user_role` enum), `phone`, `disabled_at` (soft-disable without delete), and four `notify_on_*` boolean flags for the owner's feedback notification subscriptions.
+- **`users`** (`src/db/schema/users.ts`) — app-level membership row. One row per (org, person) pair. Columns: `org_id`, `auth_user_id` (text FK to `auth_user.id`, nullable for pre-created memberships), `role` (`user_role` enum), `phone`, `disabled_at` (soft-disable without delete), `must_set_password` (owner-triggered reset gate; when true the `(app)` layout redirects to `/set-password`), and four `notify_on_*` boolean flags for the owner's feedback notification subscriptions.
 - **`auth_user`**, **`auth_session`**, **`auth_account`**, **`auth_verification`** (`src/db/schema/auth.ts`) — the four Better Auth tables. Owned by the library; schema matches its canonical layout so its Drizzle adapter recognizes them. Identity (name, email, password hash, OAuth tokens) lives on `auth_user`; sessions and OAuth account links live on the others. `users.auth_user_id` joins back to `auth_user.id`.
 
 ### Deals and buyers

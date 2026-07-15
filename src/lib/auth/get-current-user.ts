@@ -18,6 +18,10 @@ export type CurrentUser = {
   email: string;
   name: string;
   phone: string | null;
+  // True when an owner has triggered a password reset and the user has
+  // not yet chosen their own new password. The (app) layout redirects to
+  // /set-password whenever this is set. Cleared by setOwnPassword.
+  mustSetPassword: boolean;
   // Per-channel feedback notification preferences (owner-only — toggles
   // only render when role === "owner" on /profile, and recipient queries
   // also filter by role).
@@ -46,6 +50,7 @@ async function _getCurrentUser(): Promise<CurrentUser | null> {
       role: users.role,
       disabledAt: users.disabledAt,
       phone: users.phone,
+      mustSetPassword: users.mustSetPassword,
       notifyOnNewFeedback: users.notifyOnNewFeedback,
       notifyOnNewComment: users.notifyOnNewComment,
       notifyOnReplyToMine: users.notifyOnReplyToMine,
@@ -70,6 +75,7 @@ async function _getCurrentUser(): Promise<CurrentUser | null> {
     authUserId: row.authUserId,
     role: row.role,
     disabledAt: row.disabledAt,
+    mustSetPassword: row.mustSetPassword,
     notifyOnNewFeedback: row.notifyOnNewFeedback,
     notifyOnNewComment: row.notifyOnNewComment,
     notifyOnReplyToMine: row.notifyOnReplyToMine,
