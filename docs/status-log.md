@@ -4,6 +4,27 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-07-15 — Feedback triage: Send CTC button + Issues assignee scope
+
+### Done
+- **Send CTC button on the Phase 1 Cost to Complete row** (feedback item `3b9ddf75`, from Larry Nguyen 2026-07-07). Mirrors the Share Market Study pattern: `BuyerBlastButton` with `requireAttachment="file"` gates on an uploaded CTC PDF before opening the composer, defaults to green/yellow buyers. New `CTC_DISTRIBUTION_TEMPLATE` in `email-templates.ts`, new `isCtcItem` matcher in `phase-section.tsx` with `receive`/`finalize` exclusions so the button fires only on the Phase 1 row (not on the two Phase 4 milestone date rows). Commit `4e70108`.
+- **Issues tab assignee picker scoped to Deal Team** (feedback item `0c0356cf`, from Chris 2026-07-15). Previously the "Assigned to" dropdown listed every user in the org. Rewrote the query in `issues-view.tsx` to join `deal_team_members` and only offer members with a linked `userId` on this deal. Backward-compat straggler union preserves any currently-assigned user in the picker even if they've since been removed from the team, so editing an existing issue doesn't silently drop the assignee. Commit `75329da`.
+- Both fixes ship-tested statically (typecheck clean; matcher walked against every "cost to complete" row in the template — only the Phase 1 row matches). Sean will smoke-test in the live environment after Vercel auto-deploys.
+
+### Decisions
+- **CTC send mirrors Market Study, not DD Folder** — the CTC report is a single uploaded PDF (like the market study), not a link-or-file bundle (like the DD folder). So `requireAttachment="file"` (not `"any"`) is the correct pre-flight gate.
+- **Issues assignee gate is UX-only, not authz.** Server-side `addIssue`/`updateIssue` don't validate deal-team membership; a compromised client could still send any org user id. Matches today's behavior — we're not tightening the trust boundary, just the picker's shown options.
+- **Backward-compat union is on the client-side Map, not a UNION in SQL.** Simpler to reason about, no distinct-rows concerns, and the straggler set is bounded by the deal's issue count (small).
+
+### Deferred / Pending
+- **Contacts lead-picker uses the same "all org users" pattern.** Chris may or may not want the same deal-team scoping there. Not in scope for this feedback item; worth surfacing next time he's iterating on the Contacts tab.
+- Feedback items will be marked `actioned` after Sean confirms the fixes in the live environment.
+
+### Blockers
+- None. Docker Desktop not running locally so no browser-driven smoke test today; static verification stands in.
+
+---
+
 ## 2026-07-03 — Owner-triggered password reset + first-login set-password
 
 ### Done
