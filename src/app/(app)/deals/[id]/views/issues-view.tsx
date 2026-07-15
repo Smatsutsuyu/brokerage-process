@@ -1,7 +1,7 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { authUser, issues, users } from "@/db/schema";
+import { authUser, dealTeamMembers, issues, users } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
 import { IssuesList, type IssueRow, type UserOption } from "./issues-list";
@@ -32,18 +32,46 @@ export async function IssuesView({ dealId }: IssuesViewProps) {
     .where(eq(issues.dealId, dealId))
     .orderBy(asc(issues.identifiedAt));
 
-  const orgUsers = org
+  // Scope the assignee picker to Deal Team members with a linked user
+  // (contact-only or free-text team rows can't be assigned since
+  // issues.assignedUserId FKs to users). A person on multiple sub-teams
+  // shows once thanks to the Map dedupe below.
+  const teamRows = org
     ? await db
         .select({
           id: users.id,
           name: authUser.name,
           email: authUser.email,
         })
-        .from(users)
+        .from(dealTeamMembers)
+        .innerJoin(users, eq(users.id, dealTeamMembers.userId))
         .innerJoin(authUser, eq(authUser.id, users.authUserId))
-        .where(eq(users.orgId, org.id))
+        .where(
+          and(
+            eq(dealTeamMembers.dealId, dealId),
+            eq(dealTeamMembers.orgId, org.id),
+          ),
+        )
         .orderBy(asc(authUser.name))
     : [];
+
+  const optionsById = new Map<string, UserOption>();
+  for (const u of teamRows) {
+    if (!optionsById.has(u.id)) {
+      optionsById.set(u.id, { id: u.id, name: u.name || u.email });
+    }
+  }
+  // Backward compat: keep any currently-assigned user in the picker even
+  // if they've since been removed from the Deal Team, so editing an
+  // existing issue doesn't silently drop the assignee.
+  for (const r of rows) {
+    if (r.assignedUserId && !optionsById.has(r.assignedUserId)) {
+      optionsById.set(r.assignedUserId, {
+        id: r.assignedUserId,
+        name: r.assigneeName ?? "(unknown user)",
+      });
+    }
+  }
 
   const items: IssueRow[] = rows.map((r) => ({
     id: r.id,
@@ -56,10 +84,9 @@ export async function IssuesView({ dealId }: IssuesViewProps) {
     identifiedAt: r.identifiedAt.toISOString(),
   }));
 
-  const userOptions: UserOption[] = orgUsers.map((u) => ({
-    id: u.id,
-    name: u.name || u.email,
-  }));
+  const userOptions: UserOption[] = [...optionsById.values()].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
 
   return <IssuesList dealId={dealId} items={items} users={userOptions} />;
 }

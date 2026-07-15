@@ -80,7 +80,7 @@ Once items are approved, Generate PDF renders them into a Land-Advisors-branded 
 
 ### Issues
 
-A living issues tracker for due diligence. Add an issue with a title, description, priority (low / medium / high / urgent), assignee, status (open / in-progress / resolved), and identified/resolved dates. The tab badge shows the open count. Click Generate PDF to open the Due Diligence Tracking report (combined milestone dates + issues + deal team + consultants) for your DD calls.
+A living issues tracker for due diligence. Add an issue with a title, description, priority (low / medium / high / urgent), assignee, status (open / in-progress / resolved), and identified/resolved dates. The assignee picker is scoped to Deal Team members with a linked user (Owner / Broker / Buyer sub-teams) on this deal; an existing assignee since removed from the team still appears so editing the issue doesn't drop them. The tab badge shows the open count. Click Generate PDF to open the Due Diligence Tracking report (combined milestone dates + issues + deal team + consultants) for your DD calls.
 
 ### Consultants
 
