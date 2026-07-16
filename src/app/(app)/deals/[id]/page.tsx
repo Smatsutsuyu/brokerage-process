@@ -23,19 +23,22 @@ import { DealTabs } from "./deal-tabs";
 import { ChecklistView } from "./views/checklist-view";
 import { ConsultantsView } from "./views/consultants-view";
 import { ContactsView } from "./views/contacts-view";
+import { parseLayoutParam } from "./views/contacts-layouts/layout-keys";
 import { IssuesView } from "./views/issues-view";
-import {
-  PrototypeAView,
-  PrototypeBView,
-  PrototypeCView,
-  PrototypeDView,
-} from "./views/prototypes/prototype-views";
 import { QaView } from "./views/qa-view";
 import { TeamView } from "./views/team-view";
 
 
-export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DealPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string; layout?: string }>;
+}) {
   const { id } = await params;
+  const { layout: layoutParam } = await searchParams;
+  const contactsLayout = parseLayoutParam(layoutParam);
   const org = await getCurrentOrg();
   // Cookie present but session invalid (rotated secret, deleted user, disabled
   // member) — bounce to sign-in instead of showing a confusing 404.
@@ -265,7 +268,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             ),
             contacts: (
               <FeedbackZone section="deal-contacts">
-                <ContactsView dealId={id} />
+                <ContactsView dealId={id} layout={contactsLayout} />
               </FeedbackZone>
             ),
             qa: (
@@ -288,10 +291,6 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                 <TeamView dealId={id} />
               </FeedbackZone>
             ),
-            "proto-a": <PrototypeAView dealId={id} />,
-            "proto-b": <PrototypeBView dealId={id} />,
-            "proto-c": <PrototypeCView dealId={id} />,
-            "proto-d": <PrototypeDView dealId={id} />,
           }}
         </DealTabs>
       </main>

@@ -2,9 +2,7 @@
 
 import { type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { FlaskConical } from "lucide-react";
 
-import { FeedbackZone } from "@/components/feedback/feedback-zone";
 import { cn } from "@/lib/utils";
 
 type TabKey =
@@ -13,11 +11,7 @@ type TabKey =
   | "qa"
   | "issues"
   | "consultants"
-  | "team"
-  | "proto-a"
-  | "proto-b"
-  | "proto-c"
-  | "proto-d";
+  | "team";
 
 const TAB_KEYS: ReadonlySet<TabKey> = new Set([
   "checklist",
@@ -26,10 +20,6 @@ const TAB_KEYS: ReadonlySet<TabKey> = new Set([
   "issues",
   "consultants",
   "team",
-  "proto-a",
-  "proto-b",
-  "proto-c",
-  "proto-d",
 ]);
 
 function isTabKey(s: string | null | undefined): s is TabKey {
@@ -48,17 +38,13 @@ type DealTabsProps = {
   children: Record<TabKey, ReactNode>;
 };
 
-const TABS: Array<{ key: TabKey; label: string; group?: "main" | "proto" }> = [
-  { key: "checklist", label: "Checklist", group: "main" },
-  { key: "contacts", label: "Contacts", group: "main" },
-  { key: "qa", label: "Q&A", group: "main" },
-  { key: "issues", label: "Issues", group: "main" },
-  { key: "consultants", label: "Consultants", group: "main" },
-  { key: "team", label: "Teams", group: "main" },
-  { key: "proto-a", label: "A · Cards", group: "proto" },
-  { key: "proto-b", label: "B · Pane", group: "proto" },
-  { key: "proto-c", label: "C · Grouped", group: "proto" },
-  { key: "proto-d", label: "D · Compact", group: "proto" },
+const TABS: Array<{ key: TabKey; label: string }> = [
+  { key: "checklist", label: "Checklist" },
+  { key: "contacts", label: "Contacts" },
+  { key: "qa", label: "Q&A" },
+  { key: "issues", label: "Issues" },
+  { key: "consultants", label: "Consultants" },
+  { key: "team", label: "Teams" },
 ];
 
 export function DealTabs({ counts, children }: DealTabsProps) {
@@ -78,6 +64,11 @@ export function DealTabs({ counts, children }: DealTabsProps) {
     } else {
       params.set("tab", next);
     }
+    // Leaving Contacts drops the ?layout= param so it doesn't stick around
+    // as noise when the user navigates to a different tab.
+    if (next !== "contacts") {
+      params.delete("layout");
+    }
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
@@ -96,34 +87,13 @@ export function DealTabs({ counts, children }: DealTabsProps) {
         return String(counts.consultants);
       case "team":
         return String(counts.team);
-      // Prototype tabs share the buyer count from contacts.
-      case "proto-a":
-      case "proto-b":
-      case "proto-c":
-      case "proto-d":
-        return null;
     }
   }
 
-  const mainTabs = TABS.filter((t) => t.group === "main");
-  const protoTabs = TABS.filter((t) => t.group === "proto");
-
-  // Prototype switcher surfaces only when looking at Contacts (the
-  // canonical view) or one of the prototype tabs — hidden on Checklist
-  // / Q&A / Issues / Consultants where it's irrelevant. Card layout
-  // (option-a) is the canonical Contacts view; the others stay
-  // reachable for layout comparison.
-  const showProtoStrip = active === "contacts" || active.startsWith("proto-");
-
   return (
     <>
-      <nav
-        className={cn(
-          "flex flex-wrap items-center gap-0 border-b-2 border-gray-200",
-          showProtoStrip ? "mb-2" : "mb-6",
-        )}
-      >
-        {mainTabs.map((tab) => {
+      <nav className="mb-6 flex flex-wrap items-center gap-0 border-b-2 border-gray-200">
+        {TABS.map((tab) => {
           const isActive = active === tab.key;
           const badge = badgeFor(tab.key);
           return (
@@ -153,40 +123,6 @@ export function DealTabs({ counts, children }: DealTabsProps) {
           );
         })}
       </nav>
-
-      {/* Prototype switcher — only visible on Contacts or a prototype
-          view. Visually offset (amber dashed) so it reads as
-          throwaway exploration, not part of the canonical UI. Wrapped
-          in a FeedbackZone so notes about specific layouts get
-          attached to the prototypes section. */}
-      {showProtoStrip && (
-        <FeedbackZone section="contacts-prototypes" className="mb-6">
-          <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-amber-300 bg-amber-50/50 px-3 py-2">
-            <FlaskConical className="h-3.5 w-3.5 text-amber-700" />
-            <span className="mr-2 text-[10px] font-bold tracking-wider text-amber-800 uppercase">
-              Contacts layouts
-            </span>
-            {protoTabs.map((tab) => {
-              const isActive = active === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActive(tab.key)}
-                  className={cn(
-                    "rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors",
-                    isActive
-                      ? "bg-amber-700 text-white"
-                      : "text-amber-800 hover:bg-amber-100",
-                  )}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </FeedbackZone>
-      )}
 
       <div>{children[active]}</div>
     </>

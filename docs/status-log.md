@@ -4,6 +4,30 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-07-15 — Contacts layouts promoted to first-class + lead picker fix
+
+### Done
+- **Lead picker on the Contacts tab now scoped to Deal Team members** (commit `5297e03`). Same pattern as the Issues assignee fix earlier today: `deal_team_members` inner-join to `users`, dedupe by user id, backward-compat straggler union for anyone currently assigned as a lead but since removed from the team. Change is in `contacts-layouts/load-buyers.ts`.
+- **Contacts layout system reworked.** The four alternate arrangements (Cards / Pane / Grouped / Compact) that had been hiding behind an amber-dashed "experimental" strip are now first-class citizens with a proper in-tab picker. Directory `views/prototypes/` renamed to `views/contacts-layouts/`. New `layout-keys.ts` is the single source of truth for the four layout options. New `contacts-layout-picker.tsx` is a small segmented-control client component that reads/writes a `?layout=` URL param. The top-level `proto-a/b/c/d` deal tabs are gone; a Contacts URL is now `?tab=contacts` (default Cards) or `?tab=contacts&layout=b|c|d`.
+- **`ContactsView` promoted to the switcher.** Loads buyer data once via `loadBuyers`, renders the picker, then renders the chosen layout. `prototype-views.tsx` deleted (its `builderGroupsOnly` filter for B/C/D moved into `ContactsView` since B/C/D still don't handle the Unaffiliated bucket).
+- **Dead code deleted.** `contacts-table.tsx` (orphan, zero callers, same "all org users" bug the lead-picker fix addressed). `getLeadOptionsForOrg()` in `deals/[id]/actions.ts` (orphan, zero callers, same all-org-users query pattern).
+- **Backlog groomed.** The "Decommission Contacts UX prototypes" entry removed (superseded by this promotion). The `loadBuyers` parallelization entry updated to the new path.
+
+### Decisions
+- **Kept B/C/D feature-stubbed** rather than bringing them up to full parity with Cards. Chris uses Cards daily; B/C/D exist as alternate arrangements for design comparison and occasional visual inspection. Investing 6-10 hours to teach them the Unaffiliated bucket + FeedbackZone wiring + all shipped-since-June flags is premature until someone actually picks one as their preferred view. The four-layout URL surface is the commitment; feature parity remains conditional.
+- **Selector inside the Contacts tab, not a top-level tab strip.** Four `proto-*` top-level tabs plus an amber "layout switcher" strip was redundant and confusing. The new model: one `Contacts` tab, one layout picker sitting at the top of that tab's content. Bookmarkable via `?layout=` on the URL. Leaving the Contacts tab drops the `layout=` param automatically so it doesn't stick as noise on Checklist or Issues.
+- **Deleted `contacts-table.tsx` outright.** No callers, obviously stale (predates the deal_contacts model based on its imports), and it duplicated the "all org users" lead-picker bug we just fixed. Keeping it would have been a booby-trap for the next person searching for a template.
+- **No forced shared-component extraction across the four layouts.** The primitives that should be shared (`LeadPicker`, `TierBadge`, `BuyerCheckbox`, `AddContactModal`, `PickExistingContactModal`, `MarketingReportPdfButton`, `OmBlastButton`, `BuyerCommentsEditor`, `ReceivesCommunicationToggle`) already are. Layout-level structure (how contact rows arrange, where the tier chip lives relative to the lead picker) is genuinely divergent by design. Forcing a shared `ContactRow` component today would require prop bloat to accommodate all four arrangements, for negligible savings.
+
+### Deferred / Pending
+- Bring B/C/D up to Cards parity if one of them ever gets picked as a preferred daily view. Includes: Unaffiliated bucket rendering, `FeedbackZone` wiring under `deal-contacts`, per-contact `ReceivesCommunicationToggle`, `BuyerCommentsEditor`, offer-received flag, deal-team-aware lead picker consumption (already correct at data layer via `loadBuyers`).
+- Historical feedback rows with `section = "contacts-prototypes"` still exist in the DB and remain visible in `/admin/feedback` — the section slug no longer maps to a live surface, but the row content is preserved and the deal-id link still works.
+
+### Blockers
+- None.
+
+---
+
 ## 2026-07-15 — Feedback triage: Send CTC button + Issues assignee scope
 
 ### Done

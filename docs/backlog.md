@@ -141,7 +141,7 @@ When you close one, mark `~~done~~` rather than deleting so the running record s
 - **Effort**: S
 
 ### [Perf] Parallelize the two follow-up queries in `loadBuyers`
-- **What**: `src/app/(app)/deals/[id]/views/prototypes/load-buyers.ts` does the main contacts join, then a serial query for org users, then a serial query for org contacts. The two follow-ups are independent.
+- **What**: `src/app/(app)/deals/[id]/views/contacts-layouts/load-buyers.ts` does the main contacts join, then a serial query for deal-team users, then a serial query for org contacts. The two follow-ups are independent.
 - **Fix**: `Promise.all` the two follow-ups, or all three queries from the start (none share data).
 - **Effort**: S
 
@@ -149,11 +149,6 @@ When you close one, mark `~~done~~` rather than deleting so the running record s
 - **What**: `useEffect` resets `draft` from `trimmedInitial` on every prop change. A sibling revalidation can wipe an in-flight edit.
 - **Fix**: compare against `savedValue` state and skip when actively editing.
 - **Effort**: S
-
-### [Code Quality] Decommission the Contacts UX prototypes (B/C/D)
-- **What**: `src/app/(app)/deals/[id]/views/prototypes/` ~1,847 lines across 4 option files + load-buyers. Chris picked Option A on 2026-05-12 as canonical. The other three layouts are still reachable via `?tab=proto-{b,c,d}` and the "Contacts layouts" strip in `deal-tabs.tsx`.
-- **Fix**: move `OptionACards` + `load-buyers` out of `prototypes/` into `views/` proper. Delete options B/C/D, the `proto-*` tab branches, and the layout switcher strip. Confirm with Sean before deleting since the switcher was re-added intentionally as "Contacts layouts."
-- **Effort**: M, after Sean's go-ahead
 
 ### [Code Quality] Sweep stale R2 naming
 - **What**: `documents.r2Key` (legacy Cloudflare R2 name) persists in the schema + 4 source files even though we're on Vercel Blob since 2026-05-05.

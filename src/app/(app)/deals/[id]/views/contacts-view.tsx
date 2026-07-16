@@ -1,24 +1,72 @@
-// Production Contacts view. Renders the cards layout (formerly
-// option-a-cards in the prototype set) — Chris picked it as the canonical
-// surface (2026-05-12 feedback). The other prototype components stay on
-// disk in case a layout decision gets revisited but aren't reachable from
-// the UI any more (the prototype tab strip was removed).
+// Production Contacts view. Loads buyer data once and hands it to whichever
+// layout the ?layout= URL param selects. Four layouts ship: Cards (default,
+// what Chris uses day-to-day), Pane, Grouped, and Compact. All four are
+// production surfaces — the layout picker at the top lets any team member
+// switch on the fly.
+//
+// Historical note: b/c/d were built before deal_contacts added the
+// Unaffiliated bucket and only know how to render builder groups. The
+// pre-filter below keeps them compiling; if a layout ever needs to become
+// the canonical daily-driver, it'll need a rewrite to consume BuyerGroup
+// (kind: "builder" | "unaffiliated") directly.
 
-import { loadBuyers } from "./prototypes/load-buyers";
-import { OptionACards } from "./prototypes/option-a-cards";
+import type { BuyerGroup } from "./contacts-layouts/load-buyers";
+import { loadBuyers } from "./contacts-layouts/load-buyers";
+import { ContactsLayoutPicker } from "./contacts-layouts/contacts-layout-picker";
+import type { ContactsLayoutKey } from "./contacts-layouts/layout-keys";
+import { OptionACards } from "./contacts-layouts/option-a-cards";
+import { OptionBPane } from "./contacts-layouts/option-b-pane";
+import { OptionCGrouped } from "./contacts-layouts/option-c-grouped";
+import { OptionDCompact } from "./contacts-layouts/option-d-compact";
+
+type BuilderGroup = Extract<BuyerGroup, { kind: "builder" }>;
+function builderGroupsOnly(groups: BuyerGroup[]): BuilderGroup[] {
+  return groups.filter((g): g is BuilderGroup => g.kind === "builder");
+}
 
 type ContactsViewProps = {
   dealId: string;
+  layout: ContactsLayoutKey;
 };
 
-export async function ContactsView({ dealId }: ContactsViewProps) {
+export async function ContactsView({ dealId, layout }: ContactsViewProps) {
   const { groups, leadOptions, orgContacts } = await loadBuyers(dealId);
+
   return (
-    <OptionACards
-      dealId={dealId}
-      groups={groups}
-      leadOptions={leadOptions}
-      orgContacts={orgContacts}
-    />
+    <div>
+      <ContactsLayoutPicker active={layout} />
+      {layout === "a" && (
+        <OptionACards
+          dealId={dealId}
+          groups={groups}
+          leadOptions={leadOptions}
+          orgContacts={orgContacts}
+        />
+      )}
+      {layout === "b" && (
+        <OptionBPane
+          dealId={dealId}
+          groups={builderGroupsOnly(groups)}
+          leadOptions={leadOptions}
+          orgContacts={orgContacts}
+        />
+      )}
+      {layout === "c" && (
+        <OptionCGrouped
+          dealId={dealId}
+          groups={builderGroupsOnly(groups)}
+          leadOptions={leadOptions}
+          orgContacts={orgContacts}
+        />
+      )}
+      {layout === "d" && (
+        <OptionDCompact
+          dealId={dealId}
+          groups={builderGroupsOnly(groups)}
+          leadOptions={leadOptions}
+          orgContacts={orgContacts}
+        />
+      )}
+    </div>
   );
 }

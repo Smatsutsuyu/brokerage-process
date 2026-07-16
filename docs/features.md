@@ -58,7 +58,9 @@ Some items have extra affordances:
 
 ### Contacts
 
-Manage the buyer list for this deal in a card layout grouped by tier (Interested / Evaluating / Pass / Not Selected). Filter chips at the top narrow by tier.
+Manage the buyer list for this deal. Four layouts ship as first-class options, selectable from a picker at the top of the tab: **Cards** (default, grouped by tier with per-builder metadata), **Pane** (split view), **Grouped** (accordion by builder), **Compact** (dense table). The URL carries the selection via `?layout=b|c|d` so a specific layout is bookmarkable and shareable; the picker updates the URL in place without adding a history entry. Cards is the canonical daily-driver; the others are alternate arrangements of the same data.
+
+The Cards layout groups buyers by tier (Interested / Evaluating / Pass / Not Selected) with filter chips at the top to narrow by tier.
 
 For each builder card you can:
 

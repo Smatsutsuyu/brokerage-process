@@ -1333,21 +1333,6 @@ export async function getLeadsOnDeal(input: {
   return rows.map((r) => ({ id: r.id, name: r.name || r.email }));
 }
 
-// Org-wide lead options — for callers that need them without going through
-// loadBuyers (e.g., the OM-blast button on the checklist row, where the
-// page hasn't loaded buyer data yet).
-export async function getLeadOptionsForOrg(): Promise<{ id: string; name: string }[]> {
-  const org = await getCurrentOrg();
-  if (!org) return [];
-  const rows = await db
-    .select({ id: users.id, name: authUser.name, email: authUser.email })
-    .from(users)
-    .innerJoin(authUser, eq(authUser.id, users.authUserId))
-    .where(eq(users.orgId, org.id))
-    .orderBy(asc(authUser.name));
-  return rows.map((r) => ({ id: r.id, name: r.name || r.email }));
-}
-
 // Available "From:" choices for outbound client-facing email. Only
 // landadvisors.com is verified in Resend, so the only choice today is
 // Chris's address. Kept as a typed list (not a constant) so we can grow
