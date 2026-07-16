@@ -7,7 +7,6 @@ import {
   contacts,
   dealBuyers,
   dealContacts,
-  dealTeamMembers,
   users,
 } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
@@ -181,51 +180,23 @@ export async function loadBuyers(dealId: string): Promise<BuyerData> {
   const groups: BuyerGroup[] = Array.from(map.values());
   if (unaffiliated) groups.push(unaffiliated);
 
-  // Scope the lead picker to Deal Team members with a linked user
-  // (contact-only or free-text team rows can't be leads since
-  // dealBuyers.leadUserId FKs to users). Dedupe by user id since a person
-  // may sit on multiple sub-teams for the same deal.
-  const teamRows = org
+  const orgUsers = org
     ? await db
         .select({
           id: users.id,
           name: authUser.name,
           email: authUser.email,
         })
-        .from(dealTeamMembers)
-        .innerJoin(users, eq(users.id, dealTeamMembers.userId))
+        .from(users)
         .innerJoin(authUser, eq(authUser.id, users.authUserId))
-        .where(
-          and(
-            eq(dealTeamMembers.dealId, dealId),
-            eq(dealTeamMembers.orgId, org.id),
-          ),
-        )
+        .where(eq(users.orgId, org.id))
         .orderBy(asc(authUser.name))
     : [];
 
-  const leadOptionsById = new Map<string, LeadOption>();
-  for (const u of teamRows) {
-    if (!leadOptionsById.has(u.id)) {
-      leadOptionsById.set(u.id, { id: u.id, name: u.name || u.email });
-    }
-  }
-  // Backward compat: keep any currently-assigned lead in the picker even
-  // if they've since been removed from the Deal Team, so re-opening the
-  // dropdown for that buyer doesn't hide the current selection.
-  for (const g of groups) {
-    if (g.kind !== "builder") continue;
-    if (g.leadUserId && !leadOptionsById.has(g.leadUserId)) {
-      leadOptionsById.set(g.leadUserId, {
-        id: g.leadUserId,
-        name: g.leadName ?? "(unknown user)",
-      });
-    }
-  }
-
-  const leadOptions: LeadOption[] = [...leadOptionsById.values()].sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
+  const leadOptions: LeadOption[] = orgUsers.map((u) => ({
+    id: u.id,
+    name: u.name || u.email,
+  }));
 
   // Org-wide contacts directory feeds the "Add Existing Contact" picker.
   const orgContactRows = org
