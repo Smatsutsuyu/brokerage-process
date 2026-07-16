@@ -32,6 +32,27 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-07-15 — Contacts layout switching perf fix
+
+### Done
+- **Contacts layout switching is now client-side.** Chris flagged a 200-1000ms lag when clicking the layout picker. Root cause: the picker was calling `router.replace()` on every click, which is a full Next.js navigation — App Router re-fetches the RSC payload for the new URL, which re-runs `page.tsx` → `ContactsView` → `loadBuyers()` DB query. Every layout switch paid a full server render + DB roundtrip to re-arrange data we already had in memory.
+- **Fix:** split the picker into a controlled component and introduced `ContactsLayoutSwitcher` (client) as the parent. Server component (`ContactsView`) still loads buyer data once on the initial page load and hands it in via props. Layout state now lives in `useState` inside the switcher; picker clicks call `setState` locally and sync the URL via `window.history.replaceState()` (no Next navigation). URL still updates so bookmarks / shares keep working; the `?layout=` param on initial load still SSRs the correct layout via `parseLayoutParam`.
+- Switching cost drops from ~200-1000ms per click to ~10ms (pure client-side React re-render, no network, no DB).
+- Also: reverted the Contacts tab lead-picker deal-team scoping (commit `ba00b9f`) — Chris pointed out he was a lead on some buyers without being on the Deal Team roster, so the filter was hiding legitimate options. Issues assignee scoping stays (Chris's explicit ask); memory rule added at `feedback_deal_team_picker_scoping.md`.
+
+### Decisions
+- **`history.replaceState`, not `router.replace`.** The whole point of the fix is to avoid Next's navigation. Bookmarkability is preserved because the URL still updates; server-side SSR of the initial layout still works because the switcher receives `initialLayout` as a prop derived from the URL.
+- **Lazy render, not render-all-hidden.** Only the active layout mounts. Switching resets in-layout local state (expanded cards, filter chips), which matches today's behavior since today's URL change also reloads the component. Render-all-hidden would preserve state across switches but pays the mount cost of all four upfront on every Contacts navigation — not worth it for a rare interaction.
+- **Sanity fallback in the switcher.** If `layout` state somehow lands on an invalid key, render "a" instead of throwing. Belt-and-suspenders — `parseLayoutParam` on the server side and the picker's own union type on the client side both gate this, so it should never trigger.
+
+### Deferred / Pending
+- None.
+
+### Blockers
+- None.
+
+---
+
 ## 2026-07-15 — Contacts layouts promoted to first-class + lead picker fix
 
 ### Done

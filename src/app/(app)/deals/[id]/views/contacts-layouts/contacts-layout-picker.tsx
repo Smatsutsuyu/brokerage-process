@@ -1,31 +1,19 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-
 import { cn } from "@/lib/utils";
 
 import { CONTACTS_LAYOUTS, type ContactsLayoutKey } from "./layout-keys";
 
 type ContactsLayoutPickerProps = {
   active: ContactsLayoutKey;
+  onChange: (next: ContactsLayoutKey) => void;
 };
 
-export function ContactsLayoutPicker({ active }: ContactsLayoutPickerProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  function setLayout(next: ContactsLayoutKey) {
-    if (next === active) return;
-    const params = new URLSearchParams(searchParams.toString());
-    // Default layout ("a") stays param-free so bookmarks and the canonical
-    // Contacts URL don't grow a redundant ?layout=a suffix.
-    if (next === "a") params.delete("layout");
-    else params.set("layout", next);
-    const qs = params.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }
-
+// Controlled segmented control. The switcher above owns layout state
+// (see contacts-layout-switcher.tsx) so a click doesn't trigger a full
+// RSC roundtrip via router.replace — URL sync is handled there via
+// history.replaceState instead.
+export function ContactsLayoutPicker({ active, onChange }: ContactsLayoutPickerProps) {
   return (
     <div className="mb-4 flex items-center gap-3">
       <span className="text-[11px] font-semibold tracking-wide text-gray-500 uppercase">
@@ -38,7 +26,9 @@ export function ContactsLayoutPicker({ active }: ContactsLayoutPickerProps) {
             <button
               key={layout.key}
               type="button"
-              onClick={() => setLayout(layout.key)}
+              onClick={() => {
+                if (layout.key !== active) onChange(layout.key);
+              }}
               className={cn(
                 "rounded px-3 py-1 text-[12px] font-medium transition-colors",
                 isActive
