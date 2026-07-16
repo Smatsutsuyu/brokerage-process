@@ -63,7 +63,7 @@ Manage the buyer list for this deal in a card layout grouped by tier (Interested
 For each builder card you can:
 
 - Set the tier (Green / Yellow / Red / Not Selected).
-- Assign a Lead (which broker owns the relationship).
+- Assign a Lead (which broker owns the relationship). The lead picker is scoped to Deal Team members with a linked user on this deal (Owner / Broker / Buyer sub-teams); a currently-assigned lead since removed from the team still appears so re-opening the dropdown doesn't hide the selection.
 - Tick the four per-builder checkboxes: Called, Confi (signed), OM (sent), Offer (received).
 - Add a free-text comment that flows into the Marketing Report PDF.
 - Add, edit, or remove contacts within the builder. Each contact has a bell icon to toggle "receives communication." Anyone toggled off is excluded from email blasts to that builder.
