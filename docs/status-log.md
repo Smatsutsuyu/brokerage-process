@@ -4,6 +4,34 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-07-15 — Audit log wired to owner mutations
+
+### Done
+- **New `writeAudit()` helper** at `src/lib/audit.ts`. Fire-and-forget wrapper around `db.insert(auditLog)` that swallows errors so a failed audit write never breaks the mutation it's journaling. Takes `{ orgId, userId, action, entityType, entityId?, before?, after?, metadata? }`.
+- **All five owner-only mutations in `admin/actions.ts` now emit audit rows** with a `<entity>.<past_tense_verb>` action string and the actor's user id:
+  - `inviteMember` → `member.invited` (after: `{ email, name, role }`, entityId: newly-inserted user's uuid via `.returning()`)
+  - `removeMember` → `member.removed` (before: `{ role }`, entityId: the now-deleted user's uuid — safe because `audit_log.entity_id` has no FK)
+  - `changeMemberRole` → `member.role_changed` (before: `{ role: old }`, after: `{ role: new }`). Pre-fetches the current role; no-ops silently if the new role matches so we don't spam audit rows on repeat clicks.
+  - `setMemberDisabled` → `member.disabled` or `member.re_enabled` (before / after: `{ disabledAt }`). Same idempotency guard.
+  - `resetMemberPassword` → `member.password_reset` (no before/after/metadata — the action's existence is the record; deliberately no plaintext or hashed password on the row).
+- **Audit writes happen post-transaction** so a failed audit can never rescue a bad mutation. Errors log to `console.warn` with `[audit] failed to write entry` prefix (searchable in Vercel function logs).
+
+### Decisions
+- **`entityType = "user"`** for all five mutations (matches the underlying `users` table). "member" is the UI-facing noun but "user" aligns with schema.
+- **No UI yet** — the user asked for wiring only. A future `/admin/audit-log` page will surface these; today they land in Postgres for direct query (`select * from audit_log order by created_at desc limit 50` is fine).
+- **`.returning()` with no args** on the `inviteMember` insert, not `.returning({ id: ... })`, to sidestep the union-type mismatch between `neon-serverless` and `postgres-js` (documented workaround, same pattern as `dedupe-builders.ts` scripts).
+- **Idempotency guards** on `changeMemberRole` and `setMemberDisabled` — refuse to write an audit row when the mutation would be a no-op. Prevents audit noise from double-clicks or racing form submissions.
+- **Never log the plaintext or hashed password** on `member.password_reset`. The modal already shows the temp password once to the owner; no audit reason to persist it a second time.
+
+### Deferred / Pending
+- `/admin/audit-log` viewer (filterable by action + entityType + date range). Wiring is a prerequisite for the viewer, which lands separately.
+- Audit coverage beyond owner-only mutations — deal creates, checklist completions, document uploads, feedback status changes. Every mutation-side action in the app is fair game; scope is currently owner-only per Chris's ask.
+
+### Blockers
+- None.
+
+---
+
 ## 2026-07-15 — Contacts layouts promoted to first-class + lead picker fix
 
 ### Done

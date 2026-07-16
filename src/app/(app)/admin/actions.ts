@@ -7,6 +7,7 @@ import { hashPassword } from "better-auth/crypto";
 
 import { db } from "@/db";
 import { authAccount, authSession, authUser, dealTeamMembers, users } from "@/db/schema";
+import { writeAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth/auth";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
@@ -26,7 +27,7 @@ export async function inviteMember(input: {
   role: Role;
   initialPassword: string;
 }): Promise<void> {
-  await requireOwner();
+  const me = await requireOwner();
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
 
@@ -89,10 +90,24 @@ export async function inviteMember(input: {
     console.warn("[invite] failed to clean up new user's orphan session", err);
   }
 
-  await db.insert(users).values({
+  // .returning() with no args to sidestep the driver-shape difference between
+  // neon-serverless and postgres-js (see dedupe-builders.ts note).
+  const [inserted] = await db
+    .insert(users)
+    .values({
+      orgId: org.id,
+      authUserId: result.user.id,
+      role: input.role,
+    })
+    .returning();
+
+  await writeAudit({
     orgId: org.id,
-    authUserId: result.user.id,
-    role: input.role,
+    userId: me.id,
+    action: "member.invited",
+    entityType: "user",
+    entityId: inserted?.id ?? null,
+    after: { email, name, role: input.role },
   });
 
   revalidatePath("/admin/members");
@@ -154,6 +169,18 @@ export async function removeMember(input: { userId: string }): Promise<void> {
     }
   });
 
+  // Post-transaction so a failed audit can't rescue a bad delete. entityId
+  // is the target's now-nonexistent uuid — safe because audit_log.entity_id
+  // has no FK, and we set userId on audit rows to SET NULL on user delete.
+  await writeAudit({
+    orgId: me.orgId,
+    userId: me.id,
+    action: "member.removed",
+    entityType: "user",
+    entityId: input.userId,
+    before: { role: target.role },
+  });
+
   revalidatePath("/admin/members");
 }
 
@@ -163,10 +190,31 @@ export async function changeMemberRole(input: { userId: string; role: Role }): P
     throw new Error("You can't change your own role");
   }
 
+  const [prev] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(and(eq(users.id, input.userId), eq(users.orgId, me.orgId)))
+    .limit(1);
+  if (!prev) throw new Error("Member not found");
+  if (prev.role === input.role) {
+    // No-op, no audit noise.
+    return;
+  }
+
   await db
     .update(users)
     .set({ role: input.role })
     .where(and(eq(users.id, input.userId), eq(users.orgId, me.orgId)));
+
+  await writeAudit({
+    orgId: me.orgId,
+    userId: me.id,
+    action: "member.role_changed",
+    entityType: "user",
+    entityId: input.userId,
+    before: { role: prev.role },
+    after: { role: input.role },
+  });
 
   revalidatePath("/admin/members");
 }
@@ -180,10 +228,33 @@ export async function setMemberDisabled(input: {
     throw new Error("You can't disable your own account");
   }
 
+  const [prev] = await db
+    .select({ disabledAt: users.disabledAt })
+    .from(users)
+    .where(and(eq(users.id, input.userId), eq(users.orgId, me.orgId)))
+    .limit(1);
+  if (!prev) throw new Error("Member not found");
+  const wasDisabled = prev.disabledAt !== null;
+  if (wasDisabled === input.disabled) {
+    // Already in the requested state, no audit noise.
+    return;
+  }
+  const nextDisabledAt = input.disabled ? new Date() : null;
+
   await db
     .update(users)
-    .set({ disabledAt: input.disabled ? new Date() : null })
+    .set({ disabledAt: nextDisabledAt })
     .where(and(eq(users.id, input.userId), eq(users.orgId, me.orgId)));
+
+  await writeAudit({
+    orgId: me.orgId,
+    userId: me.id,
+    action: input.disabled ? "member.disabled" : "member.re_enabled",
+    entityType: "user",
+    entityId: input.userId,
+    before: { disabledAt: prev.disabledAt },
+    after: { disabledAt: nextDisabledAt },
+  });
 
   revalidatePath("/admin/members");
 }
@@ -243,6 +314,17 @@ export async function resetMemberPassword(input: {
     // Kick them out of any active session — a stale browser tab shouldn't
     // outlast a reset.
     await tx.delete(authSession).where(eq(authSession.userId, target.authUserId!));
+  });
+
+  // Note: we deliberately do NOT store the plaintext temp password (or its
+  // hash) on the audit row. The action's existence is enough; the reset
+  // modal already shows the password once to the owner.
+  await writeAudit({
+    orgId: me.orgId,
+    userId: me.id,
+    action: "member.password_reset",
+    entityType: "user",
+    entityId: input.userId,
   });
 
   revalidatePath("/admin/members");

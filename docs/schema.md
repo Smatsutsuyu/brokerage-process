@@ -64,7 +64,7 @@ Grouped by domain. One line of purpose, then notable columns and FK relationship
 
 ### Misc
 
-- **`audit_log`** (`src/db/schema/audit-log.ts`) — append-only audit trail. Columns: `org_id`, `user_id`, `action`, `entity_type`, `entity_id`, `before jsonb`, `after jsonb`, `metadata jsonb`. Only `created_at`, no `updated_at`.
+- **`audit_log`** (`src/db/schema/audit-log.ts`) — append-only audit trail. Columns: `org_id`, `user_id`, `action`, `entity_type`, `entity_id`, `before jsonb`, `after jsonb`, `metadata jsonb`. Only `created_at`, no `updated_at`. Written via the `writeAudit()` helper at `src/lib/audit.ts` (fire-and-forget with swallowed errors). Currently wired from the five owner-only mutations in `admin/actions.ts`: `member.invited`, `member.removed`, `member.role_changed`, `member.disabled` / `member.re_enabled`, `member.password_reset`. No UI on top of it yet — read via direct Postgres query.
 
 ## Enums
 

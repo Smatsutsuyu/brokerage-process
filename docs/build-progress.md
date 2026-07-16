@@ -102,6 +102,15 @@ Major reconciliation pass against Chris's `Marketing Process Checklist.xlsx` v2 
 - Member-remove flow: hard delete with cascade, last-owner guardrail, fix for inviting a member signing the owner out (`12685c5`).
 - Auto-clean orphan `deal_buyers` rows on builder delete (`1434e4d`, `85e7747`).
 
+## Audit log wired to owner mutations (2026-07-15)
+
+- **New `writeAudit()` helper** at `src/lib/audit.ts`. Fire-and-forget insert into `audit_log`, swallows errors so a failed audit can never rescue a bad mutation.
+- **All five owner-only mutations in `admin/actions.ts` emit rows.** Actions: `member.invited`, `member.removed`, `member.role_changed`, `member.disabled`, `member.re_enabled`, `member.password_reset`. Each row carries the actor's user id (`me.id`) plus the target's user id in `entity_id`.
+- **`before` / `after` jsonb snapshots** on the mutations where it's meaningful: role change captures both, disable/re-enable captures the `disabledAt` transition, invite captures the new user's `{ email, name, role }`. Reset deliberately writes nothing beyond the action itself — no plaintext or hashed password ever hits the audit table.
+- **Idempotency guards on `changeMemberRole` and `setMemberDisabled`** short-circuit before the DB write when the new value matches current, so double-click doesn't spam audit rows.
+- **`inviteMember` gained a `.returning()` on the insert** to capture the new user's UUID for `entity_id` (no-arg form, driver-shape workaround).
+- **No UI yet** — reads happen via direct Postgres query for now. `/admin/audit-log` viewer is a separate follow-up.
+
 ## Owner-triggered password reset + first-login set-password (2026-07-03)
 
 - **New `users.must_set_password` column** (migration `0030_cooing_shotgun.sql`). Default false; flipped true by an owner reset, cleared by the user's own `setOwnPassword`. `getCurrentUser` returns it as part of the shape.
