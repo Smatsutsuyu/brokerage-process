@@ -25,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { addIssue, updateIssue, type IssuePriority, type IssueStatus } from "../actions";
 
-import type { UserOption } from "./issues-list";
+import type { AssigneeOption } from "./issues-list";
 
 export type EditingIssue = {
   issueId: string;
@@ -33,7 +33,7 @@ export type EditingIssue = {
   description: string;
   status: IssueStatus;
   priority: IssuePriority;
-  assignedUserId: string | null;
+  assigneeTeamMemberId: string | null;
   identifiedAt: string;
 };
 
@@ -41,7 +41,7 @@ type AddIssueModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   dealId: string;
-  users: UserOption[];
+  assignees: AssigneeOption[];
   editing?: EditingIssue;
 };
 
@@ -64,15 +64,21 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function AddIssueModal({ open, onOpenChange, dealId, users, editing }: AddIssueModalProps) {
+export function AddIssueModal({
+  open,
+  onOpenChange,
+  dealId,
+  assignees,
+  editing,
+}: AddIssueModalProps) {
   const isEdit = Boolean(editing);
 
   const [title, setTitle] = useState(editing?.title ?? "");
   const [description, setDescription] = useState(editing?.description ?? "");
   const [status, setStatus] = useState<IssueStatus>(editing?.status ?? "open");
   const [priority, setPriority] = useState<IssuePriority>(editing?.priority ?? "medium");
-  const [assignedUserId, setAssignedUserId] = useState<string>(
-    editing?.assignedUserId ?? NO_ASSIGNEE,
+  const [assigneeTeamMemberId, setAssigneeTeamMemberId] = useState<string>(
+    editing?.assigneeTeamMemberId ?? NO_ASSIGNEE,
   );
   const [identifiedAt, setIdentifiedAt] = useState<string>(
     editing?.identifiedAt ? editing.identifiedAt.slice(0, 10) : todayISO(),
@@ -90,7 +96,7 @@ export function AddIssueModal({ open, onOpenChange, dealId, users, editing }: Ad
           setDescription("");
           setStatus("open");
           setPriority("medium");
-          setAssignedUserId(NO_ASSIGNEE);
+          setAssigneeTeamMemberId(NO_ASSIGNEE);
           setIdentifiedAt(todayISO());
         }
       }, 150);
@@ -100,7 +106,7 @@ export function AddIssueModal({ open, onOpenChange, dealId, users, editing }: Ad
     setDescription(editing?.description ?? "");
     setStatus(editing?.status ?? "open");
     setPriority(editing?.priority ?? "medium");
-    setAssignedUserId(editing?.assignedUserId ?? NO_ASSIGNEE);
+    setAssigneeTeamMemberId(editing?.assigneeTeamMemberId ?? NO_ASSIGNEE);
     setIdentifiedAt(editing?.identifiedAt ? editing.identifiedAt.slice(0, 10) : todayISO());
     setError(null);
   }, [open, editing]);
@@ -115,7 +121,7 @@ export function AddIssueModal({ open, onOpenChange, dealId, users, editing }: Ad
     }
 
     const identifiedDate = identifiedAt ? new Date(identifiedAt) : null;
-    const assigned = assignedUserId === NO_ASSIGNEE ? null : assignedUserId;
+    const assigned = assigneeTeamMemberId === NO_ASSIGNEE ? null : assigneeTeamMemberId;
 
     startTransition(async () => {
       try {
@@ -127,7 +133,7 @@ export function AddIssueModal({ open, onOpenChange, dealId, users, editing }: Ad
             description,
             status,
             priority,
-            assignedUserId: assigned,
+            assigneeTeamMemberId: assigned,
             identifiedAt: identifiedDate,
           });
         } else {
@@ -137,7 +143,7 @@ export function AddIssueModal({ open, onOpenChange, dealId, users, editing }: Ad
             description,
             status,
             priority,
-            assignedUserId: assigned,
+            assigneeTeamMemberId: assigned,
             identifiedAt: identifiedDate,
           });
         }
@@ -220,21 +226,22 @@ export function AddIssueModal({ open, onOpenChange, dealId, users, editing }: Ad
             <div className="grid gap-2">
               <Label htmlFor="add-issue-assignee">Assigned to</Label>
               <Select
-                value={assignedUserId}
-                onValueChange={(v) => setAssignedUserId(v ?? NO_ASSIGNEE)}
+                value={assigneeTeamMemberId}
+                onValueChange={(v) => setAssigneeTeamMemberId(v ?? NO_ASSIGNEE)}
               >
                 <SelectTrigger id="add-issue-assignee">
                   <SelectValue>
-                    {assignedUserId === NO_ASSIGNEE
+                    {assigneeTeamMemberId === NO_ASSIGNEE
                       ? "Unassigned"
-                      : (users.find((u) => u.id === assignedUserId)?.name ?? "Unassigned")}
+                      : (assignees.find((a) => a.id === assigneeTeamMemberId)?.name ??
+                        "Unassigned")}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_ASSIGNEE}>Unassigned</SelectItem>
-                  {users.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name}
+                  {assignees.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

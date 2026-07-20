@@ -20,12 +20,12 @@ export type IssueRow = {
   description: string | null;
   status: IssueStatus;
   priority: IssuePriority;
-  assignedUserId: string | null;
+  assigneeTeamMemberId: string | null;
   assigneeName: string | null;
   identifiedAt: string;
 };
 
-export type UserOption = {
+export type AssigneeOption = {
   id: string;
   name: string;
 };
@@ -33,7 +33,7 @@ export type UserOption = {
 type IssuesListProps = {
   dealId: string;
   items: IssueRow[];
-  users: UserOption[];
+  assignees: AssigneeOption[];
 };
 
 const PRIORITY_META: Record<IssuePriority, { label: string; badge: string }> = {
@@ -57,7 +57,7 @@ function formatDate(iso: string): string {
   });
 }
 
-export function IssuesList({ dealId, items, users }: IssuesListProps) {
+export function IssuesList({ dealId, items, assignees }: IssuesListProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<EditingIssue | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -164,7 +164,7 @@ export function IssuesList({ dealId, items, users }: IssuesListProps) {
                           description: item.description ?? "",
                           status: item.status,
                           priority: item.priority,
-                          assignedUserId: item.assignedUserId,
+                          assigneeTeamMemberId: item.assigneeTeamMemberId,
                           identifiedAt: item.identifiedAt,
                         })
                       }
@@ -218,7 +218,7 @@ export function IssuesList({ dealId, items, users }: IssuesListProps) {
         open={addOpen}
         onOpenChange={setAddOpen}
         dealId={dealId}
-        users={users}
+        assignees={assignees}
       />
       <AddIssueModal
         open={editing !== null}
@@ -226,7 +226,7 @@ export function IssuesList({ dealId, items, users }: IssuesListProps) {
           if (!open) setEditing(null);
         }}
         dealId={dealId}
-        users={users}
+        assignees={assignees}
         editing={editing ?? undefined}
       />
     </div>

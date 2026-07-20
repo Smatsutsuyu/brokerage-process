@@ -651,13 +651,37 @@ export async function deleteQaItem(input: { dealId: string; qaId: string }) {
 export type IssueStatus = "open" | "in_progress" | "resolved";
 export type IssuePriority = "low" | "medium" | "high" | "urgent";
 
+// Validate that an assigneeTeamMemberId belongs to the same deal + org
+// context as the issue being written. Without this, a caller can pass a
+// dtm.id from a foreign deal or another org and the FK layer alone will
+// accept it (deal_team_members.id is globally unique). Read paths would
+// then leak the foreign member's display name into the picker + PDF.
+async function assertAssigneeInDealScope(
+  dtmId: string,
+  dealId: string,
+  orgId: string,
+): Promise<void> {
+  const [match] = await db
+    .select({ id: dealTeamMembers.id })
+    .from(dealTeamMembers)
+    .where(
+      and(
+        eq(dealTeamMembers.id, dtmId),
+        eq(dealTeamMembers.dealId, dealId),
+        eq(dealTeamMembers.orgId, orgId),
+      ),
+    )
+    .limit(1);
+  if (!match) throw new Error("Invalid assignee");
+}
+
 export async function addIssue(input: {
   dealId: string;
   title: string;
   description?: string;
   status: IssueStatus;
   priority: IssuePriority;
-  assignedUserId?: string | null;
+  assigneeTeamMemberId?: string | null;
   identifiedAt?: Date | null;
 }) {
   const org = await getCurrentOrg();
@@ -666,6 +690,10 @@ export async function addIssue(input: {
   const title = input.title.trim();
   if (!title) throw new Error("Issue title is required");
 
+  if (input.assigneeTeamMemberId) {
+    await assertAssigneeInDealScope(input.assigneeTeamMemberId, input.dealId, org.id);
+  }
+
   await db.insert(issues).values({
     orgId: org.id,
     dealId: input.dealId,
@@ -673,7 +701,7 @@ export async function addIssue(input: {
     description: input.description?.trim() || null,
     status: input.status,
     priority: input.priority,
-    assignedUserId: input.assignedUserId ?? null,
+    assigneeTeamMemberId: input.assigneeTeamMemberId ?? null,
     identifiedAt: input.identifiedAt ?? new Date(),
   });
 
@@ -687,7 +715,7 @@ export async function updateIssue(input: {
   description?: string;
   status: IssueStatus;
   priority: IssuePriority;
-  assignedUserId?: string | null;
+  assigneeTeamMemberId?: string | null;
   identifiedAt?: Date | null;
 }) {
   const org = await getCurrentOrg();
@@ -695,6 +723,10 @@ export async function updateIssue(input: {
 
   const title = input.title.trim();
   if (!title) throw new Error("Issue title is required");
+
+  if (input.assigneeTeamMemberId) {
+    await assertAssigneeInDealScope(input.assigneeTeamMemberId, input.dealId, org.id);
+  }
 
   const wasResolved = input.status === "resolved";
 
@@ -705,7 +737,7 @@ export async function updateIssue(input: {
       description: input.description?.trim() || null,
       status: input.status,
       priority: input.priority,
-      assignedUserId: input.assignedUserId ?? null,
+      assigneeTeamMemberId: input.assigneeTeamMemberId ?? null,
       identifiedAt: input.identifiedAt ?? undefined,
       resolvedAt: wasResolved ? new Date() : null,
     })

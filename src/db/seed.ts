@@ -233,6 +233,19 @@ async function main() {
     },
   ]);
 
+  console.log("Seeding Chris on Riverside Broker Team...");
+  const [chrisOnRiverside] = await db
+    .insert(schema.dealTeamMembers)
+    .values({
+      orgId: org.id,
+      dealId: riverside.id,
+      team: "broker",
+      roleLabel: "Lead Broker",
+      userId: chris.id,
+      sortOrder: 0,
+    })
+    .returning();
+
   console.log("Seeding sample issues on Riverside...");
   await db.insert(schema.issues).values([
     {
@@ -243,7 +256,7 @@ async function main() {
         "Geotechnical report from 2019 — buyer requesting updated borings on lots 41-58 before LOI.",
       status: "open",
       priority: "high",
-      assignedUserId: chris.id,
+      assigneeTeamMemberId: chrisOnRiverside.id,
     },
     {
       orgId: org.id,
@@ -252,7 +265,7 @@ async function main() {
       description: "Missing CC&Rs and architectural guidelines.",
       status: "in_progress",
       priority: "medium",
-      assignedUserId: chris.id,
+      assigneeTeamMemberId: chrisOnRiverside.id,
     },
   ]);
 

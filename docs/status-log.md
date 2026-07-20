@@ -32,6 +32,29 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-07-15 — Issue assignee: swap users FK for polymorphic Deal Team FK
+
+### Done
+- **Schema change: `issues.assigned_user_id` (FK to `users`) replaced by `issues.assignee_team_member_id` (FK to `deal_team_members`).** Chris's original ask ("scope Issues assignee to Deal Team") + follow-up ("include Owner/Buyer teams too") collided with the underlying FK — Owner/Buyer team members are usually contacts or free-text, not org users, so the users FK filtered them out. Root cause: the assignee display was the ONLY reason for the users FK (never used for auth, permissions, or email — confirmed by discovery workflow). Now any Deal Team member on the deal is assignable, name resolved through the polymorphic identity chain.
+- **New reusable helper `src/lib/deal-team-name.ts`** — `resolveDealTeamMemberName(row)` collapses the (userId, contactId, freeName) polymorphic identity into a single display string. Mirrors `listDealTeam`'s in-memory resolver; kept in sync by convention (JSDoc note on both).
+- **Migration `0031_issue_assignee_team_member.sql`** — hand-written per the 0015 precedent: ADD COLUMN → ADD CONSTRAINT → correlated-subquery backfill → DROP CONSTRAINT → DROP COLUMN, all in one file with `--> statement-breakpoint` delimiters. Snapshot `0031_snapshot.json` hand-written too (drizzle-kit `generate` requires a TTY to disambiguate the rename-vs-drop-and-add case; docs/schema.md gotcha covers this). Journal entry appended.
+- **Read paths updated** — `issues-view.tsx` and `dd-tracking.pdf/route.ts` both join through `dealTeamMembers → users → auth_user + contacts` and route the display name through the new helper. The assignee picker in the modal now lists every Deal Team member on the deal.
+- **Backward-compat straggler union kept** — an issue currently assigned to a dtm row since removed from the roster stays in the picker so editing doesn't drop the selection. Same shape as the pre-existing pattern for users.
+- **Seed updated** — inserts Chris on Riverside's Broker Team first, references that dtm row in the seed issues.
+
+### Decisions
+- **Backfill uses a correlated subquery with an explicit `ORDER BY CASE team` picking Broker first.** A user can sit on multiple sub-teams for the same deal (schema permits it — no `UNIQUE(deal_id, user_id)` on `deal_team_members`), so a plain `UPDATE ... FROM` would pick an arbitrary match per Postgres semantics. Broker Team wins the tie because `assigned_user_id` historically only held Lakebridge users acting as brokers. Verify-agent finding, medium severity — fixed before commit.
+- **Server actions validate `assigneeTeamMemberId` scope + read joins tightened with dealId/orgId equality.** Without this, a crafted `addIssue`/`updateIssue` call could pass any dtm UUID (globally unique — FK alone doesn't check tenant scope), then the read paths would surface the foreign member's name in the picker + PDF. Cross-tenant IDOR. Two-layer fix: server actions call `assertAssigneeInDealScope()` before insert/update, and the LEFT JOIN in both read queries now includes `dealId + orgId` equality so a stale/forged reference resolves to null. Verify-agent finding, medium severity — fixed before commit.
+- **`onDelete: "set null"` on the new FK.** Matches the sibling FKs on `deal_team_members` itself (userId, contactId) and the old `assignedUserId`. Removing someone from the Deal Team is a routine action; issues are longer-lived; degrading assignment to "unassigned" is the right semantic. CASCADE would silently delete audit history; RESTRICT would block routine roster edits.
+
+### Deferred / Pending
+- **Refactor `dd-tracking.pdf/route.ts` Deal Team roster + `getDealTeamRecipients` to use `resolveDealTeamMemberName`.** Verify-agent low-severity finding: both currently reimplement name resolution inline with subtly different fallbacks (empty string vs "(unknown)"), so the same auth-user-deleted dtm can render differently in different sections of the same PDF. Pre-existing bug, not caused by this migration, but the new helper is now the canonical version — worth folding both call sites into it in a follow-up. Added to `docs/backlog.md`.
+
+### Blockers
+- None. Adversarial verify workflow found both fixable bugs pre-commit; typecheck clean.
+
+---
+
 ## 2026-07-15 — Contacts layout switching perf fix
 
 ### Done

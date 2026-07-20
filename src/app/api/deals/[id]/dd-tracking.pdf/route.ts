@@ -23,6 +23,7 @@ import {
 } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { resolveDealTeamMemberName } from "@/lib/deal-team-name";
 import {
   DdTrackingDoc,
   type ConsultantRow,
@@ -138,20 +139,40 @@ export async function GET(
     };
   });
 
-  // 2) Issues. Same shape as the old Issues Report.
+  // 2) Issues. Assignee resolved through the Deal Team polymorphic identity
+  // chain (user > contact > free-text) so Owner/Buyer team members without
+  // an org user account still render.
   const issueRows = await db
     .select({
       title: issues.title,
       description: issues.description,
       status: issues.status,
       priority: issues.priority,
-      assignedUserName: authUser.name,
-      assignedUserEmail: authUser.email,
+      assigneeTeamMemberId: issues.assigneeTeamMemberId,
+      dtmUserId: dealTeamMembers.userId,
+      dtmContactId: dealTeamMembers.contactId,
+      dtmFreeName: dealTeamMembers.name,
+      dtmUserName: authUser.name,
+      dtmUserEmail: authUser.email,
+      dtmContactFirst: contacts.firstName,
+      dtmContactLast: contacts.lastName,
       identifiedAt: issues.identifiedAt,
     })
     .from(issues)
-    .leftJoin(users, eq(users.id, issues.assignedUserId))
+    // Same defense-in-depth scoping as issues-view.tsx: a forged
+    // assigneeTeamMemberId pointing at a foreign dtm resolves to null
+    // rather than leaking that member's name into the PDF.
+    .leftJoin(
+      dealTeamMembers,
+      and(
+        eq(dealTeamMembers.id, issues.assigneeTeamMemberId),
+        eq(dealTeamMembers.dealId, issues.dealId),
+        eq(dealTeamMembers.orgId, issues.orgId),
+      ),
+    )
+    .leftJoin(users, eq(users.id, dealTeamMembers.userId))
     .leftJoin(authUser, eq(authUser.id, users.authUserId))
+    .leftJoin(contacts, eq(contacts.id, dealTeamMembers.contactId))
     .where(and(eq(issues.dealId, deal.id), eq(issues.orgId, org.id)))
     .orderBy(issues.identifiedAt);
 
@@ -160,7 +181,17 @@ export async function GET(
     description: r.description,
     status: r.status,
     priority: r.priority,
-    assignedName: r.assignedUserName || r.assignedUserEmail || null,
+    assignedName: r.assigneeTeamMemberId
+      ? resolveDealTeamMemberName({
+          userId: r.dtmUserId,
+          contactId: r.dtmContactId,
+          freeName: r.dtmFreeName,
+          userName: r.dtmUserName,
+          userEmail: r.dtmUserEmail,
+          contactFirst: r.dtmContactFirst,
+          contactLast: r.dtmContactLast,
+        })
+      : null,
     identifiedDate: formatShort(r.identifiedAt),
   }));
 

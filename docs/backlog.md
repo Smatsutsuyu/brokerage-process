@@ -165,6 +165,11 @@ When you close one, mark `~~done~~` rather than deleting so the running record s
 - **Fix**: run `npm audit fix`, smoke-test.
 - **Effort**: S
 
+### [Code Quality] Route dd-tracking Deal Team roster + getDealTeamRecipients through `resolveDealTeamMemberName`
+- **What**: Both `src/app/api/deals/[id]/dd-tracking.pdf/route.ts` (Deal Team roster section, ~lines 215-239) and `getDealTeamRecipients` in `deals/[id]/actions.ts` (~lines 2371-2383) reimplement Deal Team name resolution inline with subtly different fallbacks — the PDF roster returns empty string when auth_user is null on a user-linked row, while the issues section of the same PDF (now using `src/lib/deal-team-name.ts`) returns "(unknown)". Same person can render two different placeholders in the same document.
+- **Fix**: fold both call sites into `resolveDealTeamMemberName` from `@/lib/deal-team-name`. Extend the helper to also return `{ email, phone }` if the recipients caller needs it. Adversarial verify surfaced this as low severity during the issue-assignee-migration work — pre-existing, not caused by that change.
+- **Effort**: S
+
 ---
 
 ## P3 — Optional / nice-to-have

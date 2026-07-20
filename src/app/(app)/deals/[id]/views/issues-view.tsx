@@ -1,10 +1,18 @@
 import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { authUser, dealTeamMembers, issues, users } from "@/db/schema";
+import {
+  authUser,
+  builders,
+  contacts,
+  dealTeamMembers,
+  issues,
+  users,
+} from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
+import { resolveDealTeamMemberName } from "@/lib/deal-team-name";
 
-import { IssuesList, type IssueRow, type UserOption } from "./issues-list";
+import { IssuesList, type AssigneeOption, type IssueRow } from "./issues-list";
 
 type IssuesViewProps = {
   dealId: string;
@@ -13,8 +21,9 @@ type IssuesViewProps = {
 export async function IssuesView({ dealId }: IssuesViewProps) {
   const org = await getCurrentOrg();
 
-  // Issue → users (assignee) → auth_user (display name + email).
-  // Both joins are LEFT so unassigned issues still come back.
+  // Issue → deal_team_members (assignee) → polymorphic identity chain to
+  // resolve a display name. All joins are LEFT so unassigned issues (and
+  // team members with any identity source) still come back.
   const rows = await db
     .select({
       id: issues.id,
@@ -22,54 +31,100 @@ export async function IssuesView({ dealId }: IssuesViewProps) {
       description: issues.description,
       status: issues.status,
       priority: issues.priority,
-      assignedUserId: issues.assignedUserId,
-      assigneeName: authUser.name,
+      assigneeTeamMemberId: issues.assigneeTeamMemberId,
+      // Identity resolution columns (all nullable — polymorphic).
+      dtmUserId: dealTeamMembers.userId,
+      dtmContactId: dealTeamMembers.contactId,
+      dtmFreeName: dealTeamMembers.name,
+      dtmUserName: authUser.name,
+      dtmUserEmail: authUser.email,
+      dtmContactFirst: contacts.firstName,
+      dtmContactLast: contacts.lastName,
       identifiedAt: issues.identifiedAt,
     })
     .from(issues)
-    .leftJoin(users, eq(users.id, issues.assignedUserId))
+    // dtm join scoped to this deal + org so a forged/stale
+    // assigneeTeamMemberId pointing at a foreign row resolves to null
+    // instead of leaking a foreign display name into the picker/UI.
+    // Server actions already validate on write; this is defense-in-depth.
+    .leftJoin(
+      dealTeamMembers,
+      and(
+        eq(dealTeamMembers.id, issues.assigneeTeamMemberId),
+        eq(dealTeamMembers.dealId, issues.dealId),
+        eq(dealTeamMembers.orgId, issues.orgId),
+      ),
+    )
+    .leftJoin(users, eq(users.id, dealTeamMembers.userId))
     .leftJoin(authUser, eq(authUser.id, users.authUserId))
+    .leftJoin(contacts, eq(contacts.id, dealTeamMembers.contactId))
     .where(eq(issues.dealId, dealId))
     .orderBy(asc(issues.identifiedAt));
 
-  // Scope the assignee picker to Deal Team members with a linked user
-  // (contact-only or free-text team rows can't be assigned since
-  // issues.assignedUserId FKs to users). A person on multiple sub-teams
-  // shows once thanks to the Map dedupe below.
+  // Every Deal Team member on this deal is a candidate assignee — user,
+  // contact, or free-text identity source, any sub-team (Owner / Broker /
+  // Buyer). One query pulls the roster with all fields needed to resolve
+  // display names; the same helper as above collapses the polymorphic
+  // shape into a single name string.
   const teamRows = org
     ? await db
         .select({
-          id: users.id,
-          name: authUser.name,
-          email: authUser.email,
+          id: dealTeamMembers.id,
+          userId: dealTeamMembers.userId,
+          contactId: dealTeamMembers.contactId,
+          freeName: dealTeamMembers.name,
+          userName: authUser.name,
+          userEmail: authUser.email,
+          contactFirst: contacts.firstName,
+          contactLast: contacts.lastName,
+          team: dealTeamMembers.team,
+          sortOrder: dealTeamMembers.sortOrder,
         })
         .from(dealTeamMembers)
-        .innerJoin(users, eq(users.id, dealTeamMembers.userId))
-        .innerJoin(authUser, eq(authUser.id, users.authUserId))
+        .leftJoin(users, eq(users.id, dealTeamMembers.userId))
+        .leftJoin(authUser, eq(authUser.id, users.authUserId))
+        .leftJoin(contacts, eq(contacts.id, dealTeamMembers.contactId))
+        .leftJoin(builders, eq(builders.id, contacts.builderId))
         .where(
           and(
             eq(dealTeamMembers.dealId, dealId),
             eq(dealTeamMembers.orgId, org.id),
           ),
         )
-        .orderBy(asc(authUser.name))
+        .orderBy(
+          dealTeamMembers.team,
+          dealTeamMembers.sortOrder,
+          dealTeamMembers.createdAt,
+        )
     : [];
 
-  const optionsById = new Map<string, UserOption>();
-  for (const u of teamRows) {
-    if (!optionsById.has(u.id)) {
-      optionsById.set(u.id, { id: u.id, name: u.name || u.email });
+  const optionsById = new Map<string, AssigneeOption>();
+  for (const t of teamRows) {
+    if (!optionsById.has(t.id)) {
+      optionsById.set(t.id, { id: t.id, name: resolveDealTeamMemberName(t) });
     }
   }
-  // Backward compat: keep any currently-assigned user in the picker even
-  // if they've since been removed from the Deal Team, so editing an
-  // existing issue doesn't silently drop the assignee.
+
+  // Backward-compat: any issue currently assigned to a team member row
+  // that's since been removed from the roster stays in the picker so
+  // editing the issue doesn't silently drop the assignee.
   for (const r of rows) {
-    if (r.assignedUserId && !optionsById.has(r.assignedUserId)) {
-      optionsById.set(r.assignedUserId, {
-        id: r.assignedUserId,
-        name: r.assigneeName ?? "(unknown user)",
+    if (r.assigneeTeamMemberId && !optionsById.has(r.assigneeTeamMemberId)) {
+      // Resolve name from the joined columns on the issue row itself; if
+      // the team_member row is gone entirely (FK set null already fired)
+      // this whole branch won't hit — the assigneeTeamMemberId will be
+      // null. If the FK still resolves but display columns are all null
+      // (deleted contact / auth user), the resolver returns "(unknown)".
+      const name = resolveDealTeamMemberName({
+        userId: r.dtmUserId,
+        contactId: r.dtmContactId,
+        freeName: r.dtmFreeName,
+        userName: r.dtmUserName,
+        userEmail: r.dtmUserEmail,
+        contactFirst: r.dtmContactFirst,
+        contactLast: r.dtmContactLast,
       });
+      optionsById.set(r.assigneeTeamMemberId, { id: r.assigneeTeamMemberId, name });
     }
   }
 
@@ -79,14 +134,24 @@ export async function IssuesView({ dealId }: IssuesViewProps) {
     description: r.description,
     status: r.status,
     priority: r.priority,
-    assignedUserId: r.assignedUserId,
-    assigneeName: r.assigneeName,
+    assigneeTeamMemberId: r.assigneeTeamMemberId,
+    assigneeName: r.assigneeTeamMemberId
+      ? resolveDealTeamMemberName({
+          userId: r.dtmUserId,
+          contactId: r.dtmContactId,
+          freeName: r.dtmFreeName,
+          userName: r.dtmUserName,
+          userEmail: r.dtmUserEmail,
+          contactFirst: r.dtmContactFirst,
+          contactLast: r.dtmContactLast,
+        })
+      : null,
     identifiedAt: r.identifiedAt.toISOString(),
   }));
 
-  const userOptions: UserOption[] = [...optionsById.values()].sort((a, b) =>
+  const assigneeOptions: AssigneeOption[] = [...optionsById.values()].sort((a, b) =>
     a.name.localeCompare(b.name),
   );
 
-  return <IssuesList dealId={dealId} items={items} users={userOptions} />;
+  return <IssuesList dealId={dealId} items={items} assignees={assigneeOptions} />;
 }
