@@ -101,20 +101,21 @@ export async function IssuesView({ dealId }: IssuesViewProps) {
   const optionsById = new Map<string, AssigneeOption>();
   for (const t of teamRows) {
     if (!optionsById.has(t.id)) {
-      optionsById.set(t.id, { id: t.id, name: resolveDealTeamMemberName(t) });
+      optionsById.set(t.id, {
+        id: t.id,
+        name: resolveDealTeamMemberName(t),
+        team: t.team,
+      });
     }
   }
 
   // Backward-compat: any issue currently assigned to a team member row
   // that's since been removed from the roster stays in the picker so
-  // editing the issue doesn't silently drop the assignee.
+  // editing the issue doesn't silently drop the assignee. team is null
+  // here because the source row is gone (or never matched the deal — see
+  // the tightened LEFT JOIN); UI groups these under "Other".
   for (const r of rows) {
     if (r.assigneeTeamMemberId && !optionsById.has(r.assigneeTeamMemberId)) {
-      // Resolve name from the joined columns on the issue row itself; if
-      // the team_member row is gone entirely (FK set null already fired)
-      // this whole branch won't hit — the assigneeTeamMemberId will be
-      // null. If the FK still resolves but display columns are all null
-      // (deleted contact / auth user), the resolver returns "(unknown)".
       const name = resolveDealTeamMemberName({
         userId: r.dtmUserId,
         contactId: r.dtmContactId,
@@ -124,7 +125,11 @@ export async function IssuesView({ dealId }: IssuesViewProps) {
         contactFirst: r.dtmContactFirst,
         contactLast: r.dtmContactLast,
       });
-      optionsById.set(r.assigneeTeamMemberId, { id: r.assigneeTeamMemberId, name });
+      optionsById.set(r.assigneeTeamMemberId, {
+        id: r.assigneeTeamMemberId,
+        name,
+        team: null,
+      });
     }
   }
 
@@ -149,9 +154,20 @@ export async function IssuesView({ dealId }: IssuesViewProps) {
     identifiedAt: r.identifiedAt.toISOString(),
   }));
 
-  const assigneeOptions: AssigneeOption[] = [...optionsById.values()].sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
+  // Sort by team (Owner → Broker → Buyer → Other/stragglers), then by
+  // name within each team. Modal buckets by team for section headers.
+  const TEAM_ORDER: Record<"owner" | "broker" | "buyer", number> = {
+    owner: 0,
+    broker: 1,
+    buyer: 2,
+  };
+  const teamRank = (t: AssigneeOption["team"]): number =>
+    t === null ? 3 : TEAM_ORDER[t];
+  const assigneeOptions: AssigneeOption[] = [...optionsById.values()].sort((a, b) => {
+    const t = teamRank(a.team) - teamRank(b.team);
+    if (t !== 0) return t;
+    return a.name.localeCompare(b.name);
+  });
 
   return <IssuesList dealId={dealId} items={items} assignees={assigneeOptions} />;
 }

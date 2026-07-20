@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Calendar, FileText, Loader2, Pencil, Trash2, User } from "lucide-react";
+import { Calendar, FileSpreadsheet, Loader2, Pencil, Trash2, User } from "lucide-react";
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
-import { PlannedAction } from "@/components/planned-action";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +27,10 @@ export type IssueRow = {
 export type AssigneeOption = {
   id: string;
   name: string;
+  // Which Deal Team sub-team this member belongs to. Null for stragglers
+  // (an assignee currently referenced by an issue but no longer on the
+  // deal's roster — team is unknown at that point).
+  team: "owner" | "broker" | "buyer" | null;
 };
 
 type IssuesListProps = {
@@ -105,13 +108,19 @@ export function IssuesList({ dealId, items, assignees }: IssuesListProps) {
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
           <DdTrackingPdfButton dealId={dealId} />
-          <PlannedAction
-            label="Export to Excel"
-            icon={FileText}
-            feature="Issues Tracking export"
-            description="Exports the open issues list as a formatted Excel file matching the Issues List report layout from the wireframe."
-            phase="phase_2"
-          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              // Content-Disposition: attachment on the response, so the
+              // browser triggers a download rather than navigating away.
+              window.location.href = `/api/deals/${dealId}/issues.xlsx`;
+            }}
+            title="Download every issue on this deal as an .xlsx"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            Export to Excel
+          </Button>
           <Button size="sm" onClick={() => setAddOpen(true)}>
             + Add Issue
           </Button>
@@ -197,10 +206,15 @@ export function IssuesList({ dealId, items, assignees }: IssuesListProps) {
                   </p>
                 )}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-400">
-                  {item.assigneeName && (
+                  {item.assigneeName ? (
                     <span className="inline-flex items-center gap-1">
                       <User className="h-3 w-3" />
                       {item.assigneeName}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 italic text-amber-600">
+                      <User className="h-3 w-3" />
+                      Unassigned
                     </span>
                   )}
                   <span className="inline-flex items-center gap-1">

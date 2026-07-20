@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,10 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -46,6 +49,21 @@ type AddIssueModalProps = {
 };
 
 const NO_ASSIGNEE = "__none__";
+
+// Header labels for each Deal Team sub-team group in the assignee
+// dropdown. Mirrors the CC picker's grouping in the email composer.
+const TEAM_LABEL: Record<"owner" | "broker" | "buyer" | "_other", string> = {
+  owner: "Owner Team",
+  broker: "Broker Team",
+  buyer: "Buyer Team",
+  _other: "Other",
+};
+const TEAM_ORDER: ReadonlyArray<"owner" | "broker" | "buyer" | "_other"> = [
+  "owner",
+  "broker",
+  "buyer",
+  "_other",
+];
 
 const STATUS_LABEL: Record<IssueStatus, string> = {
   open: "Open",
@@ -85,6 +103,26 @@ export function AddIssueModal({
   );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // Bucket assignees by sub-team so the dropdown can render section
+  // headers (Owner Team / Broker Team / Buyer Team, then Other for any
+  // straggler assignees who've been removed from the roster). Iteration
+  // order preserved from the parent's sort (team first, then name).
+  const groupedAssignees = useMemo(() => {
+    const buckets = new Map<"owner" | "broker" | "buyer" | "_other", AssigneeOption[]>();
+    for (const a of assignees) {
+      const key = a.team ?? "_other";
+      let arr = buckets.get(key);
+      if (!arr) {
+        arr = [];
+        buckets.set(key, arr);
+      }
+      arr.push(a);
+    }
+    return TEAM_ORDER.map((k) => [k, buckets.get(k) ?? []] as const).filter(
+      ([, items]) => items.length > 0,
+    );
+  }, [assignees]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -239,10 +277,20 @@ export function AddIssueModal({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_ASSIGNEE}>Unassigned</SelectItem>
-                  {assignees.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name}
-                    </SelectItem>
+                  {groupedAssignees.map(([groupKey, items]) => (
+                    <Fragment key={groupKey}>
+                      <SelectSeparator />
+                      <SelectGroup>
+                        <SelectLabel className="text-[10px] font-semibold tracking-wider text-gray-500 uppercase">
+                          {TEAM_LABEL[groupKey]}
+                        </SelectLabel>
+                        {items.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </Fragment>
                   ))}
                 </SelectContent>
               </Select>
