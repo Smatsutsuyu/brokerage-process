@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { builders, contacts } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { findBuilderByName } from "@/lib/builders";
+import { parseEmailAddress } from "@/lib/email-address";
 import { formatPhone } from "@/lib/phone";
 
 // Contacts surface in two places: /contacts (the directory) and the
@@ -61,7 +62,7 @@ export async function createContact(input: ContactInput): Promise<string> {
       firstName,
       lastName,
       title: input.title?.trim() || null,
-      email: input.email?.trim() || null,
+      email: parseEmailAddress(input.email),
       phone: formatPhone(input.phone),
       geography: input.geography?.trim() || null,
       notes: input.notes?.trim() || null,
@@ -102,7 +103,7 @@ export async function updateContact(input: {
       firstName,
       lastName,
       title: input.data.title?.trim() || null,
-      email: input.data.email?.trim() || null,
+      email: parseEmailAddress(input.data.email),
       phone: formatPhone(input.data.phone),
       geography: input.data.geography?.trim() || null,
       notes: input.data.notes?.trim() || null,
@@ -223,10 +224,20 @@ export async function importContacts(rows: ImportContactRow[]): Promise<ImportRe
       }
     }
 
+    // Parse-and-validate the email. Bulk import must not throw on one
+    // bad row — catch and skip so the rest of the sheet still imports.
+    let parsedEmail: string | null = null;
+    try {
+      parsedEmail = parseEmailAddress(row.email);
+    } catch {
+      skipped++;
+      continue;
+    }
+
     // Dedupe by email (case-insensitive) within the org. If a contact with
     // this email already exists, update it; otherwise insert. Contacts with
     // no email always insert (no way to dedupe without it).
-    const emailNorm = row.email?.trim().toLowerCase() || null;
+    const emailNorm = parsedEmail?.toLowerCase() ?? null;
     let existingId: string | null = null;
     if (emailNorm) {
       const [existing] = await db
@@ -241,7 +252,7 @@ export async function importContacts(rows: ImportContactRow[]): Promise<ImportRe
       firstName,
       lastName: row.lastName.trim(),
       title: row.title?.trim() || null,
-      email: row.email?.trim() || null,
+      email: parsedEmail,
       phone: formatPhone(row.phone),
       geography: row.geography?.trim() || null,
       builderId,

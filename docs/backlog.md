@@ -105,6 +105,26 @@ When you close one, mark `~~done~~` rather than deleting so the running record s
 
 ## P2 — Worth doing during Phase 3
 
+### [UX] Wire up remaining "Coming soon" `PlannedAction` placeholders
+Inventory as of 2026-07-20. 16 total call sites split into two tiers by cost and by whether they're in scope for this build.
+
+**Cheap tier — shortcuts / roster sends (in scope, ~15-30 min each):**
+- `src/app/(app)/deals/[id]/views/consultants-list.tsx:80` "Email roster" → templated blast to every consultant on the deal, filterable buyer/seller side. Mirror the Deal Team send pattern.
+- `src/app/(app)/deals/[id]/views/qa-list.tsx:86` "Send Q&A" → tab-level shortcut to the working Q&A blast that already lives on the Q&A File checklist row. Second entry point to the same modal.
+- `src/app/(app)/deals/[id]/views/contacts-layouts/option-a-cards.tsx:300` "Send follow-up" → shortcut to the working `isFollowUpMissingOffersItem` BuyerBlastButton in phase-section.tsx.
+- Layouts B/C/D each carry a "Send OM blast" and "Send follow-up" placeholder (`option-b-pane.tsx`, `option-c-grouped.tsx`, `option-d-compact.tsx`). Fixing A alone leaves the alternates showing coming-soon toasts. Consistent with the "shared components across the four layouts" direction from the layouts-promotion refactor — bundle these when doing the feature-parity pass.
+
+**Structural tier — new patterns (~1-3 hrs each, in scope):**
+- Phase 3 "Initial Summary of Offers + LOIS" row → email Owner Team with the current SOO. Needs an LOI-summary data model or a manual-entry surface first.
+- Phase 4 "Kick off PSA" row → email PSA Attorney. Pattern exists (Deal Team send); needs a template + wire.
+- Phase 4 "Schedule Recurring Call" row → `.ics` file generator + email. No existing pattern.
+
+**Deferred to future engagement (per CLAUDE.md scope decisions — do NOT build without an explicit ask):**
+- Phase 1 templated PDFs (7): Premium Analysis, Valuation, CFD Analysis, Entitlement Schedule, Development Schedule, Entitlement Summary, Custom Underwriting File (xlsx). Templated with structured-data substitution.
+- Phase 3 "PDF Everything" — compile SOO + UW summary + recommendation memo into one PDF.
+
+**Effort**: cheap tier is ~2-3 hrs total. Structural tier is ~4-6 hrs. Deferred tier is a separate engagement.
+
 ### [Code Quality] Extract one `PdfButton` from the three copy-pasted variants
 - **What**: `marketing-report-pdf-button.tsx`, `qa-file-pdf-button.tsx`, `dd-tracking-pdf-button.tsx` are the same ~55-line component three times. Only the URL, label, and title differ.
 - **Fix**: one `<PdfButton href={...} label={...} title={...} variant={...} />` and delete the three. ~100 lines removed.

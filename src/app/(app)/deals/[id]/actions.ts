@@ -24,6 +24,7 @@ import {
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { findBuilderByName } from "@/lib/builders";
+import { parseEmailAddress } from "@/lib/email-address";
 import { sendResolvedEmails, type BlastSendResult } from "@/lib/email/blast";
 import { env } from "@/lib/env";
 import { formatPhone } from "@/lib/phone";
@@ -499,7 +500,7 @@ export async function addContact(input: AddContactInput) {
         firstName,
         lastName,
         title: input.title?.trim() || null,
-        email: input.email?.trim() || null,
+        email: parseEmailAddress(input.email),
         phone: formatPhone(input.phone),
         notes: input.notes?.trim() || null,
         // Default to true via the schema; explicit when caller provides.
@@ -554,7 +555,7 @@ export async function updateContact(input: {
     firstName,
     lastName,
     title: input.title?.trim() || null,
-    email: input.email?.trim() || null,
+    email: parseEmailAddress(input.email),
     phone: formatPhone(input.phone),
     notes: input.notes?.trim() || null,
   };
@@ -839,7 +840,7 @@ export async function addConsultant(input: {
     side: input.side,
     firmName,
     contactName: input.contactName?.trim() || null,
-    contactEmail: input.contactEmail?.trim() || null,
+    contactEmail: parseEmailAddress(input.contactEmail),
     contactPhone: formatPhone(input.contactPhone),
     notes: input.notes?.trim() || null,
   });
@@ -2172,7 +2173,7 @@ export async function addDealTeamMembers(input: {
               userId: null,
               contactId: null,
               name: m.name.trim(),
-              email: m.email?.trim() || null,
+              email: parseEmailAddress(m.email),
               phone: m.phone?.trim() || null,
             };
     return {
@@ -2224,7 +2225,7 @@ export async function addDealTeamMember(
             userId: null,
             contactId: null,
             name: input.name.trim(),
-            email: input.email?.trim() || null,
+            email: parseEmailAddress(input.email),
             phone: input.phone?.trim() || null,
           };
 
@@ -2288,7 +2289,7 @@ export async function updateDealTeamMember(input: {
   };
   if (isFreeText && input.name !== undefined) {
     updates.name = input.name.trim() || null;
-    updates.email = input.email?.trim() || null;
+    updates.email = parseEmailAddress(input.email);
     updates.phone = input.phone?.trim() || null;
   }
 
