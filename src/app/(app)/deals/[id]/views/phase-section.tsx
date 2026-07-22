@@ -554,6 +554,7 @@ export function PhaseSection({
                                 title="Send the Best & Final invitation to finalists. {{bnfDueDate}} pulls from the date on this row; fill Close of Escrow and Closing Conditions inline at compose time."
                                 template={BEST_AND_FINAL_INVITATION_TEMPLATE}
                                 defaultTiers={["green"]}
+                                attachmentSourceItemId={item.id}
                                 requireBnfDate
                               />
                             )}
