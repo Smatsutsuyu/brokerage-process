@@ -6,7 +6,9 @@ import {
   Font,
   Image,
   Page,
+  Path,
   StyleSheet,
+  Svg,
   Text,
   View,
 } from "@react-pdf/renderer";
@@ -194,14 +196,23 @@ const styles = StyleSheet.create({
     borderBottomStyle: "solid",
     borderBottomColor: COLORS.border,
   },
-  milestoneLabel: {
+  // Label side wraps the optional check + text in a flex row so the
+  // check stays inline. Prev: Text alone with flex:1 owned this slot;
+  // moving flex up to the wrap so the check + label share it.
+  milestoneLabelWrap: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  milestoneCheck: {
+    marginRight: 5,
+  },
+  milestoneLabel: {
     fontFamily: "Metropolis",
     fontSize: 10,
     color: COLORS.textPrimary,
   },
   milestoneLabelDone: {
-    flex: 1,
     fontFamily: "Metropolis",
     fontSize: 10,
     color: COLORS.textSecondary,
@@ -391,10 +402,28 @@ export function DdTrackingDoc({
         <Text style={styles.sectionHeader}>KEY DATES</Text>
         {milestones.map((m, i) => (
           <View key={`m-${i}`} style={styles.milestoneRow} wrap={false}>
-            <Text style={m.completed ? styles.milestoneLabelDone : styles.milestoneLabel}>
-              {m.hasHappened ? "✓ " : ""}
-              {m.label}
-            </Text>
+            <View style={styles.milestoneLabelWrap}>
+              {m.hasHappened && (
+                <Svg
+                  width={10}
+                  height={10}
+                  viewBox="0 0 24 24"
+                  style={styles.milestoneCheck}
+                >
+                  <Path
+                    d="M4 12 L10 18 L20 6"
+                    stroke="#059669"
+                    strokeWidth={3.5}
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </Svg>
+              )}
+              <Text style={m.completed ? styles.milestoneLabelDone : styles.milestoneLabel}>
+                {m.label}
+              </Text>
+            </View>
             <Text style={m.date ? styles.milestoneDate : styles.milestoneDateMissing}>
               {m.date ?? "not scheduled"}
             </Text>
