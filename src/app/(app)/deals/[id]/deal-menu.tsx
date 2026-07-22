@@ -22,16 +22,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { deleteDeal } from "../actions";
-import { DealModal, type EditingDeal } from "../deal-modal";
+import type { EditingDeal } from "../deal-modal";
 import { BannerUploaderModal } from "./banner-uploader-modal";
 
 type DealMenuProps = {
   deal: EditingDeal;
   hasBanner: boolean;
+  // Parent (DealHeader) owns the DealModal so the header's "+ Add
+  // purchase price" CTA can open the same instance. Menu just fires
+  // the callback when the Edit-deal item is picked.
+  onEditClick: () => void;
 };
 
-export function DealMenu({ deal, hasBanner }: DealMenuProps) {
-  const [editOpen, setEditOpen] = useState(false);
+export function DealMenu({ deal, hasBanner, onEditClick }: DealMenuProps) {
   const [bannerOpen, setBannerOpen] = useState(false);
   const [, startDelete] = useTransition();
   const confirm = useConfirm();
@@ -112,7 +115,7 @@ export function DealMenu({ deal, hasBanner }: DealMenuProps) {
             <ImageIcon className="h-3.5 w-3.5" />
             {hasBanner ? "Change banner image" : "Set banner image"}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setEditOpen(true)} className="text-[13px]">
+          <DropdownMenuItem onClick={onEditClick} className="text-[13px]">
             <Pencil className="h-3.5 w-3.5" />
             Edit deal
           </DropdownMenuItem>
@@ -126,7 +129,6 @@ export function DealMenu({ deal, hasBanner }: DealMenuProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <DealModal open={editOpen} onOpenChange={setEditOpen} editing={deal} />
       <BannerUploaderModal
         open={bannerOpen}
         onOpenChange={setBannerOpen}

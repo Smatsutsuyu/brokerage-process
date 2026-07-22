@@ -52,6 +52,11 @@ type BuyerBlastButtonProps = {
   // attachments live on a different row (like OM blast pulling from
   // Phase 1 Offering Memorandum), pass that other id.
   attachmentSourceItemId?: string | null;
+  // When true, every attachment on the source item is pre-checked in
+  // the composer instead of just the recommended one (latest file, or
+  // first link if no files). Used by Send B&F where Chris expects the
+  // entire B&F packet to attach in one click.
+  preselectAllAttachments?: boolean;
   // Filter out builders who already submitted an offer. Used by the
   // "Follow up Missing Offers" send.
   excludeOfferReceived?: boolean;
@@ -103,6 +108,7 @@ export function BuyerBlastButton({
   template,
   defaultTiers,
   attachmentSourceItemId,
+  preselectAllAttachments,
   excludeOfferReceived,
   requireAttachment,
   attachmentNoun,
@@ -228,6 +234,7 @@ export function BuyerBlastButton({
           title={modalTitle}
           defaultTiers={defaultTiers}
           attachmentSourceItemId={attachmentSourceItemId}
+          preselectAllAttachments={preselectAllAttachments}
           excludeOfferReceived={excludeOfferReceived}
           sentTracking={sentTracking}
           disableSend={disableSend}

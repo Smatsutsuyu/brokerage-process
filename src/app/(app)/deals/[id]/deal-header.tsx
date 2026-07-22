@@ -1,9 +1,12 @@
-import { Star } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { Plus, Star } from "lucide-react";
 
 import { formatCurrency } from "@/lib/currency";
 
 import { DealMenu } from "./deal-menu";
-import type { EditingDeal } from "../deal-modal";
+import { DealModal, type EditingDeal } from "../deal-modal";
 
 type DealHeaderProps = {
   name: string;
@@ -22,6 +25,11 @@ export function DealHeader({
   deal,
   hasBanner,
 }: DealHeaderProps) {
+  // Edit-deal modal state lives here (not inside DealMenu) so both the
+  // menu's Edit-deal item AND the "+ Add purchase price" CTA below can
+  // open the same modal.
+  const [editOpen, setEditOpen] = useState(false);
+
   return (
     <header className="mb-5">
       <div className="mb-1 flex items-center gap-3">
@@ -32,16 +40,26 @@ export function DealHeader({
             High Priority
           </span>
         )}
-        {deal.purchasePrice != null && (
+        {deal.purchasePrice != null ? (
           <span
             className="inline-flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200/60 ring-inset tabular-nums"
             title="Final purchase price"
           >
             {formatCurrency(deal.purchasePrice)}
           </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditOpen(true)}
+            className="inline-flex items-center gap-1 rounded-md border border-dashed border-gray-300 bg-transparent px-2 py-1 text-xs font-medium text-gray-500 transition-colors hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+            title="Set the final purchase price"
+          >
+            <Plus className="h-3 w-3" />
+            Add purchase price
+          </button>
         )}
         <div className="ml-auto">
-          <DealMenu deal={deal} hasBanner={hasBanner} />
+          <DealMenu deal={deal} hasBanner={hasBanner} onEditClick={() => setEditOpen(true)} />
         </div>
       </div>
       <p className="text-[13px] text-gray-400">{subtitle}</p>
@@ -60,6 +78,8 @@ export function DealHeader({
           {progressPct}%
         </div>
       </div>
+
+      <DealModal open={editOpen} onOpenChange={setEditOpen} editing={deal} />
     </header>
   );
 }

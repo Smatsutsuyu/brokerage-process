@@ -555,6 +555,7 @@ export function PhaseSection({
                                 template={BEST_AND_FINAL_INVITATION_TEMPLATE}
                                 defaultTiers={["green"]}
                                 attachmentSourceItemId={item.id}
+                                preselectAllAttachments
                                 requireBnfDate
                               />
                             )}

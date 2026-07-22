@@ -113,6 +113,11 @@ type BlastModalProps = {
   // Pass the OM Phase 1 item id for OM blast; the row's own item id
   // for Q&A / Market Study where files live on the row itself.
   attachmentSourceItemId?: string | null;
+  // When true, every attachment on the source item is pre-checked in
+  // step 2 instead of just the recommended one (latest file, or first
+  // link if no files). Used by Send B&F where Chris expects the
+  // entire B&F packet to attach in one click.
+  preselectAllAttachments?: boolean;
   // Filter recipients to exclude builders whose offer_received_at is
   // set. Used by the "Follow up Missing Offers" send.
   excludeOfferReceived?: boolean;
@@ -172,6 +177,7 @@ export function BlastModal({
   title,
   defaultTiers,
   attachmentSourceItemId,
+  preselectAllAttachments,
   excludeOfferReceived,
   sentTracking,
   disableSend,
@@ -421,7 +427,12 @@ export function BlastModal({
             : ccSelections;
         setPreviewVars(ctx.vars);
         setAttachmentChoices(att.choices);
-        setDefaultAttachmentIds(att.recommendedIds);
+        // Callers that want the whole packet attached in one click
+        // (Send B&F) override the default single-file recommendation
+        // with every choice on the source row.
+        setDefaultAttachmentIds(
+          preselectAllAttachments ? att.choices.map((c) => c.id) : att.recommendedIds,
+        );
         setSenderOptions(ctx.senderOptions);
         setDefaultSenderId(ctx.defaultSenderId);
         setCcOptions(mergedCcOpts);
