@@ -243,6 +243,9 @@ export default async function DealPage({
               state: deal.state,
               type: deal.type,
               priority: deal.priority,
+              // Drizzle returns numeric() columns as a string; render layer wants Number.
+              purchasePrice:
+                deal.purchasePrice != null ? Number(deal.purchasePrice) : null,
               notes: deal.notes,
             }}
             hasBanner={Boolean(deal.bannerImagePath)}

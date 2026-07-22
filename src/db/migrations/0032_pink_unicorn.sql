@@ -1,0 +1,1 @@
+ALTER TABLE "deals" ADD COLUMN "purchase_price" numeric(14, 2);

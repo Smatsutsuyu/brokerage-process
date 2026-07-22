@@ -34,6 +34,9 @@ export type EditingDeal = {
   state: string | null;
   type: string | null;
   priority: DealPriority;
+  // Whole-dollar final purchase price (null until known). Rendered on
+  // the DD Tracking PDF header when set.
+  purchasePrice: number | null;
   notes: string | null;
 };
 
@@ -58,6 +61,9 @@ export function DealModal({ open, onOpenChange, editing }: DealModalProps) {
   const [state, setState] = useState(editing?.state ?? "");
   const [type, setType] = useState(editing?.type ?? "");
   const [priority, setPriority] = useState<DealPriority>(editing?.priority ?? "normal");
+  const [purchasePrice, setPurchasePrice] = useState<string>(
+    editing?.purchasePrice != null ? String(editing.purchasePrice) : "",
+  );
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -74,6 +80,7 @@ export function DealModal({ open, onOpenChange, editing }: DealModalProps) {
           setState("");
           setType("");
           setPriority("normal");
+          setPurchasePrice("");
           setNotes("");
         }
       }, 150);
@@ -85,6 +92,7 @@ export function DealModal({ open, onOpenChange, editing }: DealModalProps) {
     setState(editing?.state ?? "");
     setType(editing?.type ?? "");
     setPriority(editing?.priority ?? "normal");
+    setPurchasePrice(editing?.purchasePrice != null ? String(editing.purchasePrice) : "");
     setNotes(editing?.notes ?? "");
     setError(null);
   }, [open, editing]);
@@ -104,7 +112,25 @@ export function DealModal({ open, onOpenChange, editing }: DealModalProps) {
       return;
     }
 
-    const payload = { name, units: unitsNum, city, state, type, priority, notes };
+    // Purchase price is entered as free-typed dollars. Strip commas and
+    // dollar signs the user might paste in, then validate.
+    const priceRaw = purchasePrice.replace(/[$,\s]/g, "");
+    const priceNum = priceRaw ? Number(priceRaw) : null;
+    if (priceNum != null && (!Number.isFinite(priceNum) || priceNum < 0)) {
+      setError("Purchase price must be a non-negative number.");
+      return;
+    }
+
+    const payload = {
+      name,
+      units: unitsNum,
+      city,
+      state,
+      type,
+      priority,
+      purchasePrice: priceNum,
+      notes,
+    };
 
     startTransition(async () => {
       try {
@@ -195,6 +221,23 @@ export function DealModal({ open, onOpenChange, editing }: DealModalProps) {
               value={type}
               onChange={(e) => setType(e.target.value)}
               placeholder="e.g. Finished lots, Paper lots, Raw land"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="deal-purchase-price" className="text-gray-600">
+              Final Purchase Price{" "}
+              <span className="text-xs font-normal text-gray-400">
+                (optional, set when Phase 4 finalizes)
+              </span>
+            </Label>
+            <Input
+              id="deal-purchase-price"
+              type="text"
+              inputMode="decimal"
+              value={purchasePrice}
+              onChange={(e) => setPurchasePrice(e.target.value)}
+              placeholder="e.g. 24500000"
             />
           </div>
 

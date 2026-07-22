@@ -1,5 +1,7 @@
 import { Star } from "lucide-react";
 
+import { formatCurrency } from "@/lib/currency";
+
 import { DealMenu } from "./deal-menu";
 import type { EditingDeal } from "../deal-modal";
 
@@ -28,6 +30,14 @@ export function DealHeader({
           <span className="text-brand-accent flex items-center gap-1 text-sm font-semibold">
             <Star className="h-4 w-4 fill-current" />
             High Priority
+          </span>
+        )}
+        {deal.purchasePrice != null && (
+          <span
+            className="inline-flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200/60 ring-inset tabular-nums"
+            title="Final purchase price"
+          >
+            {formatCurrency(deal.purchasePrice)}
           </span>
         )}
         <div className="ml-auto">

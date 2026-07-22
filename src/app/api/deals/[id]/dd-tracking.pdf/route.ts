@@ -96,13 +96,20 @@ export async function GET(
 
   const { id } = await ctx.params;
   const [deal] = await db
-    .select({ id: deals.id, name: deals.name })
+    .select({
+      id: deals.id,
+      name: deals.name,
+      purchasePrice: deals.purchasePrice,
+    })
     .from(deals)
     .where(and(eq(deals.id, id), eq(deals.orgId, org.id)))
     .limit(1);
   if (!deal) {
     return NextResponse.json({ error: "Deal not found" }, { status: 404 });
   }
+  // Drizzle returns numeric() as a string; PDF layer wants Number | null.
+  const purchasePrice =
+    deal.purchasePrice != null ? Number(deal.purchasePrice) : null;
 
   // 1) Milestones. Pull the 7 Phase 4 checklist items by name and merge
   // with the canonical order so a missing row still renders as "not
@@ -130,12 +137,31 @@ export async function GET(
   for (const r of milestoneRows) {
     byName.set(r.name, { trackedDate: r.trackedDate, completed: r.completed });
   }
+  // Local YYYY-MM-DD for "has this date happened" compare. Matches the
+  // string shape Postgres date columns return (or is derived cleanly
+  // from Date instances), so a string <= string compare is timezone-safe.
+  const now = new Date();
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const trackedDateIso = (v: unknown): string | null => {
+    if (v instanceof Date) {
+      return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}-${String(v.getDate()).padStart(2, "0")}`;
+    }
+    if (typeof v === "string" && v.length >= 10) return v.slice(0, 10);
+    return null;
+  };
   const milestones: MilestoneRow[] = MILESTONE_NAMES.map((label) => {
     const r = byName.get(label);
+    const iso = r ? trackedDateIso(r.trackedDate) : null;
+    // "Has happened" fires when the user explicitly checked the item
+    // complete OR the tracked date is today-or-past. OR keeps auto-
+    // detection working without forcing a manual check on every past
+    // milestone.
+    const hasHappened = Boolean(r?.completed) || (iso != null && iso <= todayIso);
     return {
       label,
       date: r ? formatTrackedDate(r.trackedDate) : null,
       completed: Boolean(r?.completed),
+      hasHappened,
     };
   });
 
@@ -276,6 +302,7 @@ export async function GET(
     DdTrackingDoc({
       dealName: deal.name,
       dateLabel: formatLong(new Date()),
+      purchasePrice,
       milestones,
       issues: issuesForDoc,
       team,

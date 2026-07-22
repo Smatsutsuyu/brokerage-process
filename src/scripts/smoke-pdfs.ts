@@ -14,14 +14,15 @@ async function main() {
     DdTrackingDoc({
       dealName: "Riverside Estates Phase 2",
       dateLabel: "May 13, 2026",
+      purchasePrice: 24500000,
       milestones: [
-        { label: "LOI Signed Date", date: "May 1, 2026", completed: true },
-        { label: "PSA Effective Date", date: "May 12, 2026", completed: true },
-        { label: "Receive 1st Draft Cost to Complete", date: "Jun 1, 2026", completed: false },
-        { label: "Finalize Cost to Complete / Final Purchase Price", date: null, completed: false },
-        { label: "Investment Committee Approval", date: null, completed: false },
-        { label: "Waive Feasibility", date: null, completed: false },
-        { label: "Closing Date", date: "Aug 30, 2026", completed: false },
+        { label: "LOI Signed Date", date: "May 1, 2026", completed: true, hasHappened: true },
+        { label: "PSA Effective Date", date: "May 12, 2026", completed: true, hasHappened: true },
+        { label: "Receive 1st Draft Cost to Complete", date: "Jun 1, 2026", completed: false, hasHappened: false },
+        { label: "Finalize Cost to Complete / Final Purchase Price", date: null, completed: false, hasHappened: false },
+        { label: "Investment Committee Approval", date: null, completed: false, hasHappened: false },
+        { label: "Waive Feasibility", date: null, completed: false, hasHappened: false },
+        { label: "Closing Date", date: "Aug 30, 2026", completed: false, hasHappened: false },
       ],
       issues: [
         {

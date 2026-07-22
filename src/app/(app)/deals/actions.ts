@@ -18,6 +18,9 @@ export type DealInput = {
   state?: string;
   type?: string;
   priority: DealPriority;
+  // Final purchase price in whole dollars. Null / undefined until the
+  // Phase 4 milestone lands. Numeric column persists precise value.
+  purchasePrice?: number | null;
   notes?: string;
 };
 
@@ -44,6 +47,10 @@ export async function createDeal(input: DealInput): Promise<string> {
       state: input.state?.trim() || null,
       type: input.type?.trim() || null,
       priority: input.priority,
+      // Drizzle's numeric() column expects a string on write; toFixed(2)
+      // keeps the DB value stable regardless of client-side formatting.
+      purchasePrice:
+        input.purchasePrice != null ? input.purchasePrice.toFixed(2) : null,
       notes: input.notes?.trim() || null,
     })
     .returning();
@@ -73,6 +80,8 @@ export async function updateDeal(
       state: input.state?.trim() || null,
       type: input.type?.trim() || null,
       priority: input.priority,
+      purchasePrice:
+        input.purchasePrice != null ? input.purchasePrice.toFixed(2) : null,
       notes: input.notes?.trim() || null,
     })
     .where(and(eq(deals.id, dealId), eq(deals.orgId, org.id)));

@@ -1,4 +1,4 @@
-import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { dealPriorityEnum, psaDraftingEnum } from "./enums";
 import { organizations } from "./organizations";
@@ -17,6 +17,12 @@ export const deals = pgTable("deals", {
   state: text("state"),
   type: text("type"),
   priority: dealPriorityEnum("priority").notNull().default("normal"),
+  // Final purchase price in whole dollars (no cents shown at Lakebridge
+  // scale). Null until Phase 4 "Finalize Cost to Complete / Final
+  // Purchase Price" lands. Numeric so ordering + range queries work
+  // later without parsing; drizzle returns as a string, cast to Number
+  // at the render boundary where displayed.
+  purchasePrice: numeric("purchase_price", { precision: 14, scale: 2 }),
   notes: text("notes"),
   // PSA Attorney decision — captured inline on the "Determine PSA Attorney"
   // checklist row. Each deal has at most one such decision; storing on the

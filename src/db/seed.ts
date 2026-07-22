@@ -156,6 +156,9 @@ async function main() {
         state: "CA",
         type: "Finished lots",
         priority: "high",
+        // Seed a value on the Phase-4-ish deal so the DD Tracking PDF's
+        // purchase-price header renders visibly during dev smoke tests.
+        purchasePrice: "24500000.00",
       },
       {
         orgId: org.id,

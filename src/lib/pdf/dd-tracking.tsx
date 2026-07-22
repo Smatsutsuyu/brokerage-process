@@ -11,6 +11,8 @@ import {
   View,
 } from "@react-pdf/renderer";
 
+import { formatCurrency } from "@/lib/currency";
+
 // Same Metropolis family the Marketing Report uses, registered
 // idempotently in case both modules load.
 Font.register({
@@ -57,6 +59,12 @@ export type MilestoneRow = {
   label: string;
   date: string | null;
   completed: boolean;
+  // True when this milestone has happened — either the user checked the
+  // item complete, or the tracked date is on/before today. Prefixes a
+  // "✓ " on the label when true so Chris can see at a glance which
+  // milestones are past. Computed in the route, not here, so today's-
+  // date logic stays out of the PDF template.
+  hasHappened: boolean;
 };
 
 export type DealTeam = "owner" | "broker" | "buyer";
@@ -81,6 +89,10 @@ export type ConsultantRow = {
 export type DdTrackingProps = {
   dealName: string;
   dateLabel: string;
+  // Whole-dollar amount stored on the deal. Rendered as a "PURCHASE
+  // PRICE $X,XXX,XXX" line under the title when set; skipped when null
+  // so early-phase reports don't render an unset $0.
+  purchasePrice: number | null;
   milestones: MilestoneRow[];
   issues: IssueRow[];
   team: TeamMemberRow[];
@@ -145,6 +157,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textSecondary,
     fontFamily: "Metropolis",
+    letterSpacing: 1,
+  },
+  purchasePrice: {
+    marginTop: 8,
+    fontSize: 12,
+    fontFamily: "Metropolis",
+    fontWeight: "bold",
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+  },
+  purchasePriceLabel: {
+    color: COLORS.textSecondary,
+    fontWeight: "normal",
+    fontSize: 10,
     letterSpacing: 1,
   },
   sectionHeader: {
@@ -320,6 +346,7 @@ const styles = StyleSheet.create({
 export function DdTrackingDoc({
   dealName,
   dateLabel,
+  purchasePrice,
   milestones,
   issues,
   team,
@@ -352,6 +379,12 @@ export function DdTrackingDoc({
         <View style={styles.titleBlock}>
           <Text style={styles.dealTitle}>{dealName}</Text>
           <Text style={styles.reportLabel}>DUE DILIGENCE TRACKING · {dateLabel}</Text>
+          {purchasePrice != null && (
+            <Text style={styles.purchasePrice}>
+              <Text style={styles.purchasePriceLabel}>PURCHASE PRICE  </Text>
+              {formatCurrency(purchasePrice)}
+            </Text>
+          )}
         </View>
 
         {/* Section 1: Key Dates */}
@@ -359,6 +392,7 @@ export function DdTrackingDoc({
         {milestones.map((m, i) => (
           <View key={`m-${i}`} style={styles.milestoneRow} wrap={false}>
             <Text style={m.completed ? styles.milestoneLabelDone : styles.milestoneLabel}>
+              {m.hasHappened ? "✓ " : ""}
               {m.label}
             </Text>
             <Text style={m.date ? styles.milestoneDate : styles.milestoneDateMissing}>
