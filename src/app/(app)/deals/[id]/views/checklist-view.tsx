@@ -24,6 +24,11 @@ type Item = {
   // with `dateField: true` (Phase 4 milestones, etc.); other items
   // never expose a date affordance even if this happens to be set.
   trackedDate: string | null;
+  // ISO timestamp of when the item was completed, and the completer's
+  // display name. Both null on incomplete items. Name is null when the
+  // completer's user row was deleted (FK is set-null) — renders as "Unknown".
+  completedAt: string | null;
+  completedByName: string | null;
 };
 
 type ChecklistViewProps = {

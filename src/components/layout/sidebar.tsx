@@ -42,6 +42,7 @@ export async function Sidebar({ activeDealId }: SidebarProps) {
             city: deals.city,
             state: deals.state,
             priority: deals.priority,
+            archivedAt: deals.archivedAt,
             sortOrder:
               sql<number>`coalesce(${userDealOrders.sortOrder}, 2147483647)`.as(
                 "sort_order_effective",
@@ -87,6 +88,7 @@ export async function Sidebar({ activeDealId }: SidebarProps) {
       city: d.city,
       state: d.state,
       priority: (d.priority ?? "normal") as "normal" | "high",
+      archived: d.archivedAt !== null,
       total,
       done: Number(d.doneItems ?? 0),
       phase: total > 0 ? inferPhase(d) : null,

@@ -37,6 +37,10 @@ export type EditingDeal = {
   // Whole-dollar final purchase price (null until known). Rendered on
   // the DD Tracking PDF header when set.
   purchasePrice: number | null;
+  // Non-null when the deal has been archived. Drives the header
+  // "Archived" pill and swaps the actions menu items (Archive shown
+  // when active; Unarchive + Delete shown when archived).
+  archivedAt: string | null;
   notes: string | null;
 };
 

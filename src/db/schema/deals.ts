@@ -36,6 +36,13 @@ export const deals = pgTable("deals", {
   // the SDK rather than baking signed URLs into the PDFs. Null falls back
   // to the Land Advisors-branded default header.
   bannerImagePath: text("banner_image_path"),
+  // Archive timestamp. Null = active deal (default). Non-null = archived,
+  // hidden from the sidebar by default and required-non-null before delete
+  // will accept the row (see actions.ts::deleteDeal). Reversible via
+  // unarchiveDeal, which clears the column. Keeping this as a timestamp
+  // (not a boolean) so we retain when-archived context for future audit
+  // surfaces at no extra column cost.
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

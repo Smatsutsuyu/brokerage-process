@@ -237,6 +237,20 @@ Thanks,
 {{senderName}}`,
 };
 
+// Deal Status - templated status update to the Owner Team. Cross-phase
+// (any time during the deal); attached PDF summarizes checklist progress,
+// recently completed items, upcoming milestones, open issues, and the
+// Owner Team roster.
+export const DEAL_STATUS_TEMPLATE: EmailTemplate = {
+  subject: "Status update, {{dealName}} ({{units}} {{type}}, {{city}})",
+  body: `Attached is the current status report for {{dealName}}, covering progress by phase, recently completed items, upcoming milestones, and open issues.
+
+Let me know if you'd like to walk through anything.
+
+Thanks,
+{{senderName}}`,
+};
+
 // Phase 4 - Send the combined Due Diligence Tracking PDF (key dates +
 // issues + deal team + consultants) before bi-weekly DD calls.
 export const DD_TRACKING_TEMPLATE: EmailTemplate = {

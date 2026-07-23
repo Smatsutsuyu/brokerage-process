@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
+  authUser,
   checklistCategories,
   checklistItemLinks,
   checklistItems,
@@ -13,6 +14,7 @@ import {
   documents,
   issues,
   qaItems,
+  users,
 } from "@/db/schema";
 import { FeedbackZone } from "@/components/feedback/feedback-zone";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -82,10 +84,25 @@ export default async function DealPage({
           sortOrder: checklistItems.sortOrder,
           notes: checklistItems.notes,
           trackedDate: checklistItems.trackedDate,
+          completedAt: checklistItems.completedAt,
+          // Resolve the completer's display name via the users -> auth_user
+          // two-hop join. LEFT so incomplete items still come back.
+          completedByName: authUser.name,
         })
         .from(checklistItems)
         .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
-        .where(eq(checklistCategories.dealId, id))
+        .leftJoin(users, eq(users.id, checklistItems.completedBy))
+        .leftJoin(authUser, eq(authUser.id, users.authUserId))
+        // Tenant-scope in the WHERE too — the parallel Promise.all query
+        // fires before the notFound() short-circuit, so gate here so a
+        // forged cross-org dealId doesn't even reach Postgres with valid
+        // matches (defense in depth against a timing side channel).
+        .where(
+          and(
+            eq(checklistCategories.dealId, id),
+            eq(checklistCategories.orgId, org.id),
+          ),
+        )
         .orderBy(checklistItems.sortOrder),
       db
         .select({ n: count() })
@@ -170,6 +187,22 @@ export default async function DealPage({
   const doneItems = items.filter((i) => i.completed).length;
   const pct = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
 
+  // Serialize checklist items across the RSC boundary. Drizzle returns
+  // `completedAt` as `Date | null`; the client component expects an ISO
+  // string (or null) so `toISOString()` here converts once.
+  const itemsForClient = items.map((i) => ({
+    id: i.id,
+    categoryId: i.categoryId,
+    name: i.name,
+    optional: i.optional,
+    completed: i.completed,
+    sortOrder: i.sortOrder,
+    notes: i.notes,
+    trackedDate: i.trackedDate,
+    completedAt: i.completedAt ? i.completedAt.toISOString() : null,
+    completedByName: i.completedByName,
+  }));
+
   // Latest doc per checklist item. documentRows is already sorted version
   // desc, so the first entry seen for each itemId is the most recent. Plain
   // All docs per checklist item, newest first (the source query already
@@ -246,6 +279,7 @@ export default async function DealPage({
               // Drizzle returns numeric() columns as a string; render layer wants Number.
               purchasePrice:
                 deal.purchasePrice != null ? Number(deal.purchasePrice) : null,
+              archivedAt: deal.archivedAt ? deal.archivedAt.toISOString() : null,
               notes: deal.notes,
             }}
             hasBanner={Boolean(deal.bannerImagePath)}
@@ -258,7 +292,7 @@ export default async function DealPage({
                 <ChecklistView
                   dealId={id}
                   categories={categories}
-                  items={items}
+                  items={itemsForClient}
                   documentsByItemId={documentsByItemId}
                   linksByItemId={linksByItemId}
                   psaAttorney={{

@@ -3,16 +3,24 @@ import { Star } from "lucide-react";
 
 import { db } from "@/db";
 import { deals } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
 export async function PriorityRibbon() {
   const org = await getCurrentOrg();
+  // Archived deals disappear from the ribbon even if starred — the whole
+  // point of archive is "not on my active list."
   const highPriority = org
     ? await db
         .select({ id: deals.id, name: deals.name })
         .from(deals)
-        .where(and(eq(deals.orgId, org.id), eq(deals.priority, "high")))
+        .where(
+          and(
+            eq(deals.orgId, org.id),
+            eq(deals.priority, "high"),
+            isNull(deals.archivedAt),
+          ),
+        )
         .limit(20)
     : [];
 

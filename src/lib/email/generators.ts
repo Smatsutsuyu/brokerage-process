@@ -1,5 +1,6 @@
 import "server-only";
 
+import { generateDealStatusPdf } from "@/lib/pdf/generate-deal-status";
 import { generateMarketingReportPdf } from "@/lib/pdf/generate-marketing-report";
 
 import type { SendEmailAttachment } from "./send";
@@ -22,7 +23,7 @@ import type { SendEmailAttachment } from "./send";
 // from a sibling org returns null rather than rendering data the caller
 // shouldn't see.
 
-export type GeneratorKey = "marketing-report" | "dd-tracking";
+export type GeneratorKey = "marketing-report" | "dd-tracking" | "deal-status";
 
 // Render a generator key's PDF to bytes ready to attach. Returns null
 // if the underlying data lookup fails (deal not in org, deleted, etc.).
@@ -48,6 +49,14 @@ export async function renderGeneratedAttachment(input: {
       // dd-tracking.pdf, plug it in here the same way as marketing-
       // report. See docs/backlog.md.
       throw new Error("dd-tracking generator not yet implemented");
+    }
+    case "deal-status": {
+      const pdf = await generateDealStatusPdf({
+        dealId: input.dealId,
+        orgId: input.orgId,
+      });
+      if (!pdf) return null;
+      return { filename: pdf.filename, content: pdf.content };
     }
   }
 }

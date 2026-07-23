@@ -37,15 +37,23 @@ export async function toggleChecklistItem(input: {
 }) {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
+  // Set completer identity on check, clear on uncheck. Nullable users FK
+  // (onDelete: set null) means a deleted user later surfaces as null,
+  // which the read side renders as "Unknown".
+  const user = await getCurrentUser();
+  // getCurrentOrg short-circuits on a null user, so we're guaranteed a
+  // user here in practice. Assert loudly so any future refactor that
+  // breaks the invariant fails fast instead of silently writing anonymous
+  // completions with completedBy=null.
+  if (!user) throw new Error("No user context");
 
   // Scope the update to the current org so a forged itemId can't reach across tenants.
-  // Once Clerk provides a real user, completedBy will be set from auth().
   await db
     .update(checklistItems)
     .set({
       completed: input.completed,
       completedAt: input.completed ? new Date() : null,
-      completedBy: null,
+      completedBy: input.completed ? user.id : null,
     })
     .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)));
 

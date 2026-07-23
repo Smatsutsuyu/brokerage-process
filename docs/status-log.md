@@ -32,6 +32,34 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-07-24 — Checklist completer attribution + Deal Status PDF + header refactor + archive-then-delete
+
+Six coordinated changes to the deal-page surface, all shipping together.
+
+### Done
+- **Checklist items now show who completed them and when.** Small compact "Chris · Jul 20" text next to the strikethrough item title on completed rows; full timestamp on hover via native `title=`. Requires the checklist read query to join `checklist_items.completed_by → users → auth_user` (page.tsx). Item type extended in both `checklist-view.tsx` and `phase-section.tsx`. ISO serialization at the RSC boundary.
+- **Bug fix: `toggleChecklistItem` was silently discarding the completer.** The action carried a stale "Once Clerk provides a real user, completedBy will be set" comment from before Better Auth landed, and unconditionally wrote `completedBy: null`. Every check since Better Auth deploy has lost the completer identity. Fix mirrors the pattern in `setQaApproved` — read `getCurrentUser()`, write user.id on check, null on uncheck. Historical rows stay null (rendered as "Unknown") until re-checked.
+- **Uncheck-confirmation.** Only fires when going from checked → unchecked; message calls out that the completion timestamp and completer record will be cleared. Uses the existing global `useConfirm` primitive.
+- **Deal Status PDF + email flow.** New `src/lib/pdf/deal-status.tsx` react-pdf renderer with sections: header (deal name + purchase price + current phase), overall + per-phase progress bars, recently completed items (last 10 with SVG check + attribution), upcoming milestones (Phase 4 dates not yet past or complete), open issues (open + in-progress, priority-ordered, with assignee resolved via the Deal Team polymorphic identity chain), Owner Team roster. New `src/lib/pdf/generate-deal-status.ts` extracted generator (single loader shared by the streaming route and the send pipeline). New `/api/deals/[id]/status.pdf` route. New `DEAL_STATUS_TEMPLATE` in email-templates.ts. New `"deal-status"` key in the generator registry + extended EmailAttachment discriminated union in the client. New `send-deal-status-button.tsx` + `send-deal-status-modal.tsx` mirroring the Marketing Report pair — two-step preview + compose targeting the Owner Team.
+- **Deal header action refactor.** The `Edit ▾` dropdown that hid every action behind one click is gone. Three sibling buttons + one overflow menu now sit in the header row: **Email Status** (opens the new send flow), **Edit** (opens the DealModal directly, no dropdown), and a small **⋯** menu (`DealActionsMenu`) with Set/Change banner and Archive/Unarchive/Delete. Removed: the "Generate Marketing Report" item (redundant with the Contacts toolbar + Phase 1 row) and the "Compile offer package" coming-soon placeholder. The former "Email status to Owner Team" placeholder is now the working Email Status button.
+- **Archive-then-delete.** New nullable `deals.archived_at` column (migration `0033_steep_master_mold.sql`). New `archiveDeal` + `unarchiveDeal` server actions. `deleteDeal` now requires `archivedAt IS NOT NULL` server-side (throws otherwise; the client menu only exposes Delete on archived deals). Archived deals disappear from the sidebar main list (moved under a collapsible "Archived (N)" section at the bottom, subdued styling) and from the priority ribbon even if starred. The deal page itself still functions when archived, with an "Archived" pill in the header next to the priority chip.
+
+### Decisions
+- **`archived_at` timestamp, not a boolean.** A nullable timestamp gives us "when was this archived" for free at zero extra column cost — useful for any future audit surface without another migration.
+- **Delete stays behind the menu, not promoted to a red button.** Destructive irreversible actions belong behind menu-isolation chrome exactly to prevent misclicks; a visible red button next to Edit is too easy to hit. The confirm dialog + the archive gate are complementary layers.
+- **Archive has a soft confirm; delete has a destructive confirm.** Archive is reversible so the friction stays low; delete is not, so the extra visual gravity matters.
+- **Sidebar keeps user-per-deal ordering for archived deals** (row still exists in `user_deal_orders`) so unarchiving restores them to their prior slot without needing a reorder.
+- **Status Report PDF reuses the DD Tracking scaffold** for fonts, footer, and section-header styling. Metropolis font registered idempotently — both PDF modules can register the same family without conflict.
+- **Native `title=` for the completer tooltip.** 34 files in the codebase already use it; no wrapped tooltip primitive exists. Keep it consistent.
+
+### Deferred / Pending
+- None on this batch.
+
+### Blockers
+- None.
+
+---
+
 ## 2026-07-15 — Issue assignee: swap users FK for polymorphic Deal Team FK
 
 ### Done

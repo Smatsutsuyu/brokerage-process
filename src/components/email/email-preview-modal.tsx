@@ -118,7 +118,7 @@ export type EmailAttachment =
   | {
       id: string;
       kind: "generated";
-      generator: "marketing-report" | "dd-tracking";
+      generator: "marketing-report" | "dd-tracking" | "deal-status";
       filename: string;
     };
 

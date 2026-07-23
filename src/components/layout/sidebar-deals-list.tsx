@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { GripVertical } from "lucide-react";
+import { Archive, ChevronDown, ChevronRight, GripVertical } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -38,6 +38,9 @@ export type SidebarDealItem = {
   city: string | null;
   state: string | null;
   priority: "normal" | "high";
+  // Deals with archivedAt set are hidden by default under a collapsible
+  // "Show archived" section at the bottom of the list.
+  archived: boolean;
   total: number;
   done: number;
   phase: Phase | "complete" | null;
@@ -50,23 +53,50 @@ type SidebarDealsListProps = {
 
 // Client-side sortable wrapper around the deal list. Server component
 // (Sidebar) does the DB query and passes pre-shaped rows in; this owns
-// drag interaction + optimistic reorder + persist.
+// drag interaction + optimistic reorder + persist. Archived deals are
+// hidden by default under a collapsible section at the bottom.
 export function SidebarDealsList({ deals, activeDealId }: SidebarDealsListProps) {
-  // Local order mirrors the prop list. Drag updates this synchronously
-  // so the row visually settles in its new slot the moment the user
-  // drops, then we persist + revalidate to confirm.
-  const [order, setOrder] = useState<string[]>(() => deals.map((d) => d.id));
-  const [, startPersist] = useTransition();
+  // Split active vs archived. Only active deals participate in drag-
+  // reorder; archived is a passive list shown when the user asks for it.
+  const { activeDeals, archivedDeals } = useMemo(() => {
+    const active: SidebarDealItem[] = [];
+    const archived: SidebarDealItem[] = [];
+    for (const d of deals) {
+      if (d.archived) archived.push(d);
+      else active.push(d);
+    }
+    return { activeDeals: active, archivedDeals: archived };
+  }, [deals]);
 
-  // Whenever the prop list identity shifts (server-side add/remove of a
-  // deal, or a revalidate after persist), reconcile: keep the user's
-  // current relative order for known IDs, append unseen IDs at the end.
-  const propIds = useMemo(() => deals.map((d) => d.id), [deals]);
-  if (propIds.join("|") !== order.join("|")) {
-    const known = new Set(propIds);
+  // Local order mirrors the ACTIVE prop list. Drag updates this
+  // synchronously so the row visually settles in its new slot the moment
+  // the user drops, then we persist + revalidate to confirm.
+  const [order, setOrder] = useState<string[]>(() => activeDeals.map((d) => d.id));
+  const [, startPersist] = useTransition();
+  // Auto-expand when the user lands on an archived deal, but let the
+  // user override with the toggle. Once they've clicked the toggle,
+  // archivedOpen becomes authoritative regardless of navigation state.
+  // Prevents the "click Archived to collapse and nothing happens" bug
+  // that a purely-derived-from-viewingArchived state had.
+  const viewingArchived = archivedDeals.some((d) => d.id === activeDealId);
+  const [userToggled, setUserToggled] = useState(false);
+  const [archivedOpen, setArchivedOpen] = useState<boolean>(viewingArchived);
+  const showArchived = userToggled ? archivedOpen : viewingArchived || archivedOpen;
+
+  function handleArchivedToggle() {
+    setUserToggled(true);
+    setArchivedOpen((v) => !v);
+  }
+
+  // Reconcile order state to prop identity (active deals only) — a deal
+  // archived server-side leaves the active list and needs to fall out of
+  // the drag order; a new deal appended by the server needs to appear.
+  const activeIds = useMemo(() => activeDeals.map((d) => d.id), [activeDeals]);
+  if (activeIds.join("|") !== order.join("|")) {
+    const known = new Set(activeIds);
     const filtered = order.filter((id) => known.has(id));
     const filteredSet = new Set(filtered);
-    const tail = propIds.filter((id) => !filteredSet.has(id));
+    const tail = activeIds.filter((id) => !filteredSet.has(id));
     const next = [...filtered, ...tail];
     if (next.join("|") !== order.join("|")) {
       // setState during render is fine for derived-from-props reconciles
@@ -77,11 +107,11 @@ export function SidebarDealsList({ deals, activeDealId }: SidebarDealsListProps)
 
   // Index lookup so the sortable list can re-derive deal objects in the
   // user's current order without an O(N) find per row.
-  const dealsById = useMemo(() => {
+  const activeById = useMemo(() => {
     const m = new Map<string, SidebarDealItem>();
-    for (const d of deals) m.set(d.id, d);
+    for (const d of activeDeals) m.set(d.id, d);
     return m;
-  }, [deals]);
+  }, [activeDeals]);
 
   // Pointer sensor with a small activation distance so a quick click on
   // the grip handle (or anywhere in the row) doesn't accidentally start
@@ -115,31 +145,92 @@ export function SidebarDealsList({ deals, activeDealId }: SidebarDealsListProps)
   }
 
   return (
-    // Explicit `id` so dnd-kit's accessibility describedby IDs
-    // (DndDescribedBy-N) are deterministic across SSR/hydration. Without
-    // this, dnd-kit's internal module-level counter assigns different
-    // values server-side vs client-side, triggering a hydration mismatch
-    // warning on every render of the sidebar.
-    <DndContext
-      id="sidebar-deals-dnd"
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
+    <div>
+      {/* Explicit `id` on DndContext so dnd-kit's accessibility describedby
+          IDs (DndDescribedBy-N) are deterministic across SSR/hydration.
+          Without this, the module-level counter assigns different values
+          server-side vs client-side and triggers a hydration mismatch. */}
+      {activeDeals.length === 0 ? (
+        <div className="px-3 py-4 text-center text-xs text-gray-400 italic">
+          No active deals.
+        </div>
+      ) : (
+        <DndContext
+          id="sidebar-deals-dnd"
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={order} strategy={verticalListSortingStrategy}>
+            {order.map((id) => {
+              const d = activeById.get(id);
+              if (!d) return null;
+              return (
+                <SortableDealRow
+                  key={id}
+                  deal={d}
+                  isActive={d.id === activeDealId}
+                />
+              );
+            })}
+          </SortableContext>
+        </DndContext>
+      )}
+
+      {archivedDeals.length > 0 && (
+        <div className="mt-2 border-t border-gray-100 pt-2">
+          <button
+            type="button"
+            onClick={handleArchivedToggle}
+            className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-semibold tracking-wider text-gray-400 uppercase hover:bg-gray-50 hover:text-gray-600"
+            aria-expanded={showArchived}
+          >
+            {showArchived ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            <Archive className="h-3 w-3" />
+            <span>Archived</span>
+            <span className="text-gray-400 tabular-nums">{archivedDeals.length}</span>
+          </button>
+          {showArchived && (
+            <div className="mt-1 space-y-0.5 opacity-70">
+              {archivedDeals.map((d) => (
+                <ArchivedDealRow key={d.id} deal={d} isActive={d.id === activeDealId} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type ArchivedDealRowProps = {
+  deal: SidebarDealItem;
+  isActive: boolean;
+};
+
+// Compact, non-draggable row for archived deals. Still links through to
+// the deal page so the user can unarchive from there. Visually recedes
+// (grayscale + reduced opacity via the parent wrapper).
+function ArchivedDealRow({ deal, isActive }: ArchivedDealRowProps) {
+  return (
+    <Link
+      href={`/deals/${deal.id}`}
+      className={cn(
+        "block truncate rounded px-2 py-1 text-[12px] text-gray-500 hover:bg-gray-100 hover:text-gray-700",
+        isActive && "bg-blue-50 text-brand-blue",
+      )}
     >
-      <SortableContext items={order} strategy={verticalListSortingStrategy}>
-        {order.map((id) => {
-          const d = dealsById.get(id);
-          if (!d) return null;
-          return (
-            <SortableDealRow
-              key={id}
-              deal={d}
-              isActive={d.id === activeDealId}
-            />
-          );
-        })}
-      </SortableContext>
-    </DndContext>
+      {deal.name}
+      {(deal.city || deal.state) && (
+        <span className="ml-1.5 text-[10px] text-gray-400">
+          {[deal.city, deal.state].filter(Boolean).join(", ")}
+        </span>
+      )}
+    </Link>
   );
 }
 

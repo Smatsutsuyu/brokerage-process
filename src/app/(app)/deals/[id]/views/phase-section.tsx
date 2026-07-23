@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { PlannedAction } from "@/components/planned-action";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 import { ChecklistCheckbox } from "./checklist-checkbox";
@@ -178,6 +179,8 @@ type Item = {
   completed: boolean;
   notes: string | null;
   trackedDate: string | null;
+  completedAt: string | null;
+  completedByName: string | null;
 };
 
 type PhaseSectionProps = {
@@ -330,14 +333,48 @@ export function PhaseSection({
                             dealId={dealId}
                             completed={item.completed}
                           />
-                          <span
-                            className={cn(
-                              "flex-1 text-[13px] font-normal leading-snug text-gray-700",
-                              item.completed && "text-gray-400 line-through",
+                          {/* Title + completer badge share one flex-1
+                              container so the badge sits inline with the
+                              task name (not pushed all the way right by
+                              row-level ml-auto) and the action-button
+                              cluster below still hugs the right edge. */}
+                          <div className="flex min-w-0 flex-1 items-baseline gap-2">
+                            <span
+                              className={cn(
+                                "text-[13px] font-normal leading-snug text-gray-700",
+                                item.completed && "text-gray-400 line-through",
+                              )}
+                            >
+                              {item.name}
+                            </span>
+                            {item.completed && item.completedAt && (
+                              <Popover>
+                                <PopoverTrigger
+                                  className="cursor-pointer rounded whitespace-nowrap text-[11px] tabular-nums text-gray-400 hover:bg-gray-100 hover:text-gray-600 px-1 py-0.5"
+                                  aria-label="Show completion details"
+                                >
+                                  {item.completedByName ?? "Unknown"}
+                                  {" · "}
+                                  {new Date(item.completedAt).toLocaleDateString(undefined, {
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </PopoverTrigger>
+                                <PopoverContent align="start">
+                                  <div className="font-semibold text-gray-900">
+                                    {item.completedByName ?? "Unknown"}
+                                  </div>
+                                  <div className="mt-0.5 text-gray-600">
+                                    Completed{" "}
+                                    {new Date(item.completedAt).toLocaleString(
+                                      undefined,
+                                      { dateStyle: "medium", timeStyle: "short" },
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             )}
-                          >
-                            {item.name}
-                          </span>
+                          </div>
                           {item.optional && (
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap text-amber-800">
                               optional

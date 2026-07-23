@@ -2,7 +2,9 @@
 
 import { useTransition } from "react";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
+import { useConfirm } from "@/components/confirm/confirm-provider";
 import { cn } from "@/lib/utils";
 
 import { toggleChecklistItem } from "../actions";
@@ -15,10 +17,29 @@ type ChecklistCheckboxProps = {
 
 export function ChecklistCheckbox({ itemId, dealId, completed }: ChecklistCheckboxProps) {
   const [isPending, startTransition] = useTransition();
+  const confirm = useConfirm();
 
-  function handleClick() {
+  async function handleClick() {
+    // Uncheck-only confirmation: clearing a completion loses the
+    // completer + timestamp record. Checking has no confirmation
+    // because it's cheap to correct.
+    if (completed) {
+      const ok = await confirm({
+        title: "Uncheck this item?",
+        description:
+          "The completion timestamp and completer name will be cleared.",
+        confirmLabel: "Uncheck",
+        variant: "destructive",
+      });
+      if (!ok) return;
+    }
     startTransition(async () => {
-      await toggleChecklistItem({ itemId, dealId, completed: !completed });
+      try {
+        await toggleChecklistItem({ itemId, dealId, completed: !completed });
+      } catch (err) {
+        console.error("[toggle-checklist-item]", err);
+        toast.error("Could not update the item. Try again.");
+      }
     });
   }
 
