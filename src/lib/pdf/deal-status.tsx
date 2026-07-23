@@ -271,12 +271,22 @@ const styles = StyleSheet.create({
   },
   milestoneRow: {
     flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 5,
     borderBottomWidth: 0.5,
     borderBottomStyle: "solid",
     borderBottomColor: COLORS.border,
   },
-  milestoneLabel: { flex: 1, fontSize: 10, color: COLORS.textPrimary },
+  // Label side wraps the optional Overdue chip and the label text in a
+  // flex row so the chip's padding + spacing render reliably (nested
+  // <Text><Text/>text</Text> layouts don't respect trailing whitespace
+  // or margins the way View-wrapped chips do).
+  milestoneLabelWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  milestoneLabel: { fontSize: 10, color: COLORS.textPrimary },
   milestoneDate: {
     width: 120,
     textAlign: "right",
@@ -307,7 +317,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     fontFamily: "Metropolis",
     fontWeight: "bold",
-    marginRight: 6,
+    marginRight: 8,
   },
   issueRow: {
     flexDirection: "row",
@@ -491,12 +501,14 @@ export function DealStatusDoc({
         ) : (
           upcomingMilestones.map((m, i) => (
             <View key={`um-${i}`} style={styles.milestoneRow} wrap={false}>
-              <Text style={styles.milestoneLabel}>
+              <View style={styles.milestoneLabelWrap}>
                 {m.overdue && (
-                  <Text style={styles.milestoneOverdueTag}>Overdue </Text>
+                  <View style={styles.milestoneOverdueTag}>
+                    <Text>Overdue</Text>
+                  </View>
                 )}
-                {m.label}
-              </Text>
+                <Text style={styles.milestoneLabel}>{m.label}</Text>
+              </View>
               <Text
                 style={
                   m.overdue
