@@ -101,7 +101,7 @@ Per-deal consultant roster covering 13 roles (Landscape Architect, Civil Enginee
 The Teams tab unifies the Deal Team into three groupings:
 
 - Owner Team: sellers and principals on this deal.
-- Broker Team: everyone running point for Lakebridge or Land Advisors. Pick from org users; outside cobrokers should be added via Admin > Members first.
+- Broker Team: everyone running point for Lakebridge or Land Advisors. Pick from org users; outside cobrokers should be added via Admin > Members first. Role options are Broker (the default for your own firm's people), Cobroker (outside firms), Marketing Coordinator, and Analyst.
 - Buyer Team: the chosen buyer's contacts, picked from contacts already on the deal.
 
 Each member has an Include in emails toggle. Inclusion drives the recipient list when you use the Send to Deal Team buttons (for example, sharing DD material). Members can be real users, existing contacts on the deal, or free-text entries for someone who has no platform record yet.

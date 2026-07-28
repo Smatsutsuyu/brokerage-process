@@ -46,7 +46,10 @@ type Team = "owner" | "broker" | "buyer";
 // stays uniform.
 export const ROLE_OPTIONS: Record<Team, string[]> = {
   owner: ["Owner"],
-  broker: ["Cobroker", "Marketing Coordinator", "Analyst"],
+  // Broker is the primary role (Chris's default); Cobroker stays for
+  // outside cobrokers; Marketing Coordinator + Analyst cover the rest
+  // of the firm's roster.
+  broker: ["Broker", "Cobroker", "Marketing Coordinator", "Analyst"],
   buyer: ["Buyer"],
 };
 
