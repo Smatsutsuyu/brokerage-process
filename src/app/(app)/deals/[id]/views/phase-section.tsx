@@ -439,7 +439,10 @@ export function PhaseSection({
                                 the linked DD folder + index attachment
                                 to the deal team. */}
                             {isShareDdMaterialItem(item.name) && (
-                              <ShareDdMaterialRowActions dealId={dealId} />
+                              <ShareDdMaterialRowActions
+                                dealId={dealId}
+                                itemId={item.id}
+                              />
                             )}
                             {/* Phase 1 Marketing Report row: download
                                 the per-builder Marketing Report PDF.
@@ -581,6 +584,12 @@ export function PhaseSection({
                                 template={SCHEDULE_SOO_REVIEW_TEMPLATE}
                                 teams={["owner", "broker"]}
                                 attachments={[]}
+                                // Row-local requirement first: the miss
+                                // reported is the first in this order, so
+                                // point at the date chip on THIS row
+                                // before sending the user up to Phase 2.
+                                requireVars={["reviewDate", "offersDueDate"]}
+                                sourceItemId={item.id}
                               />
                             )}
                             {isSendBnfItem(item.name) && (

@@ -27,6 +27,7 @@ import { findBuilderByName } from "@/lib/builders";
 import { parseEmailAddress } from "@/lib/email-address";
 import { sendResolvedEmails, type BlastSendResult } from "@/lib/email/blast";
 import { env } from "@/lib/env";
+import { formatMilestoneDate } from "@/lib/format-milestone-date";
 import { formatPhone } from "@/lib/phone";
 import type { ResolvedEmail } from "@/components/email/email-preview-modal";
 
@@ -1482,17 +1483,12 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
 // against a local-time Date so the formatted day matches the date the
 // user picked (passing the string straight to new Date() treats it as
 // UTC midnight, which can roll back a day in negative-offset zones).
+// Thin alias kept so existing call sites read unchanged. The real
+// implementation moved to src/lib/format-milestone-date.ts so the
+// client-side var resolver in deal-team-send-button.tsx can share it —
+// a "use server" module can't export a pure function.
 function formatOfferingDate(trackedDate: string | null): string {
-  if (!trackedDate) return "";
-  const [y, m, d] = trackedDate.split("-").map(Number);
-  if (!y || !m || !d) return "";
-  const date = new Date(y, m - 1, d);
-  return date.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatMilestoneDate(trackedDate);
 }
 
 // Standalone lookup for the deal's Offering Date tracked-date. Returns
@@ -1503,7 +1499,11 @@ export async function getOfferingDate(input: {
   dealId: string;
 }): Promise<string | null> {
   const org = await getCurrentOrg();
-  if (!org) return null;
+  // Throw, don't return null: callers treat null as "the milestone isn't
+  // set" and tell the user to go set it. On an expired session that
+  // advice is a dead end — the date IS set. Throwing routes it to the
+  // caller's catch, which surfaces a transient-failure toast instead.
+  if (!org) throw new Error("No organization context");
   const rows = await db
     .select({ name: checklistItems.name, trackedDate: checklistItems.trackedDate })
     .from(checklistItems)
@@ -1525,7 +1525,9 @@ export async function getBnfDueDate(input: {
   dealId: string;
 }): Promise<string | null> {
   const org = await getCurrentOrg();
-  if (!org) return null;
+  // See getOfferingDate: null means "not set", a throw means "couldn't
+  // check" — the two need different user-facing copy.
+  if (!org) throw new Error("No organization context");
   const rows = await db
     .select({ name: checklistItems.name, trackedDate: checklistItems.trackedDate })
     .from(checklistItems)
@@ -1541,6 +1543,148 @@ export async function getBnfDueDate(input: {
     return n.includes("send out b&f") || n.includes("send out b & f");
   });
   return row?.trackedDate ?? null;
+}
+
+// Meeting date for the Phase 3 "Schedule Summary of Offer Review" row.
+// Feeds {{reviewDate}} in SCHEDULE_SOO_REVIEW_TEMPLATE. Same shape as
+// getBnfDueDate — reads the row's tracked_date milestone.
+// Throws (rather than returning null) when there's no org context so
+// callers can tell "session expired" apart from "the row has no date".
+// A null return means genuinely-unset, which the send buttons surface as
+// an actionable "set the date first" instruction.
+export async function getSooReviewDate(input: {
+  dealId: string;
+  // When the caller knows the exact row (the send button passes its own
+  // item.id), read that row directly instead of name-matching. Avoids
+  // picking the wrong row mid-template-rename, when two matching rows
+  // can briefly coexist.
+  itemId?: string | null;
+}): Promise<string | null> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  const rows = await db
+    .select({
+      id: checklistItems.id,
+      name: checklistItems.name,
+      trackedDate: checklistItems.trackedDate,
+    })
+    .from(checklistItems)
+    .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
+    .where(
+      and(
+        eq(checklistCategories.dealId, input.dealId),
+        eq(checklistItems.orgId, org.id),
+      ),
+    );
+
+  const exact = input.itemId ? rows.find((r) => r.id === input.itemId) : undefined;
+  const row =
+    exact ??
+    rows.find((r) => r.name.toLowerCase().includes("schedule summary of offer review"));
+  return row?.trackedDate ?? null;
+}
+
+// DD folder URL for the Phase 4 Share-DD-Material sends. Feeds
+// {{ddFolderUrl}} in SHARE_DD_MATERIAL_TEMPLATE.
+//
+// Two sources, in priority order:
+//   1. A link on the calling row itself (Chris pastes the Dropbox URL
+//      right where he's sending from).
+//   2. A link on the Phase 1 "Create Full Due Diligence Dropbox Folder"
+//      row — the canonical home for the deal's DD folder, set up once
+//      during go-to-market prep and reused by every later DD send.
+//
+// Returns null when neither carries a link, which the caller's
+// pre-flight turns into an inline "add a link first" rejection rather
+// than opening a composer with a raw {{ddFolderUrl}} in the body.
+export async function getDdFolderUrl(input: {
+  dealId: string;
+  // The row the send is firing from. Checked first.
+  itemId?: string | null;
+}): Promise<string | null> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  // A row can carry several links (title report, survey, recorded map).
+  // Only one of them is the DD folder, so prefer links that actually
+  // look like a shared folder before falling back to "first link wins".
+  // Without this the Index-of-DD-Material row happily emails its index
+  // document as "the due diligence folder".
+  const looksLikeFolder = (l: { url: string; label: string | null }) => {
+    const hay = `${l.label ?? ""} ${l.url}`.toLowerCase();
+    return (
+      hay.includes("folder") ||
+      hay.includes("dropbox") ||
+      hay.includes("sharepoint") ||
+      hay.includes("drive.google")
+    );
+  };
+
+  // Source 1: links on the calling row. Joined through checklist_items ->
+  // checklist_categories so the row must belong to THIS deal — an itemId
+  // from a sibling deal in the same org can't leak its folder URL into a
+  // send that reaches the external Buyer Team.
+  if (input.itemId) {
+    const own = await db
+      .select({ url: checklistItemLinks.url, label: checklistItemLinks.label })
+      .from(checklistItemLinks)
+      .innerJoin(
+        checklistItems,
+        eq(checklistItems.id, checklistItemLinks.checklistItemId),
+      )
+      .innerJoin(
+        checklistCategories,
+        eq(checklistCategories.id, checklistItems.categoryId),
+      )
+      .where(
+        and(
+          eq(checklistItemLinks.checklistItemId, input.itemId),
+          eq(checklistItemLinks.orgId, org.id),
+          eq(checklistCategories.dealId, input.dealId),
+        ),
+      )
+      .orderBy(asc(checklistItemLinks.sortOrder), asc(checklistItemLinks.createdAt));
+    const match = own.find(looksLikeFolder);
+    if (match?.url) return match.url;
+  }
+
+  // Source 2: links on the canonical "Create Full Due Diligence Dropbox
+  // Folder" row. Name-matched the same loose way as the other row
+  // lookups so a slight template rename doesn't silently break it. The
+  // substring is specific enough not to collide with "Create Marketing
+  // Dropbox Folder" or "Share Marketing Due Diligence Folder".
+  const folderRows = await db
+    .select({ id: checklistItems.id, name: checklistItems.name })
+    .from(checklistItems)
+    .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
+    .where(
+      and(
+        eq(checklistCategories.dealId, input.dealId),
+        eq(checklistItems.orgId, org.id),
+      ),
+    );
+  const folderItem = folderRows.find((r) =>
+    r.name.toLowerCase().includes("due diligence dropbox folder"),
+  );
+  if (folderItem) {
+    const canonical = await db
+      .select({ url: checklistItemLinks.url, label: checklistItemLinks.label })
+      .from(checklistItemLinks)
+      .where(
+        and(
+          eq(checklistItemLinks.checklistItemId, folderItem.id),
+          eq(checklistItemLinks.orgId, org.id),
+        ),
+      )
+      .orderBy(asc(checklistItemLinks.sortOrder), asc(checklistItemLinks.createdAt));
+    // This row's whole purpose is the DD folder, so any link on it is
+    // the intended one — folder-looking first, else first available.
+    const chosen = canonical.find(looksLikeFolder) ?? canonical[0];
+    if (chosen?.url) return chosen.url;
+  }
+
+  return null;
 }
 
 // All possible attachments for the OM-blast email — every uploaded file

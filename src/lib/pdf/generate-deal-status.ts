@@ -1,7 +1,7 @@
 import "server-only";
 
 import { renderToBuffer } from "@react-pdf/renderer";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {

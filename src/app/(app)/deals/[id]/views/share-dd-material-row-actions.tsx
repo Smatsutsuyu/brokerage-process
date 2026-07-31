@@ -8,18 +8,25 @@ import { DealTeamSendButton } from "./deal-team-send-button";
 
 type ShareDdMaterialRowActionsProps = {
   dealId: string;
+  // The checklist row this renders on. Passed to the ddFolderUrl lookup
+  // so a link pasted on this row takes priority over the canonical
+  // Phase 1 DD Dropbox Folder row.
+  itemId: string;
 };
 
-// Phase 4 "Share Due Diligence Material / Set Meeting" row. Matches
-// Excel: emails the DD folder link + index to the Deal Team.
+// Phase 4 DD-material rows ("Share Due Diligence Material / Set Meeting"
+// and "Create Index of Due Diligence Material"). Matches Excel: emails
+// the DD folder link + meeting prompt to the Deal Team.
 //
-// The DD folder link itself is captured via the universal Link
-// affordance on the same row (Dropbox URL Chris pastes there). At real
-// send time we'd inject that into the body's {{ddFolderUrl}} var; for
-// now the placeholder lands in the preview and the user can paste the
-// URL before mock-sending. Same goes for an attached index file.
+// {{ddFolderUrl}} resolves server-side on click from two sources, in
+// order: a link on this row, else a link on the Phase 1 "Create Full Due
+// Diligence Dropbox Folder" row. If neither has one the composer refuses
+// to open and the button surfaces an inline rejection — better than
+// shipping a literal "{{ddFolderUrl}}" to the client, which is what
+// happened before this gate existed.
 export function ShareDdMaterialRowActions({
   dealId,
+  itemId,
 }: ShareDdMaterialRowActionsProps) {
   return (
     <DealTeamSendButton
@@ -31,6 +38,8 @@ export function ShareDdMaterialRowActions({
       template={SHARE_DD_MATERIAL_TEMPLATE}
       teams={["owner", "broker", "buyer"]}
       attachments={[]}
+      requireVars={["ddFolderUrl"]}
+      sourceItemId={itemId}
     />
   );
 }

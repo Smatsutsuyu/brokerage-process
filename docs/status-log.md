@@ -32,6 +32,50 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-07-30 — Unpopulated email placeholders: root cause, fix, and a build-time guard
+
+Chris reported `{{ddFolderUrl}}` rendering literally in the Phase 4 Share-DD-Material composer. Investigation found the problem was broader than the report and had been live since May.
+
+### Root cause (git-confirmed)
+- `e846251` (2026-05-13) shipped `ShareDdMaterialRowActions` with `{{ddFolderUrl}}` unwired, with a code comment stating the value would be injected "at real send time" and that for now the placeholder "lands in the preview... before **mock-sending**." Accurate at the time: sends were mocked.
+- `8915043` (2026-05-20) cut over to live Resend. The mock-send premise became false and nothing pointed back at the template.
+- The file was never edited again — one commit in its whole history. **78 days** of shipping a literal `{{ddFolderUrl}}` before a client noticed, and only then because Woods is the first deal to reach Phase 4 DD.
+
+### Why nothing caught it
+Four independent gaps lined up: (1) `extraVars?:` is optional so typecheck passes; (2) `interpolate()` deliberately passes unmatched placeholders through rather than throwing, so no runtime error; (3) the TODO lived in a code comment, not the backlog, so the Resend cutover a week later never triggered a re-audit; (4) Phase 4 rows had no real-world exercise until now.
+
+### Done
+- **Swept all 18 templates.** Two carried unpopulated placeholders and **zero** call sites passed `extraVars`: `SHARE_DD_MATERIAL_TEMPLATE` (`ddFolderUrl`) and `SCHEDULE_SOO_REVIEW_TEMPLATE` (`offersDueDate`, `reviewDate`). The Phase 3 SOO invite had the same bug; Chris just hadn't hit it.
+- **New `requireVars` pre-flight on `DealTeamSendButton`.** Resolves each required placeholder server-side on click; a miss blocks the composer and surfaces an inline rejection bubble anchored to the button (same pattern as `BuyerBlastButton`'s `requireAttachment`). Better a clear "add a link first" than a composer with a broken body.
+- **New `getDdFolderUrl({ dealId, itemId })`** — two sources in priority order: a link on the calling row, else a link on the Phase 1 "Create Full Due Diligence Dropbox Folder" row. Set the folder link once during prep and every later DD send inherits it.
+- **New `getSooReviewDate({ dealId })`** mirroring `getBnfDueDate`; `offersDueDate` reuses the existing `getOfferingDate`.
+- **`dateField: true` added to the "Schedule Summary of Offer Review" row** so it carries a milestone-date chip that `{{reviewDate}}` reads from. Runtime template flag, no migration or reconcile needed.
+- **New build guard `src/scripts/check-template-vars.ts`**, wired as the **first** step of `vercel-build` (before migrations, so a failure costs nothing). Fails the build unless every `{{placeholder}}` is either supplied by the deal context or registered as caller-supplied **and** actually wired at a call site.
+- **New shared `src/lib/format-milestone-date.ts`.** `formatOfferingDate` previously lived inside the `"use server"` actions module, which can only export async functions — so the new client-side resolver couldn't reuse it. Extracting it fixed the bug where `{{offersDueDate}}` / `{{reviewDate}}` would have shipped raw `2026-08-14` while every sibling template rendered `Friday, August 14, 2026`.
+
+### Adversarial verify (3 parallel reviewers, 19 findings, all applied)
+The first cut of this work had real defects. Notable ones, all fixed before commit:
+- **Blocker — the guard silently under-covered.** v1 regex-scraped the source. A reviewer proved by execution that converting one template to the `satisfies EmailTemplate` idiom made it report `OK (17 templates)` and exit 0, and that a body containing `};` at column 0 truncated the capture so trailing placeholders went unchecked. **Rewritten to dynamically import the module and iterate real exports** — syntax-agnostic, reads the runtime string, and immune to both. Re-tested against all three original attacks; each now exits 1.
+- **The allowlist was a promise, not a check.** Deleting a `requireVars` prop left the guard green while the placeholder went unpopulated — the exact original bug. The guard now scans the views directory and fails when a registered var has no `requireVars` / `extraVars` / gating-prop reference anywhere.
+- **`dueDate` / `bnfDueDate` were wrongly listed as always-supplied.** `formatOfferingDate` returns `""` when the milestone is unset, and `interpolate()` treats `""` as missing — so they can emit a literal placeholder too. Moved to caller-supplied, where their `requireOfferingDate` / `requireBnfDate` gates are verified.
+- **Raw ISO dates in the email body.** Fixed by the shared formatter above.
+- **Within-org cross-deal leak.** `getDdFolderUrl` source 1 didn't verify the passed `itemId` belonged to the passed `dealId`, so an org member could resolve a sibling deal's Dropbox URL into a send that reaches the **external Buyer Team**. Now joined through `checklist_categories` on `dealId`.
+- **Wrong link chosen.** Source 1 took the oldest link on the row regardless of what it pointed at, so the Index-of-DD-Material row would email its index document as "the due diligence folder". Now prefers links that look like a shared folder (`folder` / `dropbox` / `sharepoint` / `drive.google`) before falling through.
+- **Expired session reported as missing data.** The resolvers returned `null` for both "no org context" and "genuinely unset", so a session timeout told the user to go set a date that was already set. All three date resolvers now **throw** on missing org and reserve `null` for unset; the button routes throws to a toast.
+- **Misordered first-miss.** The SOO gate reported the off-screen Phase 2 dependency before the row-local one, costing two round trips on a fresh deal. Call site now lists `reviewDate` first; resolution parallelized with `Promise.all` while keeping first-miss-by-declared-order.
+- Also: added the `ring-1 ring-red-300` error ring the two sibling gated buttons already had, split the catch so resolver failures don't say "couldn't load recipients", and threaded `sourceItemId` into `getSooReviewDate`.
+
+### Decisions
+- **Gate rather than warn.** `interpolate()`'s pass-through is the right default for typos, but for a placeholder with a known data source it just guarantees the user hand-patches every send or ships a broken body. Placeholders with a resolvable source get a hard gate.
+- **Guard runs first in `vercel-build`.** It is pure static analysis with no DB dependency, so failing fast costs nothing — and it avoids the "migrations already ran, then the build failed" waste noted in the backlog.
+- **`CALLER_SUPPLIED` in the guard is a deliberate allowlist, not an inference.** Registering a var there is an assertion that a call site populates it. Cheap to keep honest, and it makes the guard's failure message actionable.
+- **Left the loose `isShareDdMaterialItem` matcher alone.** It matches both "Share Due Diligence Material / Set Meeting" and "Create Index of Due Diligence Material". Sean described both as legitimate send surfaces, so both keep the button — now both gated.
+
+### Blockers
+- None. Separately, feedback item `54a4fec3` (Deal Team send recipients + standard CC) is still awaiting a client answer on To/CC split.
+
+---
+
 ## 2026-07-24 — Checklist completer attribution + Deal Status PDF + header refactor + archive-then-delete
 
 Six coordinated changes to the deal-page surface, all shipping together.

@@ -267,7 +267,9 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
         name: "Summary of Offers (SOO)",
         items: [
           // Send invite wired in phase-section via isScheduleSooReviewItem.
-          "Schedule Summary of Offer Review",
+          // dateField drives the milestone-date chip; the invite body's
+          // {{reviewDate}} reads from it and the send is gated until set.
+          { name: "Schedule Summary of Offer Review", dateField: true },
           {
             name: "Initial Summary of Offers + LOIS",
             actions: [

@@ -49,3 +49,7 @@ backups/
 
 # graphify knowledge-graph outputs (per-user tooling, regenerable)
 graphify-out/
+
+# tsx scratch cache. Under Git Bash TEMP can resolve to the literal
+# string "undefined", so tsx writes its cache to ./undefined/temp/.
+undefined/

@@ -151,6 +151,10 @@ Some row buttons exist solely to ship a document and refuse to open the composer
 - **Send Market Study** requires an uploaded file on the row. A Dropbox link alone won't satisfy this gate — the recipient needs the actual document attached.
 - **Send CTC** (Cost to Complete row) requires an uploaded file on the row, same as Send Market Study.
 - **Send DD Folder** (Share Marketing Due Diligence Folder row) accepts either a file or a link, since these are usually shared as a Dropbox / SharePoint folder URL.
+- **Send to Deal Team** on the Phase 4 DD-material rows requires a DD folder link. It looks in two places: a link on the row you're sending from, then a link on the Phase 1 "Create Full Due Diligence Dropbox Folder" row. Set the folder link once during go-to-market prep and every later DD send picks it up automatically.
+- **Send invite** (Phase 3 Schedule Summary of Offer Review row) requires both the Offering Date (Phase 2 milestone) and a review date on the Schedule Summary of Offer Review row itself. The invite body quotes both, so it won't send until each is set.
+
+These gates exist because an email template that references a value it can't resolve will send the raw `{{placeholder}}` text to the client. A build-time check (`npm run check:template-vars`) enforces that every placeholder in every template is either supplied by the deal context or resolved by its send button, so this can't regress silently.
 
 In all three cases, drop the file or link onto the checklist row via its universal attachment / link affordance, then click Send again.
 
