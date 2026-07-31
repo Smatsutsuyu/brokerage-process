@@ -102,6 +102,17 @@ Major reconciliation pass against Chris's `Marketing Process Checklist.xlsx` v2 
 - Member-remove flow: hard delete with cascade, last-owner guardrail, fix for inviting a member signing the owner out (`12685c5`).
 - Auto-clean orphan `deal_buyers` rows on builder delete (`1434e4d`, `85e7747`).
 
+## PDF section legibility + orphaned headings (2026-07-31)
+
+Both from Chris exercising the new Consultant Roster PDF on the Woods deal.
+
+- **Subsection bands** replace bold-text-over-a-rule headings in both the Consultant Roster and DD Tracking PDFs. The old treatment weighed the same as the bold firm name / issue title directly beneath it, so role, status, and subteam headings read as just another row. Now a filled `#f1f3f5` band, uppercase and letterspaced, with rows and bands sharing a 7pt horizontal inset so band text aligns with the first column.
+- **"Not yet engaged" moved into the roster's header block.** As a trailing section it spilled onto its own page when page 1 was full, and the `fixed` column header repeated above it, producing a page of column labels with no rows. Keeping every non-table element in the header means the repeating header only lands on pages that carry entries.
+- **`Section` helper in `dd-tracking.tsx`** makes page breaks orphan-proof: the section header is glued to the first band and its first row, and each subsequent band to its own first row, via `wrap={false}`. `minPresenceAhead` was tried first and rejected — it reproducibly left a "SOILS ENGINEER" band stranded at a page bottom.
+- **Consultant rows in DD Tracking** now stack the buyer/seller tag under the firm name instead of nesting it inline, which was breaking mid-name once the column narrowed. Matches the Consultant Roster exactly.
+- **Page-break stress fixture** added to `src/scripts/smoke-pdfs.ts` (14 issues / 9 team members / 8 consultant roles) as the regression guard for the orphan class of bug.
+- Deal Status PDF still uses the old subheading treatment; not swept, not raised.
+
 ## Consultant Roster PDF + real attachment on the roster send (2026-07-30)
 
 - **New Consultant Roster PDF** (`src/lib/pdf/consultant-roster.tsx` + `src/lib/pdf/generate-consultant-roster.ts`, route `/api/deals/[id]/consultant-roster.pdf`). Land Advisors-branded contact sheet: deal header with units / type / location, an "X of 13 roles engaged" coverage line, then one section per engaged role in canonical template order with firm, buyer/seller side, contact, email, and phone. Roles with nobody engaged collapse into a single trailing "Not yet engaged" line so the detail block stays dense. Column header strip is `fixed`, so it repeats on every page of a roster that spills. Per-consultant `notes` are deliberately excluded — the roster goes to the Buyer Team too, and notes are internal commentary.

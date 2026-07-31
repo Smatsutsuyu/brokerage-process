@@ -4,6 +4,32 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-07-31 — PDF section legibility + orphaned-heading fixes
+
+Both items came from Chris exercising the new Consultant Roster PDF on the Woods deal.
+
+### Done
+- **Killed a "NOT YET ENGAGED" block that appeared detached from anything.** On a full page the trailing not-engaged list spilled onto a page of its own, and the `fixed` column header dutifully repeated above it, so page 2 was a column header plus a floating list and no rows. Moved the list into the header block under the coverage count. Every non-table element now lives in the header, so the repeating column header can only ever land on a page that carries entries.
+- **Subsections were indistinguishable from entries** in both the Consultant Roster and the DD Tracking PDF. Role / status / subteam headings were bold text over a hair rule, the same visual weight as the bold firm name or issue title immediately beneath, and the rule read as a row separator. Replaced with a filled tint band (`#f1f3f5`, uppercase, letterspaced) in both documents. Rows and bands share a 7pt horizontal inset so band text lines up with the first column.
+- **Fixed orphaned headings in the DD Tracking PDF.** Tried `minPresenceAhead` first; it proved unreliable, reproducibly leaving a "SOILS ENGINEER" band at a page bottom with its row overleaf. Replaced with a `Section` helper that glues the section header to the first band and that band's first row, and every subsequent band to its own first row, all via `wrap={false}`. Only whole rows break across pages now.
+- **Fixed a wrap artifact in DD Tracking's consultant rows.** The buyer/seller chip was a Text nested inline in the firm-name Text, which broke mid-name once the column narrowed ("Hunsaker & Associates-" / "SELLER"). Stacked it under the name in the roster's colored style, so the two PDFs now render consultants identically.
+- **Tightened the roster's vertical rhythm** (band margin 13→10, row padding 5→4). The Woods roster went from 2 pages with a single row stranded on page 2 to a clean 1 page.
+- Dropped an unused `builders` import from the DD Tracking route while in there.
+
+### Verification
+- `tsc`, `lint` (still only the pre-existing `inline-error-bubble.tsx` error, no new findings), `check:template-vars`, and `next build` all pass.
+- Reproduced Chris's exact Woods roster as a fixture, confirmed the fix visually, then re-rendered at 1 and 3 pages.
+- Added a page-break stress fixture to `src/scripts/smoke-pdfs.ts` (14 issues, 9 team members, 8 consultant roles) sized to land headings near page boundaries. Rendered across 3 pages: every band carries a row. This is the regression guard for the orphan class of bug, which is silent and visual.
+
+### Decisions
+- **Structural page-break control over `minPresenceAhead`.** The declarative prop is less code but did not hold under the stress fixture. `wrap={false}` around heading-plus-first-row is deterministic and is the same pattern the roster already used.
+- **Not-engaged list moved to the top rather than dropped.** The gaps are the actionable part during DD; muting it and putting it beside the coverage count keeps it useful without letting it dominate a sparse early roster.
+
+### Deferred / Pending
+- **Deal Status PDF** uses the same old subheading treatment and has not been swept. Not raised by Chris; worth doing for consistency if he notices it there too.
+
+---
+
 ## 2026-07-30 — Consultant Roster PDF + real attachment on the roster send
 
 ### Done

@@ -11,7 +11,6 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   authUser,
-  builders,
   checklistCategories,
   checklistItems,
   consultants,

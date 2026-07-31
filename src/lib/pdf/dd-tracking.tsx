@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 
+import type { ReactNode } from "react";
 import {
   Document,
   Font,
@@ -107,6 +108,9 @@ const COLORS = {
   textSecondary: "#6b7280",
   border: "#e5e7eb",
   rowAlt: "#f9fafb",
+  bandBg: "#f1f3f5",
+  buyer: "#1d4ed8",
+  seller: "#047857",
   open: "#b91c1c",
   inProgress: "#b45309",
   resolved: "#15803d",
@@ -135,6 +139,9 @@ const TEAM_ORDER: DealTeam[] = ["owner", "broker", "buyer"];
 
 const MARGIN = 36;
 const FOOTER_RESERVE = 70;
+// Horizontal inset shared by the subsection bands and every data row, so
+// band text lines up with the first column beneath it.
+const ROW_INSET = 7;
 
 const styles = StyleSheet.create({
   page: {
@@ -192,6 +199,7 @@ const styles = StyleSheet.create({
   milestoneRow: {
     flexDirection: "row",
     paddingVertical: 5,
+    paddingHorizontal: ROW_INSET,
     borderBottomWidth: 0.5,
     borderBottomStyle: "solid",
     borderBottomColor: COLORS.border,
@@ -231,21 +239,28 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: COLORS.textSecondary,
   },
-  // Issues styles
-  groupHeader: {
-    marginTop: 12,
-    marginBottom: 4,
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.ink,
-    fontSize: 9,
+  // Subsection band, shared by the issue status groups, the deal-team
+  // subteams, and the consultant roles. Previously these were bold text
+  // over a hair rule, which weighed the same as the bold issue title /
+  // contact name directly beneath and read as just another row. A filled
+  // band separates "subsection" from "entry" without a new font weight.
+  band: {
+    marginTop: 10,
+    backgroundColor: COLORS.bandBg,
+    paddingVertical: 4,
+    paddingHorizontal: ROW_INSET,
+  },
+  bandText: {
+    fontSize: 8.5,
     fontFamily: "Metropolis",
     fontWeight: "bold",
-    letterSpacing: 1,
+    letterSpacing: 1.2,
+    color: COLORS.ink,
   },
   issueRow: {
     flexDirection: "row",
     paddingVertical: 6,
+    paddingHorizontal: ROW_INSET,
     borderBottomWidth: 0.5,
     borderBottomStyle: "solid",
     borderBottomColor: COLORS.border,
@@ -278,17 +293,11 @@ const styles = StyleSheet.create({
   },
   small: { fontSize: 9, color: COLORS.textSecondary },
   // Team / Consultant entries
-  subHeader: {
-    marginTop: 10,
-    marginBottom: 4,
-    fontSize: 10,
-    fontFamily: "Metropolis",
-    fontWeight: "bold",
-    color: COLORS.ink,
-  },
   contactRow: {
     flexDirection: "row",
+    alignItems: "flex-start",
     paddingVertical: 4,
+    paddingHorizontal: ROW_INSET,
     borderBottomWidth: 0.5,
     borderBottomColor: COLORS.border,
   },
@@ -318,14 +327,29 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     textAlign: "right",
   },
-  sideTag: {
+  // Consultant firm cell. The side used to render as an inline chip
+  // nested in the firm-name Text, which wrapped mid-name once the column
+  // narrowed ("Hunsaker & Associates-" / "SELLER"). Stacking it under the
+  // name matches the Consultant Roster PDF and can't break the name.
+  firmCell: {
+    width: 140,
+    paddingRight: 6,
+  },
+  // Same look as contactName, minus the fixed width — firmCell owns the
+  // column geometry here, so the inner Text must not re-declare it.
+  firmName: {
+    fontFamily: "Metropolis",
+    fontWeight: "bold",
+    fontSize: 10,
+    color: COLORS.ink,
+  },
+  sideLine: {
+    marginTop: 1,
     fontSize: 7,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    backgroundColor: COLORS.rowAlt,
-    color: COLORS.textSecondary,
-    textTransform: "uppercase",
     letterSpacing: 0.5,
+    textTransform: "uppercase",
+    fontFamily: "Metropolis",
+    fontWeight: "bold",
   },
   emptyNote: {
     paddingVertical: 8,
@@ -353,6 +377,141 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
 });
+
+type SectionGroup = {
+  key: string;
+  // Subsection band, or null for a section with a single unlabeled run of
+  // rows (Key Dates).
+  band: ReactNode | null;
+  rows: ReactNode[];
+};
+
+// Renders one report section with orphan-proof page breaks.
+//
+// react-pdf's `minPresenceAhead` was tried first and proved unreliable
+// here: a band could still land at the very bottom with its rows overleaf
+// (reproduced with a "SOILS ENGINEER" heading stranded on its own). The
+// structural fix is deterministic instead: the section header is glued to
+// the first band and that band's first row, and every subsequent band is
+// glued to its own first row, all via `wrap={false}`. Only whole rows can
+// break across pages, so no heading is ever left behind.
+//
+// Empty groups are dropped, and a section with nothing left renders its
+// header plus the empty note as one unbreakable unit.
+function Section({
+  header,
+  groups,
+  emptyNote,
+}: {
+  header: string;
+  groups: SectionGroup[];
+  emptyNote: string;
+}) {
+  const populated = groups.filter((g) => g.rows.length > 0);
+
+  if (populated.length === 0) {
+    return (
+      <View wrap={false}>
+        <Text style={styles.sectionHeader}>{header}</Text>
+        <Text style={styles.emptyNote}>{emptyNote}</Text>
+      </View>
+    );
+  }
+
+  const [first, ...rest] = populated;
+  return (
+    <>
+      <View wrap={false}>
+        <Text style={styles.sectionHeader}>{header}</Text>
+        {first.band}
+        {first.rows[0]}
+      </View>
+      {first.rows.slice(1)}
+      {rest.map((g) => (
+        <View key={g.key}>
+          <View wrap={false}>
+            {g.band}
+            {g.rows[0]}
+          </View>
+          {g.rows.slice(1)}
+        </View>
+      ))}
+    </>
+  );
+}
+
+function MilestoneRowView({ m }: { m: MilestoneRow }) {
+  return (
+    <View style={styles.milestoneRow} wrap={false}>
+      <View style={styles.milestoneLabelWrap}>
+        {m.hasHappened && (
+          <Svg width={10} height={10} viewBox="0 0 24 24" style={styles.milestoneCheck}>
+            <Path
+              d="M4 12 L10 18 L20 6"
+              stroke="#059669"
+              strokeWidth={3.5}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
+        )}
+        <Text style={m.completed ? styles.milestoneLabelDone : styles.milestoneLabel}>
+          {m.label}
+        </Text>
+      </View>
+      <Text style={m.date ? styles.milestoneDate : styles.milestoneDateMissing}>
+        {m.date ?? "not scheduled"}
+      </Text>
+    </View>
+  );
+}
+
+function IssueRowView({ r }: { r: IssueRow }) {
+  const p = PRIORITY_META[r.priority];
+  return (
+    <View style={styles.issueRow} wrap={false}>
+      <View style={styles.colPriority}>
+        <Text style={[styles.priorityChip, { backgroundColor: p.bg, color: p.fg }]}>
+          {p.label}
+        </Text>
+      </View>
+      <View style={styles.colTitle}>
+        <Text style={styles.title}>{r.title}</Text>
+        {r.description ? <Text style={styles.description}>{r.description}</Text> : null}
+      </View>
+      <View style={styles.colAssigned}>
+        <Text style={styles.small}>
+          {r.assignedName ? `Assigned: ${r.assignedName}` : "Unassigned"}
+        </Text>
+      </View>
+      <View style={styles.colDate}>
+        <Text style={styles.small}>{r.identifiedDate}</Text>
+      </View>
+    </View>
+  );
+}
+
+function ConsultantRowView({ c }: { c: ConsultantRow }) {
+  return (
+    <View style={styles.contactRow} wrap={false}>
+      <View style={styles.firmCell}>
+        <Text style={styles.firmName}>{c.firmName}</Text>
+        <Text
+          style={[
+            styles.sideLine,
+            { color: c.side === "buyer" ? COLORS.buyer : COLORS.seller },
+          ]}
+        >
+          {c.side === "buyer" ? "Buyer-side" : "Seller-side"}
+        </Text>
+      </View>
+      <Text style={styles.contactRole}>{c.contactName ?? ""}</Text>
+      <Text style={styles.contactEmail}>{c.contactEmail ?? ""}</Text>
+      <Text style={styles.contactPhone}>{c.contactPhone ?? ""}</Text>
+    </View>
+  );
+}
 
 export function DdTrackingDoc({
   dealName,
@@ -399,130 +558,75 @@ export function DdTrackingDoc({
         </View>
 
         {/* Section 1: Key Dates */}
-        <Text style={styles.sectionHeader}>KEY DATES</Text>
-        {milestones.map((m, i) => (
-          <View key={`m-${i}`} style={styles.milestoneRow} wrap={false}>
-            <View style={styles.milestoneLabelWrap}>
-              {m.hasHappened && (
-                <Svg
-                  width={10}
-                  height={10}
-                  viewBox="0 0 24 24"
-                  style={styles.milestoneCheck}
-                >
-                  <Path
-                    d="M4 12 L10 18 L20 6"
-                    stroke="#059669"
-                    strokeWidth={3.5}
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </Svg>
-              )}
-              <Text style={m.completed ? styles.milestoneLabelDone : styles.milestoneLabel}>
-                {m.label}
-              </Text>
-            </View>
-            <Text style={m.date ? styles.milestoneDate : styles.milestoneDateMissing}>
-              {m.date ?? "not scheduled"}
-            </Text>
-          </View>
-        ))}
+        <Section
+          header="KEY DATES"
+          emptyNote="No milestone dates on this deal yet."
+          groups={[
+            {
+              key: "milestones",
+              band: null,
+              rows: milestones.map((m, i) => <MilestoneRowView key={`m-${i}`} m={m} />),
+            },
+          ]}
+        />
 
         {/* Section 2: Issues */}
-        <Text style={styles.sectionHeader}>ISSUES</Text>
-        {issues.length === 0 ? (
-          <Text style={styles.emptyNote}>No issues tracked on this deal yet.</Text>
-        ) : (
-          issueGroupOrder.map((status) => {
-            const list = groupedIssues[status];
-            if (list.length === 0) return null;
-            return (
-              <View key={status}>
-                <Text style={[styles.groupHeader, { color: STATUS_META[status].color }]}>
-                  {STATUS_META[status].label.toUpperCase()} ({list.length})
+        <Section
+          header="ISSUES"
+          emptyNote="No issues tracked on this deal yet."
+          groups={issueGroupOrder.map((status) => ({
+            key: status,
+            band: (
+              <View style={styles.band}>
+                <Text style={[styles.bandText, { color: STATUS_META[status].color }]}>
+                  {STATUS_META[status].label.toUpperCase()} ({groupedIssues[status].length})
                 </Text>
-                {list.map((r, i) => {
-                  const p = PRIORITY_META[r.priority];
-                  return (
-                    <View key={`${status}-${i}`} style={styles.issueRow} wrap={false}>
-                      <View style={styles.colPriority}>
-                        <Text
-                          style={[styles.priorityChip, { backgroundColor: p.bg, color: p.fg }]}
-                        >
-                          {p.label}
-                        </Text>
-                      </View>
-                      <View style={styles.colTitle}>
-                        <Text style={styles.title}>{r.title}</Text>
-                        {r.description ? (
-                          <Text style={styles.description}>{r.description}</Text>
-                        ) : null}
-                      </View>
-                      <View style={styles.colAssigned}>
-                        <Text style={styles.small}>
-                          {r.assignedName ? `Assigned: ${r.assignedName}` : "Unassigned"}
-                        </Text>
-                      </View>
-                      <View style={styles.colDate}>
-                        <Text style={styles.small}>{r.identifiedDate}</Text>
-                      </View>
-                    </View>
-                  );
-                })}
               </View>
-            );
-          })
-        )}
+            ),
+            rows: groupedIssues[status].map((r, i) => (
+              <IssueRowView key={`${status}-${i}`} r={r} />
+            )),
+          }))}
+        />
 
         {/* Section 3: Deal Team */}
-        <Text style={styles.sectionHeader}>DEAL TEAM</Text>
-        {team.length === 0 ? (
-          <Text style={styles.emptyNote}>No deal team members recorded yet.</Text>
-        ) : (
-          TEAM_ORDER.map((t) => {
-            const members = teamByGroup[t];
-            if (members.length === 0) return null;
-            return (
-              <View key={t}>
-                <Text style={styles.subHeader}>{TEAM_LABEL[t]}</Text>
-                {members.map((m, i) => (
-                  <View key={`${t}-${i}`} style={styles.contactRow} wrap={false}>
-                    <Text style={styles.contactName}>{m.name || "—"}</Text>
-                    <Text style={styles.contactRole}>{m.roleLabel || ""}</Text>
-                    <Text style={styles.contactEmail}>{m.email ?? ""}</Text>
-                    <Text style={styles.contactPhone}>{m.phone ?? ""}</Text>
-                  </View>
-                ))}
+        <Section
+          header="DEAL TEAM"
+          emptyNote="No deal team members recorded yet."
+          groups={TEAM_ORDER.map((t) => ({
+            key: t,
+            band: (
+              <View style={styles.band}>
+                <Text style={styles.bandText}>{TEAM_LABEL[t].toUpperCase()}</Text>
               </View>
-            );
-          })
-        )}
+            ),
+            rows: teamByGroup[t].map((m, i) => (
+              <View key={`${t}-${i}`} style={styles.contactRow} wrap={false}>
+                <Text style={styles.contactName}>{m.name || "—"}</Text>
+                <Text style={styles.contactRole}>{m.roleLabel || ""}</Text>
+                <Text style={styles.contactEmail}>{m.email ?? ""}</Text>
+                <Text style={styles.contactPhone}>{m.phone ?? ""}</Text>
+              </View>
+            )),
+          }))}
+        />
 
         {/* Section 4: Consultants */}
-        <Text style={styles.sectionHeader}>CONSULTANTS</Text>
-        {consultants.length === 0 ? (
-          <Text style={styles.emptyNote}>No consultants recorded yet.</Text>
-        ) : (
-          Array.from(consultantsByRole.entries()).map(([roleLabel, firms]) => (
-            <View key={roleLabel}>
-              <Text style={styles.subHeader}>{roleLabel}</Text>
-              {firms.map((c, i) => (
-                <View key={`${roleLabel}-${i}`} style={styles.contactRow} wrap={false}>
-                  <Text style={styles.contactName}>
-                    {c.firmName}
-                    {"  "}
-                    <Text style={styles.sideTag}>{c.side}</Text>
-                  </Text>
-                  <Text style={styles.contactRole}>{c.contactName ?? ""}</Text>
-                  <Text style={styles.contactEmail}>{c.contactEmail ?? ""}</Text>
-                  <Text style={styles.contactPhone}>{c.contactPhone ?? ""}</Text>
-                </View>
-              ))}
-            </View>
-          ))
-        )}
+        <Section
+          header="CONSULTANTS"
+          emptyNote="No consultants recorded yet."
+          groups={Array.from(consultantsByRole.entries()).map(([roleLabel, firms]) => ({
+            key: roleLabel,
+            band: (
+              <View style={styles.band}>
+                <Text style={styles.bandText}>{roleLabel.toUpperCase()}</Text>
+              </View>
+            ),
+            rows: firms.map((c, i) => (
+              <ConsultantRowView key={`${roleLabel}-${i}`} c={c} />
+            )),
+          }))}
+        />
 
         <View style={styles.footer} fixed>
           {LAO_LOGO_DATA_URI ? (

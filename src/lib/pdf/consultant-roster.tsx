@@ -37,8 +37,15 @@ try {
 // Consultant Roster. Standalone, Land Advisors-branded contact sheet for
 // the Phase 4 "Create Consultant Roster & Send Out" row and the
 // Consultants tab. Sections are the 13 canonical roles in template
-// order; roles with nobody engaged collapse into a single trailing list
-// so the detail block stays dense.
+// order; roles with nobody engaged collapse into one muted line in the
+// header block so the detail table stays dense.
+//
+// That line used to sit at the BOTTOM of the document, which broke on a
+// full page: it spilled onto a page of its own, and the `fixed` column
+// header dutifully repeated above it, producing a page with column
+// labels and no rows. Keeping every non-table element in the header
+// block means the repeating header only ever lands on pages that carry
+// actual entries.
 //
 // Deliberately omits the per-consultant `notes` field: this document goes
 // to the Buyer Team as well as the Owner/Broker teams, and notes are
@@ -67,7 +74,8 @@ export type ConsultantRosterProps = {
   dealSubtitle: string | null;
   // Roles with at least one firm, in canonical order.
   groups: RosterRoleGroup[];
-  // Labels of the roles nobody's been engaged for yet.
+  // Labels of the roles nobody's been engaged for yet. Rendered as a
+  // muted line in the header block, not as a trailing section.
   unfilledRoleLabels: string[];
   filledCount: number;
   totalRoles: number;
@@ -79,12 +87,16 @@ const COLORS = {
   textSecondary: "#6b7280",
   textMuted: "#9ca3af",
   border: "#e5e7eb",
+  bandBg: "#f1f3f5",
   buyer: "#1d4ed8",
   seller: "#047857",
 };
 
 const MARGIN = 36;
 const FOOTER_RESERVE = 70;
+// Horizontal inset shared by the role band, the column header, and every
+// entry row so the tinted band's text lines up with the firm names under it.
+const ROW_INSET = 7;
 
 const styles = StyleSheet.create({
   page: {
@@ -126,11 +138,25 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: COLORS.ink,
   },
+  unfilledLine: {
+    marginTop: 3,
+    fontSize: 9,
+    lineHeight: 1.4,
+    color: COLORS.textMuted,
+  },
+  unfilledLabel: {
+    fontSize: 7.5,
+    fontFamily: "Metropolis",
+    fontWeight: "bold",
+    letterSpacing: 0.8,
+    color: COLORS.textSecondary,
+  },
   // Column header strip, repeated on every page so a roster that wraps
   // keeps its labels.
   columnHeader: {
     flexDirection: "row",
     paddingBottom: 4,
+    paddingHorizontal: ROW_INSET,
     borderBottomWidth: 1.5,
     borderBottomStyle: "solid",
     borderBottomColor: COLORS.ink,
@@ -142,23 +168,28 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: COLORS.textSecondary,
   },
-  roleHeader: {
-    marginTop: 12,
-    marginBottom: 3,
-    paddingBottom: 3,
-    borderBottomWidth: 0.5,
-    borderBottomStyle: "solid",
-    borderBottomColor: COLORS.border,
-    fontSize: 9.5,
+  // Tinted full-width band. The previous treatment (bold text over a hair
+  // rule) weighed the same as a bold firm name directly under it, so role
+  // headings read as just another row. A filled band separates "section"
+  // from "entry" at a glance without adding another font weight.
+  roleBand: {
+    marginTop: 10,
+    backgroundColor: COLORS.bandBg,
+    paddingVertical: 4,
+    paddingHorizontal: ROW_INSET,
+  },
+  roleBandText: {
+    fontSize: 8.5,
     fontFamily: "Metropolis",
     fontWeight: "bold",
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     color: COLORS.ink,
   },
   entryRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    paddingVertical: 5,
+    paddingVertical: 4,
+    paddingHorizontal: ROW_INSET,
     borderBottomWidth: 0.5,
     borderBottomStyle: "solid",
     borderBottomColor: COLORS.border,
@@ -189,24 +220,6 @@ const styles = StyleSheet.create({
   },
   cellMuted: {
     fontSize: 9,
-    color: COLORS.textMuted,
-  },
-  unfilledHeader: {
-    marginTop: 18,
-    marginBottom: 5,
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: COLORS.border,
-    fontSize: 9,
-    fontFamily: "Metropolis",
-    fontWeight: "bold",
-    letterSpacing: 1,
-    color: COLORS.textSecondary,
-  },
-  unfilledList: {
-    fontSize: 9,
-    lineHeight: 1.5,
     color: COLORS.textMuted,
   },
   emptyNote: {
@@ -258,6 +271,12 @@ export function ConsultantRosterDoc({
             </Text>
             {" roles engaged"}
           </Text>
+          {unfilledRoleLabels.length > 0 && (
+            <Text style={styles.unfilledLine}>
+              <Text style={styles.unfilledLabel}>NOT YET ENGAGED{"   "}</Text>
+              {unfilledRoleLabels.join(" · ")}
+            </Text>
+          )}
         </View>
 
         {groups.length === 0 ? (
@@ -277,12 +296,14 @@ export function ConsultantRosterDoc({
 
             {groups.map((group) => (
               <View key={group.roleLabel}>
-                {/* The role header stays with at least its first entry so
-                    a break never orphans a heading at the page bottom. */}
+                {/* The role band stays with at least its first entry so a
+                    break never orphans a heading at the page bottom. */}
                 <View wrap={false}>
-                  <Text style={styles.roleHeader}>
-                    {group.roleLabel.toUpperCase()}
-                  </Text>
+                  <View style={styles.roleBand}>
+                    <Text style={styles.roleBandText}>
+                      {group.roleLabel.toUpperCase()}
+                    </Text>
+                  </View>
                   {group.entries[0] && <EntryRow entry={group.entries[0]} />}
                 </View>
                 {group.entries.slice(1).map((entry, i) => (
@@ -291,13 +312,6 @@ export function ConsultantRosterDoc({
               </View>
             ))}
           </>
-        )}
-
-        {unfilledRoleLabels.length > 0 && (
-          <View wrap={false}>
-            <Text style={styles.unfilledHeader}>NOT YET ENGAGED</Text>
-            <Text style={styles.unfilledList}>{unfilledRoleLabels.join(" · ")}</Text>
-          </View>
         )}
 
         <View style={styles.footer} fixed>

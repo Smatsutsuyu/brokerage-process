@@ -205,6 +205,62 @@ async function main() {
   );
   writeFileSync("c:/tmp/consultant-roster-smoke.pdf", rosterBuf);
   console.log("consultant-roster:", rosterBuf.length, "bytes");
+
+  // Page-break stress case. Sized so section headers and subsection bands
+  // land near page boundaries, which is what surfaced the stranded
+  // "SOILS ENGINEER" band that the Section helper in dd-tracking.tsx now
+  // prevents. Check every page: no heading may sit without a row under it.
+  const stressBuf = await renderToBuffer(
+    DdTrackingDoc({
+      dealName: "Riverside Estates Phase 2",
+      dateLabel: "July 31, 2026",
+      purchasePrice: 24500000,
+      milestones: [
+        { label: "LOI Signed Date", date: "May 1, 2026", completed: true, hasHappened: true },
+        { label: "PSA Effective Date", date: "May 12, 2026", completed: true, hasHappened: true },
+        { label: "Receive 1st Draft Cost to Complete", date: "Jun 1, 2026", completed: false, hasHappened: false },
+        { label: "Finalize Cost to Complete / Final Purchase Price", date: null, completed: false, hasHappened: false },
+        { label: "Investment Committee Approval", date: null, completed: false, hasHappened: false },
+        { label: "Waive Feasibility", date: null, completed: false, hasHappened: false },
+        { label: "Closing Date", date: "Aug 30, 2026", completed: false, hasHappened: false },
+      ],
+      issues: Array.from({ length: 14 }, (_, i) => ({
+        title: `Issue ${i + 1} needing resolution before the next call`,
+        description:
+          i % 3 === 0 ? "Longer description line that pushes the row height up a bit." : null,
+        status: (["open", "in_progress", "resolved"] as const)[i % 3],
+        priority: (["urgent", "high", "medium", "low"] as const)[i % 4],
+        assignedName: i % 2 === 0 ? "Chris Shiota" : null,
+        identifiedDate: "May 5, 2026",
+      })),
+      team: Array.from({ length: 9 }, (_, i) => ({
+        team: (["owner", "broker", "buyer"] as const)[i % 3],
+        name: `Team Member ${i + 1}`,
+        roleLabel: "Role Label",
+        email: `member${i + 1}@example.com`,
+        phone: "(949) 555-0100",
+      })),
+      consultants: Array.from({ length: 8 }, (_, i) => ({
+        roleLabel: [
+          "Landscape Architect",
+          "Civil Engineer",
+          "Soils Engineer",
+          "HOA Consultant",
+          "Dry Utility Consultant",
+          "Architect",
+          "PSA Attorney",
+          "Title Consultant",
+        ][i],
+        side: (i % 2 === 0 ? "seller" : "buyer") as "seller" | "buyer",
+        firmName: `Consulting Firm ${i + 1} & Partners LLP`,
+        contactName: `Contact ${i + 1}`,
+        contactEmail: `c${i + 1}@firm.example`,
+        contactPhone: "(949) 555-0200",
+      })),
+    }),
+  );
+  writeFileSync("c:/tmp/dd-tracking-stress-smoke.pdf", stressBuf);
+  console.log("dd-tracking (page-break stress):", stressBuf.length, "bytes");
 }
 
 main().catch((e) => {
