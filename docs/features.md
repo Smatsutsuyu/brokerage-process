@@ -94,7 +94,9 @@ Archiving a deal hides it from the sidebar (moved under a collapsible "Archived 
 
 ### Consultants
 
-Per-deal consultant roster covering 13 roles (Landscape Architect, Civil Engineer, Soils Engineer, Cost to Complete, HOA, Dry Utility, Phase 1, Land Use, Biologist, Architect, PSA Attorney, Title Consultant, Escrow Consultant). Each role can hold multiple firms split by buyer or seller side, with one or more contacts per firm. Informative metadata for the deal team; does not drive automation by itself.
+Per-deal consultant roster covering 13 roles (Landscape Architect, Civil Engineer, Soils Engineer, Cost to Complete, HOA, Dry Utility, Phase 1, Land Use, Biologist, Architect, PSA Attorney, Title Consultant, Escrow Consultant). Each role can hold multiple firms split by buyer or seller side, with one or more contacts per firm.
+
+The tab toolbar has two buttons, the same pair that sits on the Phase 4 "Create Consultant Roster & Send Out" checklist row. "Consultant Roster" opens the roster as a branded PDF in a new tab. "Email roster" runs the two-step flow: preview that PDF, then compose the email to the Deal Team with it attached. The PDF leaves out the per-consultant notes field on purpose, since the roster goes to the Buyer Team as well.
 
 ### Teams
 
@@ -112,11 +114,12 @@ Send to Deal Team composers open with the marketing coordinator already checked 
 
 ## Generating documents (the PDFs)
 
-Three Land-Advisors-branded PDFs are built into the app. All three open in a new browser tab as inline PDFs so you can preview before forwarding.
+Four Land-Advisors-branded PDFs are built into the app. All of them open in a new browser tab as inline PDFs so you can preview before forwarding.
 
 - Marketing Report. Builder list grouped by tier with per-builder comments. Generated from the Contacts tab toolbar (button labeled "Marketing Report") or the Marketing Report row on the Phase 1 checklist. This is what you send to ownership for status updates. The Contacts tab also has a "Send Marketing Report" button next to it that runs the same two-step PDF-preview-then-email flow as the Phase 2 checklist row (delivers to the Owner Team with co-brokers CC'd).
 - Q&A File. Approved Q&A items rendered as a clean branded document. Generated from the Q&A tab or the Phase 2 "Q&A File" checklist row.
 - Due Diligence Tracking. Combined PDF for the bi-weekly DD call: the 7 milestone dates from the Phase 4 checklist, current issues grouped by status (no summary stats), the full Deal Team (Owner / Broker / Buyer subteams), and the consultant roster. Generated from the Issues tab toolbar or the Phase 4 "Complete Due Diligence" row.
+- Consultant Roster. Standalone contact sheet for the deal's consultants: one section per engaged role with firm, buyer or seller side, contact name, email, and phone, plus a coverage count and a trailing list of roles nobody has been engaged for yet. Generated from the Consultants tab toolbar or the Phase 4 "Create Consultant Roster & Send Out" row. The "Email roster" button next to it previews this PDF and then attaches it to a Deal Team email.
 
 The fonts and logo are baked in so the output matches Land Advisors brand standards without any setup.
 

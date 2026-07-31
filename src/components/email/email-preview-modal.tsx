@@ -118,7 +118,12 @@ export type EmailAttachment =
   | {
       id: string;
       kind: "generated";
-      generator: "marketing-report" | "dd-tracking" | "deal-status";
+      // Keep in sync with GeneratorKey in src/lib/email/generators.ts.
+      generator:
+        | "marketing-report"
+        | "dd-tracking"
+        | "deal-status"
+        | "consultant-roster";
       filename: string;
     };
 

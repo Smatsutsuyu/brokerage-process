@@ -4,6 +4,34 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-07-30 — Consultant Roster PDF + real attachment on the roster send
+
+### Done
+- **New Consultant Roster PDF.** `src/lib/pdf/consultant-roster.tsx` (template) + `src/lib/pdf/generate-consultant-roster.ts` (org-scoped data loader and render-to-bytes) + `/api/deals/[id]/consultant-roster.pdf` (inline stream). Same split as the Deal Status report, so the same bytes back both the browser preview and the email attachment.
+- **Layout**: deal name, `CONSULTANT ROSTER · <date>`, a units / type / location subtitle, and an "X of 13 roles engaged" coverage line. Then one section per engaged role in canonical template order, four columns (firm + side, contact, email, phone). Roles with nobody engaged collapse into one trailing "Not yet engaged" line. The column header strip is `fixed` so it repeats on page 2+; each role header is wrapped with its first entry so a page break can't orphan a heading.
+- **Fixed the bug that prompted this.** The Phase 4 "Create Consultant Roster & Send Out" row used the generic `DealTeamSendButton` with `attachments={[]}`, while `CONSULTANT_ROSTER_TEMPLATE`'s body reads "Attached is the consultant roster for {{dealName}}." Every send of that row went out promising an attachment that wasn't there.
+- **Replaced it with a two-step modal** (`send-consultant-roster-modal.tsx`), mirroring `SendDealStatusModal`: step 1 previews the freshly-rendered PDF in an iframe, step 2 is the composer with the PDF attached as `kind: "generated"` and `{ dealId }` passed to `sendBlastEmails` (required for generated attachments).
+- **Registered `consultant-roster` in the generator registry** (`src/lib/email/generators.ts`) and in the `EmailAttachment` union in `email-preview-modal.tsx`.
+- **Consultants tab toolbar wired for real.** The "Email roster" `PlannedAction` placeholder is gone; the tab now carries the same two buttons as the checklist row, built as shared components with default / compact variants (`ConsultantRosterPdfButton`, `SendConsultantRosterButton`).
+- **Deduplicated the 13-role list** into `src/lib/consultant-roles.ts`. It was defined twice already (views module + a local `CONSULTANT_ROLE_LABEL` in the DD Tracking route) and the new generator would have been a third. Views re-exports it and keeps only the Tailwind `SIDE_META`.
+
+### Decisions
+- **Notes excluded from the PDF.** `consultants.notes` is internal commentary and the roster goes to the Buyer Team alongside Owner and Broker. Matches the DD Tracking PDF, which also omits it. Easy to add if Chris asks for it.
+- **Unfilled roles shown, not hidden.** During DD the gaps are the useful part ("who still needs engaging"), and it matches the tab's own "X of 13 roles filled" framing. Kept compact as a single comma-joined line so it can't dominate a sparse early-phase roster.
+- **Recipients deliberately unchanged**: Owner + Broker + Buyer teams filtered by include-in-emails, one email per sub-team, marketing coordinator pre-checked in CC. The complaint was the missing attachment, not the audience.
+- **Shipped as a Deal Team send, not a consultant blast.** The old backlog line for this placeholder sketched "templated blast to every consultant on the deal, filterable by side." That's a different feature and a different audience; noted in `docs/backlog.md` as still unbuilt.
+
+### Verification
+- `tsc --noEmit`, `npm run lint` (only the pre-existing `inline-error-bubble.tsx` error remains), `npm run check:template-vars`, and `next build` all pass; the new route registers.
+- PDF rendered and visually reviewed at 1 page and 3 pages via `src/scripts/smoke-pdfs.ts` (roster fixture added) — column header repeat, page-break behavior, and the firm-column gutter all confirmed.
+- Roster queries validated via `.toSQL()` (correct columns, deal + org scoping).
+
+### Deferred / Pending
+- **No live-DB run.** Docker wasn't up locally, so the generator was not exercised against real deal data. First run on a preview deploy should confirm the grouping against a real roster.
+- **Emailing the consultants themselves** (as opposed to emailing the roster to the Deal Team) remains unbuilt.
+
+---
+
 ## 2026-07-15 — Audit log wired to owner mutations
 
 ### Done

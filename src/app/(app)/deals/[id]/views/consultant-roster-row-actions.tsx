@@ -1,34 +1,28 @@
 "use client";
 
-import { Send } from "lucide-react";
-
-import { CONSULTANT_ROSTER_TEMPLATE } from "@/lib/email-templates";
-
-import { DealTeamSendButton } from "./deal-team-send-button";
+import { ConsultantRosterPdfButton } from "./consultant-roster-pdf-button";
+import { SendConsultantRosterButton } from "./send-consultant-roster-button";
 
 type ConsultantRosterRowActionsProps = {
   dealId: string;
 };
 
-// Phase 4 "Create Consultant Roster & Send Out" row. The tab-link to
-// the Consultants tab is already rendered via the linksTo lookup on
-// the row; this component adds the "Send to Deal Team" affordance.
-// No PDF generation yet (consultants can be sent as a link to the
-// Consultants tab, or pasted inline once we render the roster as a PDF
-// follow-up). For now we attach nothing and let Chris edit the body.
+// Pair of actions on the Phase 4 "Create Consultant Roster & Send Out"
+// row. The tab-link to the Consultants tab is already rendered via the
+// linksTo lookup on the row; this component adds:
+//   1. Generate PDF -> opens the Consultant Roster PDF (13 roles, firms
+//      grouped by role with buyer/seller side and contact details).
+//   2. Send to Deal Team -> two-step modal: preview that same PDF, then
+//      compose the email with it attached.
+//
+// Mirrors DdTrackingRowActions on the sibling Phase 4 row.
 export function ConsultantRosterRowActions({
   dealId,
 }: ConsultantRosterRowActionsProps) {
   return (
-    <DealTeamSendButton
-      dealId={dealId}
-      label="Send to Deal Team"
-      title="Email the consultant roster to the Deal Team"
-      icon={Send}
-      modalTitle="Consultant roster"
-      template={CONSULTANT_ROSTER_TEMPLATE}
-      teams={["owner", "broker", "buyer"]}
-      attachments={[]}
-    />
+    <>
+      <ConsultantRosterPdfButton dealId={dealId} variant="compact" />
+      <SendConsultantRosterButton dealId={dealId} />
+    </>
   );
 }

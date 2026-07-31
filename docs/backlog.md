@@ -109,7 +109,7 @@ When you close one, mark `~~done~~` rather than deleting so the running record s
 Inventory as of 2026-07-20. 16 total call sites split into two tiers by cost and by whether they're in scope for this build.
 
 **Cheap tier — shortcuts / roster sends (in scope, ~15-30 min each):**
-- `src/app/(app)/deals/[id]/views/consultants-list.tsx:80` "Email roster" → templated blast to every consultant on the deal, filterable buyer/seller side. Mirror the Deal Team send pattern.
+- ~~`src/app/(app)/deals/[id]/views/consultants-list.tsx:80` "Email roster"~~ — **done 2026-07-30.** Replaced with the Consultant Roster PDF button + the two-step Deal Team send (preview PDF → compose with it attached). Note this shipped as "send the roster *to the Deal Team*", not the originally-sketched "blast to every consultant on the deal, filterable by side" — emailing the consultants themselves is still unbuilt and needs a separate ask from Chris.
 - `src/app/(app)/deals/[id]/views/qa-list.tsx:86` "Send Q&A" → tab-level shortcut to the working Q&A blast that already lives on the Q&A File checklist row. Second entry point to the same modal.
 - `src/app/(app)/deals/[id]/views/contacts-layouts/option-a-cards.tsx:300` "Send follow-up" → shortcut to the working `isFollowUpMissingOffersItem` BuyerBlastButton in phase-section.tsx.
 - Layouts B/C/D each carry a "Send OM blast" and "Send follow-up" placeholder (`option-b-pane.tsx`, `option-c-grouped.tsx`, `option-d-compact.tsx`). Fixing A alone leaves the alternates showing coming-soon toasts. Consistent with the "shared components across the four layouts" direction from the layouts-promotion refactor — bundle these when doing the feature-parity pass.

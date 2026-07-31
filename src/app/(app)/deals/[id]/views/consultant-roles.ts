@@ -1,31 +1,18 @@
-import type { ConsultantRole, ConsultantSide } from "../actions";
+import type { ConsultantSide } from "../actions";
 
-export const CONSULTANT_ROLES: Array<{ value: ConsultantRole; label: string }> = [
-  { value: "landscape_architect", label: "Landscape Architect" },
-  { value: "civil_engineer", label: "Civil Engineer" },
-  { value: "soils_engineer", label: "Soils Engineer" },
-  { value: "cost_to_complete", label: "Cost to Complete Consultant" },
-  { value: "hoa", label: "HOA Consultant" },
-  { value: "dry_utility", label: "Dry Utility Consultant" },
-  { value: "phase_1_environmental", label: "Phase I Environmental Consultant" },
-  { value: "land_use", label: "Land Use Consultant" },
-  { value: "biologist", label: "Biologist" },
-  { value: "architect", label: "Architect" },
-  { value: "psa_attorney", label: "PSA Attorney" },
-  { value: "title", label: "Title Consultant" },
-  { value: "escrow", label: "Escrow Consultant" },
-];
+// Role list + labels are shared with the server-side PDF generators, so
+// they live in src/lib/consultant-roles.ts. Re-exported here so the
+// existing component imports keep working (and so there's exactly one
+// place to add a role).
+export {
+  CONSULTANT_ROLES,
+  ROLE_LABEL,
+  SIDE_LABEL,
+} from "@/lib/consultant-roles";
 
-export const ROLE_LABEL = Object.fromEntries(
-  CONSULTANT_ROLES.map((r) => [r.value, r.label]),
-) as Record<ConsultantRole, string>;
-
+// UI-only: Tailwind chip classes for the buyer/seller badge. Stays next
+// to the components that render it rather than in the shared lib.
 export const SIDE_META: Record<ConsultantSide, { label: string; chip: string }> = {
   buyer: { label: "Buyer", chip: "bg-blue-100 text-blue-700" },
   seller: { label: "Seller", chip: "bg-emerald-100 text-emerald-700" },
-};
-
-export const SIDE_LABEL: Record<ConsultantSide, string> = {
-  buyer: "Buyer-side",
-  seller: "Seller-side",
 };

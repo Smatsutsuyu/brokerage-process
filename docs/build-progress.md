@@ -102,6 +102,15 @@ Major reconciliation pass against Chris's `Marketing Process Checklist.xlsx` v2 
 - Member-remove flow: hard delete with cascade, last-owner guardrail, fix for inviting a member signing the owner out (`12685c5`).
 - Auto-clean orphan `deal_buyers` rows on builder delete (`1434e4d`, `85e7747`).
 
+## Consultant Roster PDF + real attachment on the roster send (2026-07-30)
+
+- **New Consultant Roster PDF** (`src/lib/pdf/consultant-roster.tsx` + `src/lib/pdf/generate-consultant-roster.ts`, route `/api/deals/[id]/consultant-roster.pdf`). Land Advisors-branded contact sheet: deal header with units / type / location, an "X of 13 roles engaged" coverage line, then one section per engaged role in canonical template order with firm, buyer/seller side, contact, email, and phone. Roles with nobody engaged collapse into a single trailing "Not yet engaged" line so the detail block stays dense. Column header strip is `fixed`, so it repeats on every page of a roster that spills. Per-consultant `notes` are deliberately excluded — the roster goes to the Buyer Team too, and notes are internal commentary.
+- **Fixed a send that promised an attachment and shipped none.** The Phase 4 "Create Consultant Roster & Send Out" row used the generic `DealTeamSendButton` with `attachments={[]}` while `CONSULTANT_ROSTER_TEMPLATE` opened with "Attached is the consultant roster for {{dealName}}." Replaced with a dedicated two-step modal (`send-consultant-roster-modal.tsx`) that mirrors Send Deal Status: step 1 previews the freshly-rendered PDF in an iframe, step 2 opens the composer with the PDF attached as `kind: "generated"`.
+- **`consultant-roster` added to the generator registry** (`src/lib/email/generators.ts` + the `EmailAttachment` union). Attachment bytes are rendered server-side at send time, org-scoped, so a forged dealId from a sibling org returns null instead of a document.
+- **Consultants tab toolbar is real.** The "Email roster" `PlannedAction` placeholder is gone, replaced by the same two buttons the checklist row carries (`ConsultantRosterPdfButton` + `SendConsultantRosterButton`), built as shared components with default / compact variants so the tab and the row can't drift.
+- **Role list deduplicated** into `src/lib/consultant-roles.ts`. It was defined three times: the views module, the DD Tracking route's local `CONSULTANT_ROLE_LABEL`, and (would have been) the new generator. The views module now re-exports it and keeps only the Tailwind-flavored `SIDE_META`; the DD Tracking route imports `ROLE_LABEL`.
+- **Recipients unchanged** from the previous button: Owner + Broker + Buyer teams filtered by include-in-emails, one email per sub-team, marketing coordinator pre-checked in the CC picker.
+
 ## Audit log wired to owner mutations (2026-07-15)
 
 - **New `writeAudit()` helper** at `src/lib/audit.ts`. Fire-and-forget insert into `audit_log`, swallows errors so a failed audit can never rescue a bad mutation.

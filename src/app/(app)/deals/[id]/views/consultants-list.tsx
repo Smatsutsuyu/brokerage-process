@@ -4,7 +4,6 @@ import { useMemo, useState, useTransition } from "react";
 import { Loader2, Mail, Pencil, Phone, Plus, StickyNote, Trash2 } from "lucide-react";
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
-import { PlannedAction } from "@/components/planned-action";
 import { formatPhone } from "@/lib/phone";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +11,8 @@ import { deleteConsultant, type ConsultantRole, type ConsultantSide } from "../a
 
 import { ConsultantModal, type EditingConsultant } from "./consultant-modal";
 import { CONSULTANT_ROLES, SIDE_META } from "./consultant-roles";
+import { ConsultantRosterPdfButton } from "./consultant-roster-pdf-button";
+import { SendConsultantRosterButton } from "./send-consultant-roster-button";
 
 export type ConsultantRow = {
   id: string;
@@ -76,14 +77,12 @@ export function ConsultantsList({ dealId, items }: ConsultantsListProps) {
           <span className="font-semibold tabular-nums">{filledCount}</span> of{" "}
           <span className="tabular-nums">{CONSULTANT_ROLES.length}</span> roles filled
         </div>
-        <div className="ml-auto flex flex-wrap gap-2">
-          <PlannedAction
-            label="Email roster"
-            icon={Mail}
-            feature="Email all consultants"
-            description="Drafts a templated update email to every consultant on this deal (filterable by buyer/seller side)."
-            phase="phase_2"
-          />
+        {/* Same two actions as the Phase 4 "Create Consultant Roster &
+            Send Out" checklist row, shared via these components so the
+            tab and the row can't drift. */}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <ConsultantRosterPdfButton dealId={dealId} />
+          <SendConsultantRosterButton dealId={dealId} compact={false} />
         </div>
       </div>
 

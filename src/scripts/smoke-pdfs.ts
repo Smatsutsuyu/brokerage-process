@@ -1,11 +1,14 @@
-// One-shot smoke test: render Due Diligence Tracking + Q&A PDFs to
-// disk so we can eyeball the LAO theme without round-tripping through
-// the dev server. Throwaway, left in src/scripts so it's git-tracked
-// next to the other dev tools.
+// One-shot smoke test: render Due Diligence Tracking + Q&A + Consultant
+// Roster PDFs to disk so we can eyeball the LAO theme without round-
+// tripping through the dev server. Throwaway, left in src/scripts so
+// it's git-tracked next to the other dev tools.
+//
+// Run: npx tsx src/scripts/smoke-pdfs.ts
 
 import { renderToBuffer } from "@react-pdf/renderer";
 import { writeFileSync } from "node:fs";
 
+import { ConsultantRosterDoc } from "../lib/pdf/consultant-roster";
 import { DdTrackingDoc } from "../lib/pdf/dd-tracking";
 import { QaFileDoc } from "../lib/pdf/qa-file";
 
@@ -104,6 +107,104 @@ async function main() {
   );
   writeFileSync("c:/tmp/qa-file-smoke.pdf", qaBuf);
   console.log("q&a:", qaBuf.length, "bytes");
+
+  const rosterBuf = await renderToBuffer(
+    ConsultantRosterDoc({
+      dealName: "Riverside Estates Phase 2",
+      dateLabel: "July 30, 2026",
+      dealSubtitle: "182 units · Single Family Detached · Riverside, CA",
+      filledCount: 5,
+      totalRoles: 13,
+      groups: [
+        {
+          roleLabel: "Landscape Architect",
+          entries: [
+            {
+              side: "seller",
+              firmName: "Summers / Murphy & Partners",
+              contactName: "Dana Reyes",
+              contactEmail: "dreyes@summersmurphy.example",
+              contactPhone: "(949) 555-0310",
+            },
+          ],
+        },
+        {
+          roleLabel: "Civil Engineer",
+          entries: [
+            {
+              side: "seller",
+              firmName: "Hunsaker & Associates",
+              contactName: "Jane Doe",
+              contactEmail: "jane.doe@hunsaker.example",
+              contactPhone: "(949) 555-0200",
+            },
+            {
+              side: "buyer",
+              firmName: "Fuscoe Engineering",
+              contactName: "Marcus Webb",
+              contactEmail: "mwebb@fuscoe.example",
+              contactPhone: null,
+            },
+          ],
+        },
+        {
+          roleLabel: "Soils Engineer",
+          entries: [
+            {
+              side: "seller",
+              firmName: "Leighton Consulting",
+              contactName: null,
+              contactEmail: "info@leighton.example",
+              contactPhone: "(714) 555-0144",
+            },
+          ],
+        },
+        {
+          roleLabel: "Cost to Complete Consultant",
+          entries: [
+            {
+              side: "seller",
+              firmName: "Pacific Coast Cost Management Group",
+              contactName: "Alex Trinh",
+              contactEmail: "atrinh@pccmg.example",
+              contactPhone: "(760) 555-0187",
+            },
+          ],
+        },
+        {
+          roleLabel: "PSA Attorney",
+          entries: [
+            {
+              side: "seller",
+              firmName: "Allen Matkins",
+              contactName: "Priya Nandakumar",
+              contactEmail: "pnandakumar@allenmatkins.example",
+              contactPhone: "(949) 555-0455",
+            },
+            {
+              side: "buyer",
+              firmName: "Cox Castle & Nicholson",
+              contactName: "R. Whitfield",
+              contactEmail: null,
+              contactPhone: "(310) 555-0166",
+            },
+          ],
+        },
+      ],
+      unfilledRoleLabels: [
+        "HOA Consultant",
+        "Dry Utility Consultant",
+        "Phase I Environmental Consultant",
+        "Land Use Consultant",
+        "Biologist",
+        "Architect",
+        "Title Consultant",
+        "Escrow Consultant",
+      ],
+    }),
+  );
+  writeFileSync("c:/tmp/consultant-roster-smoke.pdf", rosterBuf);
+  console.log("consultant-roster:", rosterBuf.length, "bytes");
 }
 
 main().catch((e) => {

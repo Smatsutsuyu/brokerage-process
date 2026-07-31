@@ -23,6 +23,7 @@ import {
 } from "@/db/schema";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { ROLE_LABEL as CONSULTANT_ROLE_LABEL } from "@/lib/consultant-roles";
 import { resolveDealTeamMemberName } from "@/lib/deal-team-name";
 import {
   DdTrackingDoc,
@@ -46,22 +47,6 @@ const MILESTONE_NAMES: readonly string[] = [
   "Waive Feasibility",
   "Closing Date",
 ] as const;
-
-const CONSULTANT_ROLE_LABEL: Record<string, string> = {
-  landscape_architect: "Landscape Architect",
-  civil_engineer: "Civil Engineer",
-  soils_engineer: "Soils Engineer",
-  cost_to_complete: "Cost to Complete Consultant",
-  hoa: "HOA Consultant",
-  dry_utility: "Dry Utility Consultant",
-  phase_1_environmental: "Phase I Environmental Consultant",
-  land_use: "Land Use Consultant",
-  biologist: "Biologist",
-  architect: "Architect",
-  psa_attorney: "PSA Attorney",
-  title: "Title Consultant",
-  escrow: "Escrow Consultant",
-};
 
 function formatLong(d: Date): string {
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { generateConsultantRosterPdf } from "@/lib/pdf/generate-consultant-roster";
 import { generateDealStatusPdf } from "@/lib/pdf/generate-deal-status";
 import { generateMarketingReportPdf } from "@/lib/pdf/generate-marketing-report";
 
@@ -23,7 +24,11 @@ import type { SendEmailAttachment } from "./send";
 // from a sibling org returns null rather than rendering data the caller
 // shouldn't see.
 
-export type GeneratorKey = "marketing-report" | "dd-tracking" | "deal-status";
+export type GeneratorKey =
+  | "marketing-report"
+  | "dd-tracking"
+  | "deal-status"
+  | "consultant-roster";
 
 // Render a generator key's PDF to bytes ready to attach. Returns null
 // if the underlying data lookup fails (deal not in org, deleted, etc.).
@@ -52,6 +57,14 @@ export async function renderGeneratedAttachment(input: {
     }
     case "deal-status": {
       const pdf = await generateDealStatusPdf({
+        dealId: input.dealId,
+        orgId: input.orgId,
+      });
+      if (!pdf) return null;
+      return { filename: pdf.filename, content: pdf.content };
+    }
+    case "consultant-roster": {
+      const pdf = await generateConsultantRosterPdf({
         dealId: input.dealId,
         orgId: input.orgId,
       });
