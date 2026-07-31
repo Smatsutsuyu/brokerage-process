@@ -9,6 +9,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { writeFileSync } from "node:fs";
 
 import { ConsultantRosterDoc } from "../lib/pdf/consultant-roster";
+import { DealStatusDoc } from "../lib/pdf/deal-status";
 import { DdTrackingDoc } from "../lib/pdf/dd-tracking";
 import { QaFileDoc } from "../lib/pdf/qa-file";
 
@@ -261,6 +262,52 @@ async function main() {
   );
   writeFileSync("c:/tmp/dd-tracking-stress-smoke.pdf", stressBuf);
   console.log("dd-tracking (page-break stress):", stressBuf.length, "bytes");
+
+  // Deal Status, sized to spill so its section headers land near page
+  // boundaries. Same orphan check as the DD Tracking stress case: no
+  // section header may sit on a page without a row beneath it.
+  const statusBuf = await renderToBuffer(
+    DealStatusDoc({
+      dealName: "Riverside Estates Phase 2",
+      dateLabel: "July 31, 2026",
+      purchasePrice: 24500000,
+      currentPhaseLabel: "Phase 4 - Due Diligence",
+      overall: { done: 38, total: 52, pct: 73 },
+      phaseProgress: [
+        { phase: "phase_1", label: "Phase 1 - Going to Market", done: 14, total: 14 },
+        { phase: "phase_2", label: "Phase 2 - Marketing Process", done: 12, total: 12 },
+        { phase: "phase_3", label: "Phase 3 - Summary of Offers", done: 7, total: 9 },
+        { phase: "phase_4", label: "Phase 4 - Due Diligence", done: 5, total: 17 },
+      ],
+      recentlyCompleted: Array.from({ length: 10 }, (_, i) => ({
+        itemName: `Completed checklist item ${i + 1} with a reasonably long name`,
+        categoryName: "Category",
+        phaseLabel: `Phase ${(i % 4) + 1}`,
+        completedAt: "Jul 2, 2026",
+        completedByName: i % 3 === 0 ? null : "Chris Shiota",
+      })),
+      upcomingMilestones: [
+        { label: "Receive 1st Draft Cost to Complete", date: "Jun 1, 2026", overdue: true },
+        { label: "Finalize Cost to Complete / Final Purchase Price", date: null, overdue: false },
+        { label: "Investment Committee Approval", date: "Aug 12, 2026", overdue: false },
+        { label: "Waive Feasibility", date: null, overdue: false },
+        { label: "Closing Date", date: "Aug 30, 2026", overdue: false },
+      ],
+      openIssues: Array.from({ length: 12 }, (_, i) => ({
+        title: `Open issue ${i + 1} that still needs an owner and a resolution date`,
+        status: (["open", "in_progress"] as const)[i % 2],
+        priority: (["urgent", "high", "medium", "low"] as const)[i % 4],
+        assignedName: i % 2 === 0 ? "Chris Shiota" : null,
+      })),
+      ownerTeam: Array.from({ length: 6 }, (_, i) => ({
+        name: `Owner Contact ${i + 1}`,
+        roleLabel: "Principal",
+        email: `owner${i + 1}@example.com`,
+      })),
+    }),
+  );
+  writeFileSync("c:/tmp/deal-status-stress-smoke.pdf", statusBuf);
+  console.log("deal-status (page-break stress):", statusBuf.length, "bytes");
 }
 
 main().catch((e) => {

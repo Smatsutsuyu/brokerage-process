@@ -1,7 +1,6 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 
-import type { ReactNode } from "react";
 import {
   Document,
   Font,
@@ -15,6 +14,8 @@ import {
 } from "@react-pdf/renderer";
 
 import { formatCurrency } from "@/lib/currency";
+
+import { Section } from "./section";
 
 // Same Metropolis family the Marketing Report uses, registered
 // idempotently in case both modules load.
@@ -378,68 +379,6 @@ const styles = StyleSheet.create({
   },
 });
 
-type SectionGroup = {
-  key: string;
-  // Subsection band, or null for a section with a single unlabeled run of
-  // rows (Key Dates).
-  band: ReactNode | null;
-  rows: ReactNode[];
-};
-
-// Renders one report section with orphan-proof page breaks.
-//
-// react-pdf's `minPresenceAhead` was tried first and proved unreliable
-// here: a band could still land at the very bottom with its rows overleaf
-// (reproduced with a "SOILS ENGINEER" heading stranded on its own). The
-// structural fix is deterministic instead: the section header is glued to
-// the first band and that band's first row, and every subsequent band is
-// glued to its own first row, all via `wrap={false}`. Only whole rows can
-// break across pages, so no heading is ever left behind.
-//
-// Empty groups are dropped, and a section with nothing left renders its
-// header plus the empty note as one unbreakable unit.
-function Section({
-  header,
-  groups,
-  emptyNote,
-}: {
-  header: string;
-  groups: SectionGroup[];
-  emptyNote: string;
-}) {
-  const populated = groups.filter((g) => g.rows.length > 0);
-
-  if (populated.length === 0) {
-    return (
-      <View wrap={false}>
-        <Text style={styles.sectionHeader}>{header}</Text>
-        <Text style={styles.emptyNote}>{emptyNote}</Text>
-      </View>
-    );
-  }
-
-  const [first, ...rest] = populated;
-  return (
-    <>
-      <View wrap={false}>
-        <Text style={styles.sectionHeader}>{header}</Text>
-        {first.band}
-        {first.rows[0]}
-      </View>
-      {first.rows.slice(1)}
-      {rest.map((g) => (
-        <View key={g.key}>
-          <View wrap={false}>
-            {g.band}
-            {g.rows[0]}
-          </View>
-          {g.rows.slice(1)}
-        </View>
-      ))}
-    </>
-  );
-}
-
 function MilestoneRowView({ m }: { m: MilestoneRow }) {
   return (
     <View style={styles.milestoneRow} wrap={false}>
@@ -560,7 +499,9 @@ export function DdTrackingDoc({
         {/* Section 1: Key Dates */}
         <Section
           header="KEY DATES"
+          headerStyle={styles.sectionHeader}
           emptyNote="No milestone dates on this deal yet."
+          emptyNoteStyle={styles.emptyNote}
           groups={[
             {
               key: "milestones",
@@ -573,7 +514,9 @@ export function DdTrackingDoc({
         {/* Section 2: Issues */}
         <Section
           header="ISSUES"
+          headerStyle={styles.sectionHeader}
           emptyNote="No issues tracked on this deal yet."
+          emptyNoteStyle={styles.emptyNote}
           groups={issueGroupOrder.map((status) => ({
             key: status,
             band: (
@@ -592,7 +535,9 @@ export function DdTrackingDoc({
         {/* Section 3: Deal Team */}
         <Section
           header="DEAL TEAM"
+          headerStyle={styles.sectionHeader}
           emptyNote="No deal team members recorded yet."
+          emptyNoteStyle={styles.emptyNote}
           groups={TEAM_ORDER.map((t) => ({
             key: t,
             band: (
@@ -614,7 +559,9 @@ export function DdTrackingDoc({
         {/* Section 4: Consultants */}
         <Section
           header="CONSULTANTS"
+          headerStyle={styles.sectionHeader}
           emptyNote="No consultants recorded yet."
+          emptyNoteStyle={styles.emptyNote}
           groups={Array.from(consultantsByRole.entries()).map(([roleLabel, firms]) => ({
             key: roleLabel,
             band: (

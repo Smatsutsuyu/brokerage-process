@@ -15,6 +15,8 @@ import {
 
 import { formatCurrency } from "@/lib/currency";
 
+import { Section } from "./section";
+
 // Same Metropolis family registered here as in dd-tracking.tsx;
 // @react-pdf's Font.register is idempotent so both modules can register
 // the same family without conflict.
@@ -449,119 +451,162 @@ export function DealStatusDoc({
           <Text style={styles.currentPhase}>Currently: {currentPhaseLabel}</Text>
         </View>
 
-        {/* Progress */}
-        <Text style={styles.sectionHeader}>PROGRESS</Text>
-        {phaseProgress.map((p) => {
-          const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
-          return (
-            <View key={p.phase} style={styles.progressRow} wrap={false}>
-              <Text style={styles.progressLabel}>{p.label}</Text>
-              <View style={styles.progressBarOuter}>
-                <View style={{ ...styles.progressBarFill, width: `${pct}%` }} />
-              </View>
-              <Text style={styles.progressCount}>
-                {p.done}/{p.total}
-              </Text>
-            </View>
-          );
-        })}
-        <View style={styles.overallProgress} wrap={false}>
-          <Text style={styles.overallLabel}>Overall</Text>
-          <View style={styles.progressBarOuter}>
-            <View style={{ ...styles.progressBarFill, width: `${overall.pct}%` }} />
-          </View>
-          <Text style={styles.overallCount}>
-            {overall.done}/{overall.total}
-          </Text>
-        </View>
+        {/* Progress. The Overall bar is the last row of the group rather
+            than a trailing sibling so it can't detach from the phase bars
+            it totals. */}
+        <Section
+          header="PROGRESS"
+          headerStyle={styles.sectionHeader}
+          emptyNote="No checklist items on this deal yet."
+          emptyNoteStyle={styles.emptyNote}
+          groups={[
+            {
+              key: "progress",
+              band: null,
+              rows: [
+                ...phaseProgress.map((p) => {
+                  const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
+                  return (
+                    <View key={p.phase} style={styles.progressRow} wrap={false}>
+                      <Text style={styles.progressLabel}>{p.label}</Text>
+                      <View style={styles.progressBarOuter}>
+                        <View style={{ ...styles.progressBarFill, width: `${pct}%` }} />
+                      </View>
+                      <Text style={styles.progressCount}>
+                        {p.done}/{p.total}
+                      </Text>
+                    </View>
+                  );
+                }),
+                <View key="overall" style={styles.overallProgress} wrap={false}>
+                  <Text style={styles.overallLabel}>Overall</Text>
+                  <View style={styles.progressBarOuter}>
+                    <View style={{ ...styles.progressBarFill, width: `${overall.pct}%` }} />
+                  </View>
+                  <Text style={styles.overallCount}>
+                    {overall.done}/{overall.total}
+                  </Text>
+                </View>,
+              ],
+            },
+          ]}
+        />
 
         {/* Recently completed */}
-        <Text style={styles.sectionHeader}>RECENTLY COMPLETED</Text>
-        {recentlyCompleted.length === 0 ? (
-          <Text style={styles.emptyNote}>No items completed yet.</Text>
-        ) : (
-          recentlyCompleted.map((r, i) => (
-            <View key={`rc-${i}`} style={styles.completedRow} wrap={false}>
-              <CheckIcon />
-              <Text style={styles.completedName}>{r.itemName}</Text>
-              <Text style={styles.completedPhase}>{r.phaseLabel}</Text>
-              <Text style={styles.completedBy}>
-                {r.completedByName ?? "Unknown"}
-                {" · "}
-                {r.completedAt}
-              </Text>
-            </View>
-          ))
-        )}
+        <Section
+          header="RECENTLY COMPLETED"
+          headerStyle={styles.sectionHeader}
+          emptyNote="No items completed yet."
+          emptyNoteStyle={styles.emptyNote}
+          groups={[
+            {
+              key: "recently-completed",
+              band: null,
+              rows: recentlyCompleted.map((r, i) => (
+                <View key={`rc-${i}`} style={styles.completedRow} wrap={false}>
+                  <CheckIcon />
+                  <Text style={styles.completedName}>{r.itemName}</Text>
+                  <Text style={styles.completedPhase}>{r.phaseLabel}</Text>
+                  <Text style={styles.completedBy}>
+                    {r.completedByName ?? "Unknown"}
+                    {" · "}
+                    {r.completedAt}
+                  </Text>
+                </View>
+              )),
+            },
+          ]}
+        />
 
         {/* Upcoming milestones */}
-        <Text style={styles.sectionHeader}>UPCOMING MILESTONES</Text>
-        {upcomingMilestones.length === 0 ? (
-          <Text style={styles.emptyNote}>All milestones have happened.</Text>
-        ) : (
-          upcomingMilestones.map((m, i) => (
-            <View key={`um-${i}`} style={styles.milestoneRow} wrap={false}>
+        <Section
+          header="UPCOMING MILESTONES"
+          headerStyle={styles.sectionHeader}
+          emptyNote="All milestones have happened."
+          emptyNoteStyle={styles.emptyNote}
+          groups={[
+            {
+              key: "upcoming-milestones",
+              band: null,
+              rows: upcomingMilestones.map((m, i) => (
+                <View key={`um-${i}`} style={styles.milestoneRow} wrap={false}>
               <View style={styles.milestoneLabelWrap}>
-                {m.overdue && (
-                  <View style={styles.milestoneOverdueTag}>
-                    <Text>Overdue</Text>
-                  </View>
-                )}
-                <Text style={styles.milestoneLabel}>{m.label}</Text>
-              </View>
-              <Text
-                style={
-                  m.overdue
-                    ? styles.milestoneDateOverdue
-                    : m.date
-                      ? styles.milestoneDate
-                      : styles.milestoneDateMissing
-                }
-              >
-                {m.date ?? "not scheduled"}
-              </Text>
-            </View>
-          ))
-        )}
-
-        {/* Open issues */}
-        <Text style={styles.sectionHeader}>OPEN ISSUES</Text>
-        {openIssues.length === 0 ? (
-          <Text style={styles.emptyNote}>No open issues.</Text>
-        ) : (
-          openIssues.map((r, i) => {
-            const p = PRIORITY_META[r.priority];
-            const s = STATUS_META[r.status];
-            return (
-              <View key={`iss-${i}`} style={styles.issueRow} wrap={false}>
-                <View style={{ ...styles.issueStatusBar, backgroundColor: s.color }} />
-                <View
-                  style={{ ...styles.priorityChip, backgroundColor: p.bg, color: p.fg }}
-                >
-                  <Text>{p.label}</Text>
+                  {m.overdue && (
+                    <View style={styles.milestoneOverdueTag}>
+                      <Text>Overdue</Text>
+                    </View>
+                  )}
+                  <Text style={styles.milestoneLabel}>{m.label}</Text>
                 </View>
-                <Text style={styles.issueTitle}>{r.title}</Text>
-                <Text style={styles.issueAssignee}>
-                  {r.assignedName ? `Assigned: ${r.assignedName}` : "Unassigned"}
+                <Text
+                  style={
+                    m.overdue
+                      ? styles.milestoneDateOverdue
+                      : m.date
+                        ? styles.milestoneDate
+                        : styles.milestoneDateMissing
+                  }
+                >
+                  {m.date ?? "not scheduled"}
                 </Text>
               </View>
-            );
-          })
-        )}
+              )),
+            },
+          ]}
+        />
+
+        {/* Open issues */}
+        <Section
+          header="OPEN ISSUES"
+          headerStyle={styles.sectionHeader}
+          emptyNote="No open issues."
+          emptyNoteStyle={styles.emptyNote}
+          groups={[
+            {
+              key: "open-issues",
+              band: null,
+              rows: openIssues.map((r, i) => {
+                const p = PRIORITY_META[r.priority];
+                const s = STATUS_META[r.status];
+                return (
+                  <View key={`iss-${i}`} style={styles.issueRow} wrap={false}>
+                    <View style={{ ...styles.issueStatusBar, backgroundColor: s.color }} />
+                    <View
+                      style={{ ...styles.priorityChip, backgroundColor: p.bg, color: p.fg }}
+                    >
+                      <Text>{p.label}</Text>
+                    </View>
+                    <Text style={styles.issueTitle}>{r.title}</Text>
+                    <Text style={styles.issueAssignee}>
+                      {r.assignedName ? `Assigned: ${r.assignedName}` : "Unassigned"}
+                    </Text>
+                  </View>
+                );
+              }),
+            },
+          ]}
+        />
 
         {/* Owner Team */}
-        <Text style={styles.sectionHeader}>OWNER TEAM</Text>
-        {ownerTeam.length === 0 ? (
-          <Text style={styles.emptyNote}>No Owner Team members configured.</Text>
-        ) : (
-          ownerTeam.map((r, i) => (
-            <View key={`ot-${i}`} style={styles.teamRow} wrap={false}>
-              <Text style={styles.teamName}>{r.name}</Text>
-              <Text style={styles.teamRole}>{r.roleLabel}</Text>
-              <Text style={styles.teamEmail}>{r.email ?? "(no email)"}</Text>
-            </View>
-          ))
-        )}
+        <Section
+          header="OWNER TEAM"
+          headerStyle={styles.sectionHeader}
+          emptyNote="No Owner Team members configured."
+          emptyNoteStyle={styles.emptyNote}
+          groups={[
+            {
+              key: "owner-team",
+              band: null,
+              rows: ownerTeam.map((r, i) => (
+                <View key={`ot-${i}`} style={styles.teamRow} wrap={false}>
+                  <Text style={styles.teamName}>{r.name}</Text>
+                  <Text style={styles.teamRole}>{r.roleLabel}</Text>
+                  <Text style={styles.teamEmail}>{r.email ?? "(no email)"}</Text>
+                </View>
+              )),
+            },
+          ]}
+        />
 
         {/* Footer */}
         <View style={styles.footer} fixed>

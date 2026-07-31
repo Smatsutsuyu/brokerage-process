@@ -110,8 +110,9 @@ Both from Chris exercising the new Consultant Roster PDF on the Woods deal.
 - **"Not yet engaged" moved into the roster's header block.** As a trailing section it spilled onto its own page when page 1 was full, and the `fixed` column header repeated above it, producing a page of column labels with no rows. Keeping every non-table element in the header means the repeating header only lands on pages that carry entries.
 - **`Section` helper in `dd-tracking.tsx`** makes page breaks orphan-proof: the section header is glued to the first band and its first row, and each subsequent band to its own first row, via `wrap={false}`. `minPresenceAhead` was tried first and rejected — it reproducibly left a "SOILS ENGINEER" band stranded at a page bottom.
 - **Consultant rows in DD Tracking** now stack the buyer/seller tag under the firm name instead of nesting it inline, which was breaking mid-name once the column narrowed. Matches the Consultant Roster exactly.
-- **Page-break stress fixture** added to `src/scripts/smoke-pdfs.ts` (14 issues / 9 team members / 8 consultant roles) as the regression guard for the orphan class of bug.
-- Deal Status PDF still uses the old subheading treatment; not swept, not raised.
+- **Page-break stress fixtures** added to `src/scripts/smoke-pdfs.ts` for DD Tracking (14 issues / 9 team members / 8 consultant roles) and Deal Status (10 completed / 12 open issues / 6 owner-team), as the regression guard for the orphan class of bug. It's silent and visual, so it needs a fixture rather than a note.
+- **`Section` lives in `src/lib/pdf/section.tsx`**, shared by DD Tracking and Deal Status. Callers pass their own header / empty-note styles since each document owns its type scale; the page-break guarantee is what's shared.
+- **Deal Status swept** onto `Section` too. Its five sections were plain header-then-rows and could strand a header; the Overall progress bar is now the last row of the Progress group so it can't detach from the phase bars it totals. No band treatment there: it has no subsection level, so the legibility complaint doesn't apply.
 
 ## Consultant Roster PDF + real attachment on the roster send (2026-07-30)
 
