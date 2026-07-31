@@ -14,9 +14,10 @@ type ShareDdMaterialRowActionsProps = {
   itemId: string;
 };
 
-// Phase 4 DD-material rows ("Share Due Diligence Material / Set Meeting"
-// and "Create Index of Due Diligence Material"). Matches Excel: emails
-// the DD folder link + meeting prompt to the Deal Team.
+// Phase 4 "Share Due Diligence Material / Set Meeting" row. Matches
+// Excel: emails the DD folder link + meeting prompt to the Deal Team.
+// Only this row — "Create Index of Due Diligence Material" is a
+// do-the-work step, not a send surface.
 //
 // {{ddFolderUrl}} resolves server-side on click from two sources, in
 // order: a link on this row, else a link on the Phase 1 "Create Full Due

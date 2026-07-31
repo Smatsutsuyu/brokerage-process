@@ -81,10 +81,18 @@ function isConsultantRosterItem(name: string): boolean {
   return name.toLowerCase().includes("consultant roster");
 }
 
-// Loose-match for the "Share Due Diligence Material / Set Meeting" row
-// in Phase 4. Excel says: email the deal team with DD links.
+// Match for the "Share Due Diligence Material / Set Meeting" row in
+// Phase 4. Excel says: email the deal team with DD links.
+//
+// Anchored on "share" on purpose. The earlier, looser
+// includes("due diligence material") also matched "Create Index of Due
+// Diligence Material", so that row rendered a Send button wired to the
+// DD-folder template — a send affordance on a do-the-work step, mailing
+// a body about the folder rather than the index. Keep this specific
+// enough to exclude the Index row while still tolerating a rename of
+// the trailing "/ Set Meeting" part.
 function isShareDdMaterialItem(name: string): boolean {
-  return name.toLowerCase().includes("due diligence material");
+  return name.toLowerCase().includes("share due diligence material");
 }
 
 // Loose-match for the Phase 1 "Marketing Report" row. Same PDF route
