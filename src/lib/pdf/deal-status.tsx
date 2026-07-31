@@ -253,6 +253,12 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
     gap: 6,
   },
+  // Dividers separate rows WITHIN a section, so the last row drops its
+  // rule — otherwise it draws a line against the next section header and
+  // reads as a divider for nothing.
+  rowLast: {
+    borderBottomWidth: 0,
+  },
   completedCheck: { marginRight: 2 },
   completedName: {
     flex: 1,
@@ -503,7 +509,15 @@ export function DealStatusDoc({
               key: "recently-completed",
               band: null,
               rows: recentlyCompleted.map((r, i) => (
-                <View key={`rc-${i}`} style={styles.completedRow} wrap={false}>
+                <View
+                  key={`rc-${i}`}
+                  style={
+                    i === recentlyCompleted.length - 1
+                      ? [styles.completedRow, styles.rowLast]
+                      : styles.completedRow
+                  }
+                  wrap={false}
+                >
                   <CheckIcon />
                   <Text style={styles.completedName}>{r.itemName}</Text>
                   <Text style={styles.completedPhase}>{r.phaseLabel}</Text>
@@ -529,7 +543,15 @@ export function DealStatusDoc({
               key: "upcoming-milestones",
               band: null,
               rows: upcomingMilestones.map((m, i) => (
-                <View key={`um-${i}`} style={styles.milestoneRow} wrap={false}>
+                <View
+                  key={`um-${i}`}
+                  style={
+                    i === upcomingMilestones.length - 1
+                      ? [styles.milestoneRow, styles.rowLast]
+                      : styles.milestoneRow
+                  }
+                  wrap={false}
+                >
               <View style={styles.milestoneLabelWrap}>
                   {m.overdue && (
                     <View style={styles.milestoneOverdueTag}>
@@ -569,7 +591,15 @@ export function DealStatusDoc({
                 const p = PRIORITY_META[r.priority];
                 const s = STATUS_META[r.status];
                 return (
-                  <View key={`iss-${i}`} style={styles.issueRow} wrap={false}>
+                  <View
+                    key={`iss-${i}`}
+                    style={
+                      i === openIssues.length - 1
+                        ? [styles.issueRow, styles.rowLast]
+                        : styles.issueRow
+                    }
+                    wrap={false}
+                  >
                     <View style={{ ...styles.issueStatusBar, backgroundColor: s.color }} />
                     <View
                       style={{ ...styles.priorityChip, backgroundColor: p.bg, color: p.fg }}
@@ -598,7 +628,15 @@ export function DealStatusDoc({
               key: "owner-team",
               band: null,
               rows: ownerTeam.map((r, i) => (
-                <View key={`ot-${i}`} style={styles.teamRow} wrap={false}>
+                <View
+                  key={`ot-${i}`}
+                  style={
+                    i === ownerTeam.length - 1
+                      ? [styles.teamRow, styles.rowLast]
+                      : styles.teamRow
+                  }
+                  wrap={false}
+                >
                   <Text style={styles.teamName}>{r.name}</Text>
                   <Text style={styles.teamRole}>{r.roleLabel}</Text>
                   <Text style={styles.teamEmail}>{r.email ?? "(no email)"}</Text>

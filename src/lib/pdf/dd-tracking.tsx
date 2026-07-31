@@ -266,6 +266,12 @@ const styles = StyleSheet.create({
     borderBottomStyle: "solid",
     borderBottomColor: COLORS.border,
   },
+  // Dividers separate rows WITHIN a group, so the last row in each group
+  // drops its rule — otherwise it draws a line against the next band or
+  // section header and reads as a divider for nothing.
+  rowLast: {
+    borderBottomWidth: 0,
+  },
   colPriority: { width: 56, paddingRight: 6 },
   colTitle: { flex: 2, paddingRight: 6 },
   colAssigned: { width: 110, paddingRight: 6 },
@@ -379,9 +385,12 @@ const styles = StyleSheet.create({
   },
 });
 
-function MilestoneRowView({ m }: { m: MilestoneRow }) {
+function MilestoneRowView({ m, isLast }: { m: MilestoneRow; isLast: boolean }) {
   return (
-    <View style={styles.milestoneRow} wrap={false}>
+    <View
+      style={isLast ? [styles.milestoneRow, styles.rowLast] : styles.milestoneRow}
+      wrap={false}
+    >
       <View style={styles.milestoneLabelWrap}>
         {m.hasHappened && (
           <Svg width={10} height={10} viewBox="0 0 24 24" style={styles.milestoneCheck}>
@@ -406,10 +415,13 @@ function MilestoneRowView({ m }: { m: MilestoneRow }) {
   );
 }
 
-function IssueRowView({ r }: { r: IssueRow }) {
+function IssueRowView({ r, isLast }: { r: IssueRow; isLast: boolean }) {
   const p = PRIORITY_META[r.priority];
   return (
-    <View style={styles.issueRow} wrap={false}>
+    <View
+      style={isLast ? [styles.issueRow, styles.rowLast] : styles.issueRow}
+      wrap={false}
+    >
       <View style={styles.colPriority}>
         <Text style={[styles.priorityChip, { backgroundColor: p.bg, color: p.fg }]}>
           {p.label}
@@ -431,9 +443,12 @@ function IssueRowView({ r }: { r: IssueRow }) {
   );
 }
 
-function ConsultantRowView({ c }: { c: ConsultantRow }) {
+function ConsultantRowView({ c, isLast }: { c: ConsultantRow; isLast: boolean }) {
   return (
-    <View style={styles.contactRow} wrap={false}>
+    <View
+      style={isLast ? [styles.contactRow, styles.rowLast] : styles.contactRow}
+      wrap={false}
+    >
       <View style={styles.firmCell}>
         <Text style={styles.firmName}>{c.firmName}</Text>
         <Text
@@ -506,7 +521,13 @@ export function DdTrackingDoc({
             {
               key: "milestones",
               band: null,
-              rows: milestones.map((m, i) => <MilestoneRowView key={`m-${i}`} m={m} />),
+              rows: milestones.map((m, i) => (
+                <MilestoneRowView
+                  key={`m-${i}`}
+                  m={m}
+                  isLast={i === milestones.length - 1}
+                />
+              )),
             },
           ]}
         />
@@ -527,7 +548,11 @@ export function DdTrackingDoc({
               </View>
             ),
             rows: groupedIssues[status].map((r, i) => (
-              <IssueRowView key={`${status}-${i}`} r={r} />
+              <IssueRowView
+                key={`${status}-${i}`}
+                r={r}
+                isLast={i === groupedIssues[status].length - 1}
+              />
             )),
           }))}
         />
@@ -546,7 +571,15 @@ export function DdTrackingDoc({
               </View>
             ),
             rows: teamByGroup[t].map((m, i) => (
-              <View key={`${t}-${i}`} style={styles.contactRow} wrap={false}>
+              <View
+                key={`${t}-${i}`}
+                style={
+                  i === teamByGroup[t].length - 1
+                    ? [styles.contactRow, styles.rowLast]
+                    : styles.contactRow
+                }
+                wrap={false}
+              >
                 <Text style={styles.contactName}>{m.name || "—"}</Text>
                 <Text style={styles.contactRole}>{m.roleLabel || ""}</Text>
                 <Text style={styles.contactEmail}>{m.email ?? ""}</Text>
@@ -570,7 +603,11 @@ export function DdTrackingDoc({
               </View>
             ),
             rows: firms.map((c, i) => (
-              <ConsultantRowView key={`${roleLabel}-${i}`} c={c} />
+              <ConsultantRowView
+                key={`${roleLabel}-${i}`}
+                c={c}
+                isLast={i === firms.length - 1}
+              />
             )),
           }))}
         />

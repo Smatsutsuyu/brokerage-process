@@ -194,6 +194,12 @@ const styles = StyleSheet.create({
     borderBottomStyle: "solid",
     borderBottomColor: COLORS.border,
   },
+  // Dividers separate entries WITHIN a role, so the last entry drops its
+  // rule — otherwise it draws a line against the next role's band (or the
+  // end of the document) and reads as a divider for nothing.
+  entryRowLast: {
+    borderBottomWidth: 0,
+  },
   // Wider gutter than the other columns: firm names are the longest
   // free-text field on the sheet and butt straight into CONTACT.
   colFirm: { flex: 1, paddingRight: 14 },
@@ -304,10 +310,21 @@ export function ConsultantRosterDoc({
                       {group.roleLabel.toUpperCase()}
                     </Text>
                   </View>
-                  {group.entries[0] && <EntryRow entry={group.entries[0]} />}
+                  {group.entries[0] && (
+                    <EntryRow
+                      entry={group.entries[0]}
+                      isLast={group.entries.length === 1}
+                    />
+                  )}
                 </View>
+                {/* slice(1) index i is original index i + 1, so the last
+                    original entry (length - 1) is i === length - 2. */}
                 {group.entries.slice(1).map((entry, i) => (
-                  <EntryRow key={`${group.roleLabel}-${i + 1}`} entry={entry} />
+                  <EntryRow
+                    key={`${group.roleLabel}-${i + 1}`}
+                    entry={entry}
+                    isLast={i === group.entries.length - 2}
+                  />
                 ))}
               </View>
             ))}
@@ -331,9 +348,12 @@ export function ConsultantRosterDoc({
   );
 }
 
-function EntryRow({ entry }: { entry: RosterEntry }) {
+function EntryRow({ entry, isLast }: { entry: RosterEntry; isLast: boolean }) {
   return (
-    <View style={styles.entryRow} wrap={false}>
+    <View
+      style={isLast ? [styles.entryRow, styles.entryRowLast] : styles.entryRow}
+      wrap={false}
+    >
       <View style={styles.colFirm}>
         <Text style={styles.firmName}>{entry.firmName}</Text>
         <Text

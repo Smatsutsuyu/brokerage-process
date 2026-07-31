@@ -25,6 +25,11 @@ Both items came from Chris exercising the new Consultant Roster PDF on the Woods
 - **Structural page-break control over `minPresenceAhead`.** The declarative prop is less code but did not hold under the stress fixture. `wrap={false}` around heading-plus-first-row is deterministic and is the same pattern the roster already used.
 - **Not-engaged list moved to the top rather than dropped.** The gaps are the actionable part during DD; muting it and putting it beside the coverage count keeps it useful without letting it dominate a sparse early roster.
 
+### Follow-up, same day: trailing row dividers removed
+- **Every data row carried a bottom border**, so the last row in a group drew a rule separating it from nothing: against the next subsection band, the next section header, or the end of the document. Chris flagged it on the Consultant Roster and the DD Tracking PDF.
+- Fixed in all three PDFs (Consultant Roster, DD Tracking, Deal Status) by dropping the border on the last row of each group. Dividers now appear only *between* rows within a group, so a single-entry role or a one-issue status group renders with no rule at all.
+- Deal Status was swept in the same pass even though it wasn't named: it has the identical pattern across all four of its row types, and leaving it would have made the three documents inconsistent right after unifying them.
+
 ### Follow-up, same day: Deal Status swept + `Section` extracted
 - **`Section` moved to `src/lib/pdf/section.tsx`** rather than being copied a second time. Callers pass their own header / empty-note styles (each document owns its type scale); the page-break guarantee is what's shared. DD Tracking now imports it.
 - **Deal Status PDF converted to `Section`.** All five sections (Progress, Recently Completed, Upcoming Milestones, Open Issues, Owner Team) were plain header-then-rows and could strand a header at a page bottom. The Overall progress bar became the last row of the Progress group rather than a trailing sibling, so it can't detach from the phase bars it totals.
