@@ -106,6 +106,8 @@ The Teams tab unifies the Deal Team into three groupings:
 
 Each member has an Include in emails toggle. Inclusion drives the recipient list when you use the Send to Deal Team buttons (for example, sharing DD material). Members can be real users, existing contacts on the deal, or free-text entries for someone who has no platform record yet.
 
+Send to Deal Team composers open with the marketing coordinator already checked in the CC picker, so she gets a copy without anyone having to remember. It is a default, not a lock: uncheck her on any individual send and that choice applies to that send only. The CC list itself is the full org directory, so you can add anyone else per send.
+
 ---
 
 ## Generating documents (the PDFs)

@@ -71,8 +71,15 @@ The first cut of this work had real defects. Notable ones, all fixed before comm
 - **`CALLER_SUPPLIED` in the guard is a deliberate allowlist, not an inference.** Registering a var there is an assertion that a call site populates it. Cheap to keep honest, and it makes the guard's failure message actionable.
 - **Left the loose `isShareDdMaterialItem` matcher alone.** It matches both "Share Due Diligence Material / Set Meeting" and "Create Index of Due Diligence Material". Sean described both as legitimate send surfaces, so both keep the button — now both gated.
 
+### Follow-up shipped same day: default CC on Deal Team sends
+- **Marketing coordinator now pre-checked in the CC picker on every Send-to-Deal-Team composer.** `DealTeamSendButton` previously passed no `ccOptions` at all, so the CC affordance never rendered in this flow. It now loads the org directory via `getOrgCcOptions()` and seeds the default once per recipient group (recipients are grouped one email per sub-team).
+- **New `src/lib/email/default-cc.ts`.** Matched by email, not a hardcoded user id, so the rule works across local / preview / production where the users table has different uuids. A miss is silent by design — a fresh local DB or an offboarded person means no default CC rather than an error.
+- **Ephemeral by design.** No `onCcChange` is passed, so the selection is per-send only and never persisted. Unchecking her applies to that send alone.
+- Deliberately **not** a database setting: one entry that changes roughly never doesn't justify an admin UI. Revisit if the list grows or needs to vary per deal.
+- The other half of the feedback ("brokers CC'd") is **intentionally not built** — brokers are already in the To line on these sends, so CC'ing them too is redundant. Parked pending the client's answer on the To/CC split.
+
 ### Blockers
-- None. Separately, feedback item `54a4fec3` (Deal Team send recipients + standard CC) is still awaiting a client answer on To/CC split.
+- None. Feedback item `54a4fec3` remains partially open pending a client answer on whether the Deal Team send should be one combined email or To: owner+buyer with brokers CC'd.
 
 ---
 

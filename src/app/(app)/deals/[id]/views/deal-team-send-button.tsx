@@ -7,10 +7,13 @@ import { toast } from "sonner";
 import {
   EmailPreviewModal,
   type EmailAttachment,
+  type EmailCcInitialEntry,
+  type EmailCcUserOption,
   type EmailRecipient,
   type EmailSenderChoice,
 } from "@/components/email/email-preview-modal";
 import { useInlineError } from "@/components/inline-error-bubble";
+import { resolveDefaultCcUserIds } from "@/lib/email/default-cc";
 import { formatMilestoneDate } from "@/lib/format-milestone-date";
 import { cn } from "@/lib/utils";
 import { type EmailTemplate } from "@/lib/email-templates";
@@ -20,6 +23,7 @@ import {
   getDealTeamRecipients,
   getOfferingDate,
   getOmBlastTemplateContext,
+  getOrgCcOptions,
   getSooReviewDate,
   sendBlastEmails,
   type DealTeamRecipientGroup,
@@ -104,6 +108,8 @@ export function DealTeamSendButton({
   const [vars, setVars] = useState<Record<string, string>>({});
   const [senderOptions, setSenderOptions] = useState<EmailSenderChoice[]>([]);
   const [defaultSenderId, setDefaultSenderId] = useState<string | undefined>();
+  const [ccOptions, setCcOptions] = useState<EmailCcUserOption[]>([]);
+  const [ccInitial, setCcInitial] = useState<EmailCcInitialEntry[]>([]);
   const [loading, startLoading] = useTransition();
   const {
     error: inlineError,
@@ -180,9 +186,10 @@ export function DealTeamSendButton({
         // Parallel load: recipients (deal team) + composer context
         // (sender list + deal-info vars). Same shape OM-blast uses
         // since the function is generic despite its name.
-        const [ctx, recs] = await Promise.all([
+        const [ctx, recs, cc] = await Promise.all([
           getOmBlastTemplateContext({ dealId }),
           getDealTeamRecipients({ dealId, teams }),
+          getOrgCcOptions(),
         ]);
         setVars({ ...ctx.vars, ...resolved, ...(extraVars ?? {}) });
         setSenderOptions(ctx.senderOptions);
@@ -196,6 +203,22 @@ export function DealTeamSendButton({
             builderName: r.builderName,
           })),
         );
+
+        // CC picker, stocked from the org directory with the marketing
+        // coordinator pre-checked. Recipients are grouped one email per
+        // sub-team (builderId is the team key), so seed the default once
+        // per group that actually has members. No onCcChange is passed:
+        // the selection is per-send only, never persisted, and the user
+        // can uncheck it in the composer.
+        setCcOptions(cc.map((u) => ({ id: u.id, name: u.name, email: u.email })));
+        const defaultCcIds = resolveDefaultCcUserIds(cc);
+        const groupIds = [...new Set(recs.map((r) => r.builderId))];
+        setCcInitial(
+          defaultCcIds.length > 0
+            ? groupIds.map((builderId) => ({ builderId, userIds: defaultCcIds }))
+            : [],
+        );
+
         setOpen(true);
       } catch (err) {
         console.error("[deal-team-send] context load failed", err);
@@ -243,6 +266,8 @@ export function DealTeamSendButton({
         defaultSelectedAttachmentIds={attachments.map((a) => a.id)}
         senderOptions={senderOptions}
         defaultSenderId={defaultSenderId}
+        ccOptions={ccOptions}
+        ccInitial={ccInitial}
         onSend={async (emails) => {
           const result = await sendBlastEmails(emails);
           if (result.failed === 0) {
