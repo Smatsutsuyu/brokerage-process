@@ -185,6 +185,12 @@ Inventory as of 2026-07-20. 16 total call sites split into two tiers by cost and
 - **Fix**: run `npm audit fix`, smoke-test.
 - **Effort**: S
 
+### [Bug — latent] Two-step composer modals can clip their own footer on short viewports
+- **What**: `DialogContent` (`src/components/ui/dialog.tsx`) sets no `overflow` and no `max-height` of its own. The two-step send modals override it to `flex h-[85vh] max-h-[900px] flex-col` and drop `EmailPreviewBody` straight in, and that body has no scroll container either. On a 768px-tall laptop, 85vh is ~653px while the composer runs ~700px+ (From, To, CC, attachments, subject, a 200px body textarea, footer). The overflow is clipped rather than scrolled, so the Send button can sit off the bottom with no way to reach it.
+- **Affects**: `send-marketing-report-modal.tsx`, `send-consultant-roster-modal.tsx`, `send-deal-status-modal.tsx`. Not `unified-deal-team-send-button.tsx`, which wraps its `EmailPreviewBody` in a `min-h-0 flex-1 overflow-y-auto` container (it runs taller still, so it was fixed on the way past).
+- **Fix**: apply the same wrapper to the other three, or better, put it inside `EmailPreviewBody` once so every embedder inherits it. Check the standalone `EmailPreviewModal` path too, which is `sm:max-w-2xl` with no height cap and so behaves differently.
+- **Effort**: S
+
 ### [Code Quality] Route dd-tracking Deal Team roster + getDealTeamRecipients through `resolveDealTeamMemberName`
 - **Note 2026-08-03**: the first call site moved. The dd-tracking roster resolver now lives in `src/lib/pdf/generate-dd-tracking.ts` (the loader was extracted out of the route), with an inline comment marking the divergence. A third inline copy now also exists in `src/lib/email/unified-deal-team.ts` (`resolveTeamIdentity`), which needs the email alongside the name — folding all of them together means extending the shared helper to return `{ name, email, phone }`.
 - **What**: Both `src/app/api/deals/[id]/dd-tracking.pdf/route.ts` (Deal Team roster section, ~lines 215-239) and `getDealTeamRecipients` in `deals/[id]/actions.ts` (~lines 2371-2383) reimplement Deal Team name resolution inline with subtly different fallbacks — the PDF roster returns empty string when auth_user is null on a user-linked row, while the issues section of the same PDF (now using `src/lib/deal-team-name.ts`) returns "(unknown)". Same person can render two different placeholders in the same document.

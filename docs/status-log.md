@@ -40,6 +40,16 @@ Surfaced by the review above and fixed in the same batch, because the unified co
 - **Verification**: normalised diff of the old route loader against the new lib body — 159 vs 154 significant lines, differing only by hoisting `trackedDateIso` from an inline arrow to a module function (body verbatim) and one Prettier rewrap. Route exercised under `next dev`: returns 401 like its sibling `status.pdf`, so the module graph including `server-only` resolves at runtime. `smoke-pdfs` still renders `DdTrackingDoc` at 84KB; neither the template nor the smoke harness was touched.
 - **Verification gap, stated plainly**: I could not rasterize and eyeball the PDF. `pdftoppm` isn't installed here, and no generator can run under `tsx` because `server-only` is a Next build-time alias rather than a real package. The render path is provably unmodified, so this is low-risk, but the first real send is still the first visual confirmation.
 
+### Follow-up: Complete Due Diligence gets the two-step preview
+
+Sean, after the push: the DD Tracking send "should probably be similar to the other tasks that generate the pdf first, present the preview, and then go to the next step with it attached."
+
+- **Added an optional `previewPdf` prop to `UnifiedDealTeamSendButton`** rather than writing a fourth near-duplicate of the two-step modal. With it set the button renders the wide `h-[85vh]` Dialog with `PdfPreviewStep` then `EmailPreviewBody`; without it, today's standalone composer. Both branches spread the same `composerProps` object, so the single-step and two-step flows cannot drift in what they actually compose. Share DD Material stays single-step: it ships a folder link in the body, not a document.
+- **Loading stays in the click handler**, unlike the sibling modals which load inside a `useEffect` after opening. That keeps the existing pre-flight and zero-recipient guards rejecting before anything opens, and has the side benefit that Continue is live immediately instead of showing "Loading recipients...".
+- **Cache-busting** is applied at click time (`?t=`), so each open previews current data.
+- **Found while wiring it**: `DialogContent` sets no `overflow` and no `max-height` of its own, and the two-step modals give it a fixed `h-[85vh]`. The composer body has no scroll container either, so on a ~768px-tall laptop the footer can be clipped with no way to reach Send. Wrapped this composer's body in `min-h-0 flex-1 overflow-y-auto`. It runs taller than the siblings (wrapping provenance chips plus a summary line under each recipient box), so it would have been the first to hit it. The three sibling modals have the same latent bug and are logged in `docs/backlog.md`; not fixed here because they are outside this change and untested by me.
+- `tsc`, `lint` (0 errors), and `next build` all pass.
+
 ### Deferred
 - **Self-CC.** The sender is usually on the Broker Team, so he is default-CC'd and the send also BCCs him. Visible and uncheckable; left alone pending Chris's preference.
 - **`resolveDealTeamMemberName` now has three inline reimplementations** (dd-tracking generator roster, `getDealTeamRecipients`, and the new `resolveTeamIdentity` in `unified-deal-team.ts`). Backlog entry updated with all three.

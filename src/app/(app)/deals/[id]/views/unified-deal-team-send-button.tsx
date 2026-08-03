@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useTransition, type ComponentType } from "react";
-import { Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import {
+  EmailPreviewBody,
   EmailPreviewModal,
   type EmailAttachment,
   type EmailCcInitialEntry,
@@ -13,6 +15,14 @@ import {
   type EmailSenderChoice,
 } from "@/components/email/email-preview-modal";
 import { useInlineError } from "@/components/inline-error-bubble";
+import { PdfPreviewStep } from "@/components/pdf/pdf-preview-step";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { type EmailTemplate } from "@/lib/email-templates";
 
@@ -45,6 +55,16 @@ type UnifiedDealTeamSendButtonProps = {
   // off for a send where copying the other side of the table would be
   // wrong.
   includeConsultants?: boolean;
+  // When set, the flow becomes two-step: review the freshly-rendered PDF
+  // first, then continue to the composer with it already attached. Same
+  // shape as the Marketing Report / Consultant Roster / Deal Status
+  // sends. Omit on rows with nothing to preview (Share DD Material ships
+  // a folder link in the body, not a document).
+  //
+  // `path` is the route only; the cache-busting query is appended at
+  // click time so each open renders current data rather than a cached
+  // response from the last preview.
+  previewPdf?: { path: string; title: string; description?: string };
   compact?: boolean;
 };
 
@@ -80,9 +100,15 @@ export function UnifiedDealTeamSendButton({
   requireVars,
   sourceItemId,
   includeConsultants = true,
+  previewPdf,
   compact = true,
 }: UnifiedDealTeamSendButtonProps) {
   const [open, setOpen] = useState(false);
+  // Only meaningful when previewPdf is set. Reset to "preview" on every
+  // open so reopening never lands mid-flow.
+  const [step, setStep] = useState<"preview" | "compose">("preview");
+  const [pdfUrl, setPdfUrl] = useState("");
+  const [toCount, setToCount] = useState(0);
   const [recipients, setRecipients] = useState<EmailRecipient[]>([]);
   const [vars, setVars] = useState<Record<string, string>>({});
   const [senderOptions, setSenderOptions] = useState<EmailSenderChoice[]>([]);
@@ -142,6 +168,14 @@ export function UnifiedDealTeamSendButton({
         setSenderOptions(ctx.senderOptions);
         setDefaultSenderId(ctx.defaultSenderId);
         setDefaultAttachmentIds(attachments.map((a) => a.id));
+        setToCount(data.to.length);
+        // Everything is loaded before the dialog opens, so the preview
+        // step's Continue is live immediately rather than waiting on a
+        // recipient fetch the way the sibling two-step modals do.
+        setStep("preview");
+        if (previewPdf) {
+          setPdfUrl(`${previewPdf.path}?t=${Date.now()}`);
+        }
 
         // Every To recipient shares the one synthetic group so the
         // composer emits exactly one email. Their real provenance rides
@@ -208,6 +242,48 @@ export function UnifiedDealTeamSendButton({
 
   const errorRing = inlineError ? "ring-1 ring-red-300" : undefined;
 
+  async function handleSend(emails: Parameters<typeof sendBlastEmails>[0]) {
+    // dealId is required by the transport to render any kind:"generated"
+    // attachment (the DD Tracking report rides through here).
+    const result = await sendBlastEmails(emails, { dealId });
+    if (result.failed === 0) {
+      toast.success(`Sent ${result.sent} ${result.sent === 1 ? "email" : "emails"}`, {
+        duration: 4000,
+      });
+    } else if (result.sent === 0) {
+      const first = result.outcomes.find((o) => !o.ok);
+      toast.error("Send failed", {
+        description: first && !first.ok ? first.reason : "Check Resend logs.",
+        duration: 8000,
+      });
+    } else {
+      const failed = result.outcomes.filter((o) => !o.ok);
+      toast.warning(`Sent ${result.sent}, failed ${result.failed}`, {
+        description: failed
+          .map((f) => `${f.builderName}: ${"reason" in f ? f.reason : ""}`)
+          .join("; "),
+        duration: 10000,
+      });
+    }
+  }
+
+  // Shared by both presentations so the single-step and two-step flows
+  // can never drift in what they actually compose.
+  const composerProps = {
+    title: modalTitle,
+    description,
+    recipients,
+    template,
+    vars,
+    attachmentChoices: attachments,
+    defaultSelectedAttachmentIds: defaultAttachmentIds,
+    senderOptions,
+    defaultSenderId,
+    ccOptions,
+    ccInitial,
+    onSend: handleSend,
+  };
+
   return (
     <span className="relative inline-flex">
       {bubble}
@@ -232,49 +308,67 @@ export function UnifiedDealTeamSendButton({
         {label}
       </button>
 
-      <EmailPreviewModal
-        open={open}
-        onOpenChange={setOpen}
-        title={modalTitle}
-        description={description}
-        recipients={recipients}
-        template={template}
-        vars={vars}
-        attachmentChoices={attachments}
-        defaultSelectedAttachmentIds={defaultAttachmentIds}
-        senderOptions={senderOptions}
-        defaultSenderId={defaultSenderId}
-        ccOptions={ccOptions}
-        ccInitial={ccInitial}
-        onSend={async (emails) => {
-          // dealId is required by the transport for any kind:"generated"
-          // attachment. None flow through here yet (DD Tracking still
-          // ships as kind:"link" — see docs/backlog.md), but passing it
-          // costs nothing and means the generator migration is a
-          // one-line call-site change.
-          const result = await sendBlastEmails(emails, { dealId });
-          if (result.failed === 0) {
-            toast.success(
-              `Sent ${result.sent} ${result.sent === 1 ? "email" : "emails"}`,
-              { duration: 4000 },
-            );
-          } else if (result.sent === 0) {
-            const first = result.outcomes.find((o) => !o.ok);
-            toast.error("Send failed", {
-              description: first && !first.ok ? first.reason : "Check Resend logs.",
-              duration: 8000,
-            });
-          } else {
-            const failed = result.outcomes.filter((o) => !o.ok);
-            toast.warning(`Sent ${result.sent}, failed ${result.failed}`, {
-              description: failed
-                .map((f) => `${f.builderName}: ${"reason" in f ? f.reason : ""}`)
-                .join("; "),
-              duration: 10000,
-            });
-          }
-        }}
-      />
+      {previewPdf ? (
+        // Two-step: review the freshly-rendered PDF, then compose with it
+        // attached. Same shape as the Marketing Report / Consultant
+        // Roster / Deal Status sends.
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="flex h-[85vh] max-h-[900px] w-[min(95vw,1100px)] max-w-none flex-col gap-3 sm:max-w-none">
+            {step === "preview" ? (
+              <PdfPreviewStep
+                pdfUrl={pdfUrl}
+                title={previewPdf.title}
+                description={previewPdf.description}
+                continueLabel="Continue to email"
+                onCancel={() => setOpen(false)}
+                onContinue={() => setStep("compose")}
+              />
+            ) : (
+              <>
+                <DialogHeader className="sr-only">
+                  <DialogTitle>{modalTitle}</DialogTitle>
+                  <DialogDescription>
+                    Compose the email that will go to the Deal Team with the
+                    report attached.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="mt-4 flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[12px] text-blue-900">
+                  <Users className="h-3.5 w-3.5 flex-shrink-0 text-blue-700" />
+                  <span>
+                    One email to <strong>{toCount}</strong> recipient
+                    {toCount === 1 ? "" : "s"} on the Deal Team, plus anyone
+                    CC&apos;d. Manage who&apos;s included on the{" "}
+                    <Link
+                      href={`/deals/${dealId}?tab=team`}
+                      className="underline hover:text-blue-700"
+                      onClick={() => setOpen(false)}
+                    >
+                      Teams tab
+                    </Link>
+                    .
+                  </span>
+                </div>
+                {/* DialogContent has no overflow handling of its own, and
+                    this one is a fixed h-[85vh]. The composer runs taller
+                    here than in the sibling two-step modals (provenance
+                    chips wrap, and each recipient box carries a summary
+                    line), so on a short laptop viewport the footer would
+                    be clipped with no way to scroll to Send. Scrolling the
+                    whole body keeps every control reachable. */}
+                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+                  <EmailPreviewBody
+                    {...composerProps}
+                    onClose={() => setOpen(false)}
+                    onBack={() => setStep("preview")}
+                  />
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+      ) : (
+        <EmailPreviewModal open={open} onOpenChange={setOpen} {...composerProps} />
+      )}
     </span>
   );
 }

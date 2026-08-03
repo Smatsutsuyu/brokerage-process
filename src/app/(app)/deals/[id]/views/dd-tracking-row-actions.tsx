@@ -46,6 +46,16 @@ export function DdTrackingRowActions({ dealId }: DdTrackingRowActionsProps) {
             filename: "Due Diligence Tracking.pdf",
           },
         ]}
+        // Review the report before composing, matching the Marketing
+        // Report / Consultant Roster / Deal Status sends. The preview
+        // and the attachment render from the same loader, so what you
+        // approve here is what recipients receive.
+        previewPdf={{
+          path: `/api/deals/${dealId}/dd-tracking.pdf`,
+          title: "Due Diligence Tracking preview",
+          description:
+            "Review the freshly-generated report before continuing to the email composer.",
+        }}
       />
     </>
   );
