@@ -50,8 +50,11 @@ When you're done, `npm run db:down` stops the container (keeps data on disk).
 | `npm run db:studio`  | Open Drizzle Studio (browser UI for inspecting the DB)                      |
 | `npm run db:seed`    | Wipe + seed the full demo dataset (org, users, builders, deals, checklist)  |
 | `npm run db:seed:email-test` | Additively layer in a rate-limit test deal (does NOT wipe)          |
+| `npm run verify:unified-composer` | Assert the unified Deal Team send's recipient/CC shaping against real rows |
 
 ### Testing email blasts locally (Resend rate limit)
+
+`npm run verify:unified-composer` is the closest thing the repo has to a test for the unified Deal Team send. It inserts a fixture roster (owner / buyer / broker members across all three identity sources, plus consultants with good, missing, and malformed addresses), runs the same three queries the server action runs, feeds them the same pure transform, asserts 30 properties across four scenarios, then removes the fixtures. It refuses to run unless `DATABASE_URL` points at localhost, since it writes rows. Run it after touching `src/lib/email/unified-deal-team.ts`.
 
 `npm run db:seed:email-test` adds a deal named **"RL Test — Rate Limit"** with 6 builders (bump `BUILDER_COUNT` in `src/db/seed-email-test.ts` for more). Every contact uses a Gmail subaddress — `seanesparza+rl1@gmail.com` … `+rl6@gmail.com` — which all deliver to `seanesparza@gmail.com`, so one inbox receives the whole blast. Each builder is one outbound email, so the builder count equals the number of Resend requests a single blast fires.
 

@@ -4,7 +4,7 @@ import { Send } from "lucide-react";
 
 import { SHARE_DD_MATERIAL_TEMPLATE } from "@/lib/email-templates";
 
-import { DealTeamSendButton } from "./deal-team-send-button";
+import { UnifiedDealTeamSendButton } from "./unified-deal-team-send-button";
 
 type ShareDdMaterialRowActionsProps = {
   dealId: string;
@@ -30,14 +30,13 @@ export function ShareDdMaterialRowActions({
   itemId,
 }: ShareDdMaterialRowActionsProps) {
   return (
-    <DealTeamSendButton
+    <UnifiedDealTeamSendButton
       dealId={dealId}
       label="Send to Deal Team"
-      title="Email the DD folder link + meeting prompt to the Deal Team"
+      title="Email the DD folder link + meeting prompt to the Deal Team (one email: ownership + buyer on To, brokerage CC'd)"
       icon={Send}
       modalTitle="Share DD Material"
       template={SHARE_DD_MATERIAL_TEMPLATE}
-      teams={["owner", "broker", "buyer"]}
       attachments={[]}
       requireVars={["ddFolderUrl"]}
       sourceItemId={itemId}

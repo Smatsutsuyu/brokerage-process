@@ -135,10 +135,10 @@ Inventory as of 2026-07-20. 16 total call sites split into two tiers by cost and
 - **Fix**: one helper in `src/lib/pdf/` centralizes the cast and the response shape.
 - **Effort**: S
 
-### [Code Quality] Migrate DD Tracking PDF from kind: "link" to kind: "generated"
-- **What**: `src/app/(app)/deals/[id]/views/dd-tracking-row-actions.tsx` attaches the DD Tracking PDF as `kind: "link"`, which embeds the URL in the email body as text rather than attaching the bytes. Recipients have to click through and authenticate. Same gap the Marketing Report send had before it migrated to `kind: "generated"` (commit landed 2026-05-19).
-- **Fix**: extract `generateDdTrackingPdf({ dealId, orgId })` into `src/lib/pdf/generate-dd-tracking.ts` (mirror `src/lib/pdf/generate-marketing-report.ts`). Refactor the API route to call it. Wire `dd-tracking` into the generator registry in `src/lib/email/generators.ts` (currently throws "not yet implemented"). Switch `dd-tracking-row-actions.tsx` to pass `{ kind: "generated", generator: "dd-tracking", filename: ... }`. Update the `DealTeamSendButton` call site to forward `dealId` through.
-- **Effort**: M
+### ~~[Bug] Migrate DD Tracking PDF from kind: "link" to kind: "generated"~~ — done 2026-08-03
+- **What it was**: `dd-tracking-row-actions.tsx` attached the report as `kind: "link"` with a *relative* URL (`/api/deals/${dealId}/dd-tracking.pdf`), and `appendLinksToBody` concatenates link attachments into the message body verbatim. Recipients received the literal string `Due Diligence Tracking PDF: /api/deals/<uuid>/dd-tracking.pdf` — not a link, just a path, and session-gated even if made absolute. **The DD Tracking send never actually delivered the report.** Surfaced while shipping the unified Deal Team composer onto that same row.
+- **Fixed by**: extracting `generateDdTrackingPdf({ dealId, orgId })` into `src/lib/pdf/generate-dd-tracking.ts` (a pure move of the route's loader, mirroring `generate-deal-status.ts`), refactoring the route to call it, wiring the `dd-tracking` key in `src/lib/email/generators.ts` (it previously threw "not yet implemented"), and switching the row to `{ kind: "generated", generator: "dd-tracking" }`. The call site already forwarded `dealId` to `sendBlastEmails`.
+- **Still open, separately**: the roster section of that generator resolves member names inline and returns `""` where `resolveDealTeamMemberName` returns `"(unknown)"` — see the entry below. Deliberately left untouched so the extraction stayed a verifiable pure move.
 
 ### [Code Quality] Extract the "builder has contacts on deal" EXISTS subquery
 - **What**: Same EXISTS subquery hand-written in `src/app/(app)/builders/page.tsx`, `src/app/api/deals/[id]/marketing-report.pdf/route.ts`, and `src/app/(app)/builders/actions.ts`. Will be used in more PDF routes once the Compiled Package lands.
@@ -186,6 +186,7 @@ Inventory as of 2026-07-20. 16 total call sites split into two tiers by cost and
 - **Effort**: S
 
 ### [Code Quality] Route dd-tracking Deal Team roster + getDealTeamRecipients through `resolveDealTeamMemberName`
+- **Note 2026-08-03**: the first call site moved. The dd-tracking roster resolver now lives in `src/lib/pdf/generate-dd-tracking.ts` (the loader was extracted out of the route), with an inline comment marking the divergence. A third inline copy now also exists in `src/lib/email/unified-deal-team.ts` (`resolveTeamIdentity`), which needs the email alongside the name — folding all of them together means extending the shared helper to return `{ name, email, phone }`.
 - **What**: Both `src/app/api/deals/[id]/dd-tracking.pdf/route.ts` (Deal Team roster section, ~lines 215-239) and `getDealTeamRecipients` in `deals/[id]/actions.ts` (~lines 2371-2383) reimplement Deal Team name resolution inline with subtly different fallbacks — the PDF roster returns empty string when auth_user is null on a user-linked row, while the issues section of the same PDF (now using `src/lib/deal-team-name.ts`) returns "(unknown)". Same person can render two different placeholders in the same document.
 - **Fix**: fold both call sites into `resolveDealTeamMemberName` from `@/lib/deal-team-name`. Extend the helper to also return `{ email, phone }` if the recipients caller needs it. Adversarial verify surfaced this as low severity during the issue-assignee-migration work — pre-existing, not caused by that change.
 - **Effort**: S

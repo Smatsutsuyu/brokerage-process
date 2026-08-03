@@ -4,6 +4,52 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-08-03 — Unified Deal Team send: one email, To/CC split, recipient provenance
+
+Closes the design half of feedback item `54a4fec3`. Chris: *"I'd like this to be 1 email TO: Ownership (Seller) and Buyer with a CC to Loan and co-brokers. Ideally I'd have the CC line allow me to send to consultant teams too."* Follow-up ask in the same thread: show which team or consultant each address belongs to, at a glance.
+
+Options doc with rendered mockups: `https://claude.ai/code/artifact/0a2a61ad-1a7d-4411-b5b7-c3c10b028d77`. Sean picked option B (collapse + consultant CC) and treatment B2 (leading provenance cap).
+
+### Done
+- **New `UnifiedDealTeamSendButton`** (`views/unified-deal-team-send-button.tsx`), opted into by the two Phase 4 rows only: Share DD Material and Complete Due Diligence. Schedule SOO Review deliberately stays on the per-sub-team `DealTeamSendButton` — the Excel specs it as Owner + Broker, and CC'ing the eventual buyer on an offer-review invite would be wrong. Reverting a row is swapping which component it renders.
+- **One new server action, `getUnifiedDealTeamComposerData`**, rather than widening `getDealTeamRecipients` / `getOrgCcOptions` / `getDealTeamCcOptions`. Those three are shared with the OM blast and three two-step composers; adding provenance to them would have touched every one.
+- **Shaping extracted to `src/lib/email/unified-deal-team.ts`.** `actions.ts` carries `"use server"` and may only export async functions, which makes anything inside it untestable by construction. The action is now queries-only.
+- **Provenance caps on To/CC chips.** Additive optional props on the shared composer, so all five existing callers render byte-identically. Cap vocabulary is quoted from what the app already shows — Owner / Broker / Buyer from the deal team sub-team labels, Seller / Buyer from the Consultants tab side badge, Org from the CC picker section header. Role trails as a dim suffix and is the only element permitted to truncate: cap, name and address never clip, because verifying addresses is the reason the To line is on screen.
+- **Consultants reachable from the CC picker**, grouped by side, never pre-checked. `CcGroup` gained `consultant_seller` / `consultant_buyer`; `CcOption` gained `detail`, `disabled`, `disabledNote`.
+- **Fixed the CC-persistence landmine** flagged during the earlier research pass. `blast-modal.tsx` filtered CC ids before writing to a `uuid[]` column using a prefix denylist (`owner:`, `broker:`). The new `consultant:` ids would have sailed through into a Postgres type error. Now an allowlist keyed on the org group, so unknown id kinds are excluded by construction.
+- **Fixed the pre-existing `inline-error-bubble.tsx` lint error** (`react-hooks/set-state-in-effect`), structurally rather than by suppression: the measuring half moved into a child keyed on the message, so remount re-arms the hidden-until-measured state instead of an effect resetting it. Also fixes a real frame-level bug where one message replacing another kept the previous message's translate-X. `npm run lint` is now 0 errors for the first time in a while.
+- **`updateConsultant` now runs the address through `parseEmailAddress`**, matching `addConsultant`. It was a bare `trim()`, so an edit could store an address the insert path would have rejected. Newly load-bearing now that consultants are email recipients.
+- **`handleSend` in the shared composer catches a thrown send.** It was try/finally with no catch, so a rejected send (expired session, network failure) produced no toast and left the modal open with no sign anything failed. All five embedding composers get the fix.
+
+### Verification
+- New `npm run verify:unified-composer` — 30 assertions across four scenarios (full roster, broker-only fallback, empty roster, malformed consultant addresses), run against real Postgres rows through the same transform the action ships. Guarded to refuse any non-localhost `DATABASE_URL`, since it writes fixture rows.
+- `tsc`, `lint` (0 errors, 7 pre-existing warnings), and `next build` all pass.
+- Adversarial review: 6 reviewers over the diff, 27 raw findings, 17 surviving independent refutation. All applied or consciously deferred.
+
+### Notable review catches
+- **Regression the fixtures missed.** Scoping the To line to Owner + Buyer made a broker-only roster unsendable: `to = []`, composer opens to a dead end, Send permanently disabled — where the old button emailed the Broker Team fine. The dev seed is exactly that shape. Fixed with a fallback (brokerage carries the send, composer says so) plus a click-time guard that rejects with the inline bubble instead of opening an unsendable composer.
+- **A test of mine was wrong, not the code.** I asserted a trailing-bracket address (`gilad@blackwood.com>`, the shape behind the live Resend 422) should be rejected. `parseEmailAddress` *repairs* it, which is the better behavior. Assertion rewritten to check the repaired address is clean and that only unrepairable junk is disabled.
+
+### Follow-up shipped same day: DD Tracking actually delivers its PDF
+
+Surfaced by the review above and fixed in the same batch, because the unified composer landed on the Phase 4 **"Complete Due Diligence"** row while that row's attachment was broken.
+
+- **The bug**: the row attached its report as `kind: "link"` with a *relative* URL, `/api/deals/${dealId}/dd-tracking.pdf`. `appendLinksToBody` concatenates link attachments into the message body verbatim, so recipients got the literal text `Due Diligence Tracking PDF: /api/deals/<uuid>/dd-tracking.pdf`. Not a link, just a path — and session-gated even if made absolute. That send has never delivered the report. It looked fine in the composer, which renders the row as "Due Diligence Tracking PDF · link · fetched at send", and the attachment was pre-checked by default.
+- **Fix**: extracted `generateDdTrackingPdf({ dealId, orgId })` into `src/lib/pdf/generate-dd-tracking.ts`, refactored the route to a thin auth-and-stream wrapper (same shape as `status.pdf`), wired the `dd-tracking` key in the generator registry (it threw "not yet implemented"), and switched the row to `kind: "generated"`. `sendBlastEmails` was already receiving `dealId` from the unified button.
+- **Scope discipline**: kept as a pure move. The roster section's inline name resolver returns `""` where `resolveDealTeamMemberName` returns `"(unknown)"`; that divergence is its own backlog item and was deliberately not folded in, so the extraction stays mechanically verifiable.
+- **Verification**: normalised diff of the old route loader against the new lib body — 159 vs 154 significant lines, differing only by hoisting `trackedDateIso` from an inline arrow to a module function (body verbatim) and one Prettier rewrap. Route exercised under `next dev`: returns 401 like its sibling `status.pdf`, so the module graph including `server-only` resolves at runtime. `smoke-pdfs` still renders `DdTrackingDoc` at 84KB; neither the template nor the smoke harness was touched.
+- **Verification gap, stated plainly**: I could not rasterize and eyeball the PDF. `pdftoppm` isn't installed here, and no generator can run under `tsx` because `server-only` is a Next build-time alias rather than a real package. The render path is provably unmodified, so this is low-risk, but the first real send is still the first visual confirmation.
+
+### Deferred
+- **Self-CC.** The sender is usually on the Broker Team, so he is default-CC'd and the send also BCCs him. Visible and uncheckable; left alone pending Chris's preference.
+- **`resolveDealTeamMemberName` now has three inline reimplementations** (dd-tracking generator roster, `getDealTeamRecipients`, and the new `resolveTeamIdentity` in `unified-deal-team.ts`). Backlog entry updated with all three.
+
+### Open with Chris
+- Should buyer-side consultants be offered on ownership-facing sends? Currently both sides are offered on DD sends, never pre-checked.
+- Does the one-email shape eventually apply to Schedule SOO Review too?
+
+---
+
 ## 2026-07-31 — PDF section legibility + orphaned-heading fixes
 
 Both items came from Chris exercising the new Consultant Roster PDF on the Woods deal.

@@ -26,6 +26,10 @@ import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { findBuilderByName } from "@/lib/builders";
 import { parseEmailAddress } from "@/lib/email-address";
 import { sendResolvedEmails, type BlastSendResult } from "@/lib/email/blast";
+import {
+  buildUnifiedComposerData,
+  type UnifiedDealTeamComposerData,
+} from "@/lib/email/unified-deal-team";
 import { env } from "@/lib/env";
 import { formatMilestoneDate } from "@/lib/format-milestone-date";
 import { formatPhone } from "@/lib/phone";
@@ -881,7 +885,11 @@ export async function updateConsultant(input: {
       side: input.side,
       firmName,
       contactName: input.contactName?.trim() || null,
-      contactEmail: input.contactEmail?.trim() || null,
+      // Was a bare trim while addConsultant already parsed, so an edit
+      // could store an address the insert path would have rejected.
+      // Consultants are now email recipients (unified Deal Team CC), and
+      // a malformed address fails the whole outbound message at Resend.
+      contactEmail: parseEmailAddress(input.contactEmail),
       contactPhone: formatPhone(input.contactPhone),
       notes: input.notes?.trim() || null,
     })
@@ -1485,7 +1493,7 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
 // UTC midnight, which can roll back a day in negative-offset zones).
 // Thin alias kept so existing call sites read unchanged. The real
 // implementation moved to src/lib/format-milestone-date.ts so the
-// client-side var resolver in deal-team-send-button.tsx can share it —
+// client-side var resolver in deal-team-preflight.ts can share it —
 // a "use server" module can't export a pure function.
 function formatOfferingDate(trackedDate: string | null): string {
   return formatMilestoneDate(trackedDate);
@@ -2577,6 +2585,109 @@ export async function getDealTeamRecipients(input: {
       builderName: DEAL_TEAM_GROUP_LABEL[r.team],
     };
   });
+}
+
+// ---------------------------------------------------------------------
+// Unified Deal Team composer
+// ---------------------------------------------------------------------
+//
+// Backs UnifiedDealTeamSendButton — the "one email, proper To/CC split"
+// variant Chris asked for: TO ownership + buyer, CC the brokerage, the
+// marketing coordinator, and (optionally) the deal's consultants.
+//
+// Deliberately a SINGLE action returning the whole composer shape rather
+// than new fields threaded through getDealTeamRecipients /
+// getOrgCcOptions / getDealTeamCcOptions. Those three are shared with the
+// per-sub-team button, the OM blast, and three two-step composers;
+// widening them to carry provenance would touch every one of those
+// flows. Keeping the unified shape here means reverting this feature is
+// deleting a file and swapping two call sites back.
+//
+// This action is queries only. All shaping lives in
+// src/lib/email/unified-deal-team.ts, because "use server" modules may
+// only export async functions and so cannot expose a pure helper for a
+// verification script to exercise.
+export type {
+  UnifiedCapLabel,
+  UnifiedCcGroup,
+  UnifiedCcOption,
+  UnifiedDealTeamComposerData,
+  UnifiedRecipient,
+} from "@/lib/email/unified-deal-team";
+
+export async function getUnifiedDealTeamComposerData(input: {
+  dealId: string;
+  // When false, consultants are left out of the CC pool entirely. Lets a
+  // call site opt into the collapsed To/CC shape without offering
+  // consultants (e.g. a send where copying the other side would be
+  // wrong).
+  includeConsultants?: boolean;
+}): Promise<UnifiedDealTeamComposerData> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  const includeConsultants = input.includeConsultants ?? true;
+
+  const [teamRows, consultantRows, orgRows] = await Promise.all([
+    db
+      .select({
+        id: dealTeamMembers.id,
+        team: dealTeamMembers.team,
+        roleLabel: dealTeamMembers.roleLabel,
+        userId: dealTeamMembers.userId,
+        contactId: dealTeamMembers.contactId,
+        freeName: dealTeamMembers.name,
+        freeEmail: dealTeamMembers.email,
+        userName: authUser.name,
+        userEmail: authUser.email,
+        contactFirst: contacts.firstName,
+        contactLast: contacts.lastName,
+        contactEmail: contacts.email,
+      })
+      .from(dealTeamMembers)
+      .leftJoin(users, eq(users.id, dealTeamMembers.userId))
+      .leftJoin(authUser, eq(authUser.id, users.authUserId))
+      .leftJoin(contacts, eq(contacts.id, dealTeamMembers.contactId))
+      .where(
+        and(
+          eq(dealTeamMembers.dealId, input.dealId),
+          eq(dealTeamMembers.orgId, org.id),
+          eq(dealTeamMembers.includeInEmails, true),
+        ),
+      )
+      .orderBy(
+        dealTeamMembers.team,
+        dealTeamMembers.sortOrder,
+        dealTeamMembers.createdAt,
+      ),
+    includeConsultants
+      ? db
+          .select({
+            id: consultants.id,
+            role: consultants.role,
+            side: consultants.side,
+            firmName: consultants.firmName,
+            contactName: consultants.contactName,
+            contactEmail: consultants.contactEmail,
+          })
+          .from(consultants)
+          .where(
+            and(
+              eq(consultants.dealId, input.dealId),
+              eq(consultants.orgId, org.id),
+            ),
+          )
+          .orderBy(consultants.role, consultants.firmName)
+      : Promise.resolve([]),
+    db
+      .select({ id: users.id, name: authUser.name, email: authUser.email })
+      .from(users)
+      .innerJoin(authUser, eq(authUser.id, users.authUserId))
+      .where(eq(users.orgId, org.id))
+      .orderBy(asc(authUser.name)),
+  ]);
+
+  return buildUnifiedComposerData({ teamRows, consultantRows, orgRows });
 }
 
 export async function setDealTeamMemberIncluded(input: {

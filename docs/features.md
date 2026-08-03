@@ -108,7 +108,27 @@ The Teams tab unifies the Deal Team into three groupings:
 
 Each member has an Include in emails toggle. Inclusion drives the recipient list when you use the Send to Deal Team buttons (for example, sharing DD material). Members can be real users, existing contacts on the deal, or free-text entries for someone who has no platform record yet.
 
-Send to Deal Team composers open with the marketing coordinator already checked in the CC picker, so she gets a copy without anyone having to remember. It is a default, not a lock: uncheck her on any individual send and that choice applies to that send only. The CC list itself is the full org directory, so you can add anyone else per send.
+### How a Deal Team send is addressed
+
+The two Phase 4 rows, Share Due Diligence Material and Complete Due Diligence, send **one email** with a proper To/CC split:
+
+- **To**: Owner Team and Buyer Team.
+- **CC**: Broker Team, pre-checked, plus the marketing coordinator.
+
+Every name on both lines carries a small tag showing where the person comes from: Owner, Broker, or Buyer for deal team members, Seller or Buyer for consultants, Org for anyone else in the directory. The tag is the same wording those people already carry elsewhere in the app, so a buyer-side consultant reads "Buyer" exactly as the Consultants tab badges them. The person's role on the deal follows their address in lighter text.
+
+The CC picker also offers the deal's **consultants**, grouped into seller-side and buyer-side sections. They are never CC'd by default; adding one is always a deliberate act. A consultant with no email address on file, or with an address that can't be parsed, appears greyed out with the reason rather than silently disappearing, so you know to go fix the record on the Consultants tab.
+
+Two edge cases worth knowing:
+
+- If nobody on ownership or the buyer side has an email address yet (common early in a deal, before a buyer is selected), the brokerage goes on the To line instead and the composer says so. The send still works.
+- If nobody on the deal team has an email address at all, the button refuses to open the composer and tells you why, rather than opening an email you can't send.
+
+Anyone left off for want of an email address is counted in the composer's description, so an under-send is visible rather than silent.
+
+The marketing coordinator and the brokerage are defaults, not locks: uncheck anyone on an individual send and that choice applies to that send only. Nothing here is persisted between sends.
+
+Other Deal Team composers (Schedule SOO Review, Marketing Report, Consultant Roster, Deal Status) still send one email per sub-team.
 
 ---
 
@@ -118,7 +138,7 @@ Four Land-Advisors-branded PDFs are built into the app. All of them open in a ne
 
 - Marketing Report. Builder list grouped by tier with per-builder comments. Generated from the Contacts tab toolbar (button labeled "Marketing Report") or the Marketing Report row on the Phase 1 checklist. This is what you send to ownership for status updates. The Contacts tab also has a "Send Marketing Report" button next to it that runs the same two-step PDF-preview-then-email flow as the Phase 2 checklist row (delivers to the Owner Team with co-brokers CC'd).
 - Q&A File. Approved Q&A items rendered as a clean branded document. Generated from the Q&A tab or the Phase 2 "Q&A File" checklist row.
-- Due Diligence Tracking. Combined PDF for the bi-weekly DD call: the 7 milestone dates from the Phase 4 checklist, current issues grouped by status (no summary stats), the full Deal Team (Owner / Broker / Buyer subteams), and the consultant roster. Generated from the Issues tab toolbar or the Phase 4 "Complete Due Diligence" row.
+- Due Diligence Tracking. Combined PDF for the bi-weekly DD call: the 7 milestone dates from the Phase 4 checklist, current issues grouped by status (no summary stats), the full Deal Team (Owner / Broker / Buyer subteams), and the consultant roster. Generated from the Issues tab toolbar or the Phase 4 "Complete Due Diligence" row. When you email it from that row, the PDF is rendered fresh at send time and attached as a real file, so recipients get the report itself rather than a link they'd have to log in to open.
 - Consultant Roster. Standalone contact sheet for the deal's consultants: one section per engaged role with firm, buyer or seller side, contact name, email, and phone, plus a coverage count and a trailing list of roles nobody has been engaged for yet. Generated from the Consultants tab toolbar or the Phase 4 "Create Consultant Roster & Send Out" row. The "Email roster" button next to it previews this PDF and then attaches it to a Deal Team email.
 
 The fonts and logo are baked in so the output matches Land Advisors brand standards without any setup.

@@ -4,8 +4,8 @@ import { Send } from "lucide-react";
 
 import { DD_TRACKING_TEMPLATE } from "@/lib/email-templates";
 
-import { DealTeamSendButton } from "./deal-team-send-button";
 import { DdTrackingPdfButton } from "./dd-tracking-pdf-button";
+import { UnifiedDealTeamSendButton } from "./unified-deal-team-send-button";
 
 type DdTrackingRowActionsProps = {
   dealId: string;
@@ -15,31 +15,35 @@ type DdTrackingRowActionsProps = {
 //   1. Generate PDF -> opens the combined Due Diligence Tracking PDF
 //      (key dates + issues + deal team + consultants).
 //   2. Send to Deal Team -> opens the email composer with the PDF
-//      pre-attached and Deal Team recipients (owner + broker + buyer,
-//      filtered by include-in-emails) pre-populated.
+//      pre-attached and Deal Team recipients pre-populated as ONE email:
+//      ownership + buyer on the To line, the brokerage CC'd, consultants
+//      available from the CC picker.
 //
 // Matches the Excel functionality column for the row: "PDF Report and
 // Send to those checked on deal team from Roster Report."
 export function DdTrackingRowActions({ dealId }: DdTrackingRowActionsProps) {
-  const pdfUrl = `/api/deals/${dealId}/dd-tracking.pdf`;
-
   return (
     <>
       <DdTrackingPdfButton dealId={dealId} variant="compact" />
-      <DealTeamSendButton
+      <UnifiedDealTeamSendButton
         dealId={dealId}
         label="Send to Deal Team"
-        title="Email the Due Diligence Tracking report to the Deal Team (owner + broker + buyer, filtered by include-in-emails)"
+        title="Email the Due Diligence Tracking report to the Deal Team as one email (ownership + buyer on To, brokerage CC'd)"
         icon={Send}
         modalTitle="Due Diligence Tracking"
         template={DD_TRACKING_TEMPLATE}
-        teams={["owner", "broker", "buyer"]}
+        // kind: "generated" — the PDF is rendered server-side at send
+        // time and attached as real bytes. This was kind: "link" until
+        // 2026-08-03, pointing at the relative /api/deals/<id>/
+        // dd-tracking.pdf route; link attachments get concatenated into
+        // the message body as text, so recipients received a bare
+        // session-gated path and never got the report.
         attachments={[
           {
             id: "dd-tracking-pdf",
-            kind: "link",
-            url: pdfUrl,
-            label: "Due Diligence Tracking PDF",
+            kind: "generated",
+            generator: "dd-tracking",
+            filename: "Due Diligence Tracking.pdf",
           },
         ]}
       />

@@ -15,19 +15,39 @@ import { cn } from "@/lib/utils";
 // Optional grouping for the dropdown. Items in the same group render
 // together; a section divider + label appears when the group changes.
 // Used by the blast composer to separate the deal's Owner Team from the
-// broader Org Members list.
-export type CcGroup = "owner" | "broker" | "org";
+// broader Org Members list, and by the unified Deal Team composer to
+// separate the deal's consultants by which side they act for.
+export type CcGroup =
+  | "owner"
+  | "broker"
+  | "org"
+  | "consultant_seller"
+  | "consultant_buyer";
 
 const GROUP_LABEL: Record<CcGroup, string> = {
   owner: "Owner Team",
   broker: "Broker Team",
   org: "Org Members",
+  // Wording tracks the Consultants tab's own side badge rather than
+  // inventing a synonym.
+  consultant_seller: "Seller-side consultants",
+  consultant_buyer: "Buyer-side consultants",
 };
 
 export type CcOption = {
   id: string;
   name: string;
   group?: CcGroup;
+  // Secondary line under the name — the person's role on this deal
+  // ("Cobroker", "Civil Engineer"). Optional; omitted rows render as a
+  // single line exactly as before.
+  detail?: string | null;
+  // Rendered greyed-out and unselectable. Used for a consultant with no
+  // email on file: they appear nowhere else in this flow, so omitting
+  // them silently reads as a bug, while a disabled row with a reason
+  // points the user at the record to fix.
+  disabled?: boolean;
+  disabledNote?: string;
 };
 
 type CcPickerProps = {
@@ -135,7 +155,7 @@ export function CcPicker({
         <span>{label}</span>
         <ChevronDown className="h-3 w-3 opacity-50" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
+      <DropdownMenuContent align="start" className="max-h-80 w-64 overflow-y-auto">
         {options.length === 0 ? (
           <div className="px-2 py-1.5 text-[12px] text-gray-400 italic">
             No org members to CC.
@@ -157,14 +177,54 @@ export function CcPicker({
               )}
               {items.map((opt) => {
                 const isSelected = optimistic.has(opt.id);
+                // Disabled rows stay real menu items rather than becoming
+                // bare divs: Base UI keeps them in the menu tree with
+                // aria-disabled and data-disabled (which supplies both the
+                // dimming and pointer-events:none), so arrow-key
+                // navigation and screen readers still reach them. A
+                // non-menuitem child of role="menu" is skipped by both.
+                if (opt.disabled) {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={opt.id}
+                      checked={false}
+                      disabled
+                      className="text-[13px]"
+                    >
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                        <span className="truncate">{opt.name}</span>
+                        {opt.disabledNote && (
+                          <span className="flex-shrink-0 text-[10px] italic">
+                            {opt.disabledNote}
+                          </span>
+                        )}
+                      </span>
+                    </DropdownMenuCheckboxItem>
+                  );
+                }
+                // Without a detail line the label renders exactly as it
+                // always has — bare text that wraps. Wrapping every caller
+                // in a truncating flex column would have silently started
+                // clipping long names in the four composers that pass no
+                // detail.
                 return (
                   <DropdownMenuCheckboxItem
                     key={opt.id}
                     checked={isSelected}
                     onCheckedChange={() => toggle(opt.id)}
                     className="text-[13px]"
+                    title={opt.detail ? `${opt.name} · ${opt.detail}` : undefined}
                   >
-                    {opt.name}
+                    {opt.detail ? (
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate">{opt.name}</span>
+                        <span className="truncate text-[11px] text-gray-500">
+                          {opt.detail}
+                        </span>
+                      </span>
+                    ) : (
+                      opt.name
+                    )}
                   </DropdownMenuCheckboxItem>
                 );
               })}

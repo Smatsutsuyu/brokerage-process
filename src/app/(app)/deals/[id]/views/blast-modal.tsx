@@ -444,6 +444,21 @@ export function BlastModal({
     });
   }
 
+  // Which CC picks are safe to persist. deal_buyers.cc_user_ids is a
+  // uuid[], so only entries whose id is a real users.id may be written;
+  // everything else is per-send only.
+  //
+  // Deliberately an ALLOWLIST keyed on the org group rather than a
+  // denylist of known sentinel prefixes. The denylist this replaced
+  // enumerated `owner:` and `broker:`, which meant any CC source added
+  // later (the unified Deal Team composer's `consultant:` ids, for
+  // instance) would sail through and throw a Postgres type error on
+  // write. Unknown id kinds are now excluded by construction.
+  const persistableCcIds = useMemo(
+    () => new Set(ccOptions.filter((o) => o.group === "org").map((o) => o.id)),
+    [ccOptions],
+  );
+
   // Recipients passed to step 2 = checked contacts with an email,
   // mapped into the shape EmailPreviewBody expects.
   const previewRecipients = useMemo<EmailRecipient[]>(
@@ -731,14 +746,12 @@ export function BlastModal({
             disableSend={disableSend}
             disableSendReason={disableSendReason}
             onCcChange={async ({ builderId, userIds }) => {
-              // deal_buyers.cc_user_ids is a uuid[] — only org-user
-              // picks persist there. Deal-team picks use `owner:` or
-              // `broker:` sentinel ids which we strip here so they stay
-              // per-send (per the trade-off in getDealTeamCcOptions's
-              // comment).
-              const orgOnly = userIds.filter(
-                (id) => !id.startsWith("owner:") && !id.startsWith("broker:"),
-              );
+              // Only org-user picks persist to deal_buyers.cc_user_ids
+              // (a uuid[]). Deal-team picks carry sentinel ids and stay
+              // per-send, per the trade-off in getDealTeamCcOptions's
+              // comment. See persistableCcIds for why this is an
+              // allowlist.
+              const orgOnly = userIds.filter((id) => persistableCcIds.has(id));
               await setBuilderCcUsers({ dealId, builderId, userIds: orgOnly });
             }}
             onSend={async (emails) => {

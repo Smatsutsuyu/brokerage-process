@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CcPicker } from "@/components/email/cc-picker";
+import { CcPicker, type CcGroup } from "@/components/email/cc-picker";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,9 +38,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { interpolate, type EmailTemplate } from "@/lib/email-templates";
 import { cn } from "@/lib/utils";
 
+// Short provenance token rendered at the leading edge of a To/CC chip —
+// which side of the table this person sits on. Every value is a string
+// the app already shows somewhere else (the deal team sub-team labels,
+// the Consultants tab side badge, the CC picker's "Org Members"), so the
+// composer quotes existing vocabulary rather than coining synonyms.
+//
+// Optional throughout: a chip with no cap renders exactly as it always
+// has. Only the unified Deal Team composer supplies these today.
+export type ChipProvenance = {
+  capLabel?: string | null;
+  // Per-deal role ("Cobroker", "Marketing Coordinator", "Civil
+  // Engineer"). Rendered as a dim suffix and is the ONLY part of the
+  // chip allowed to truncate — the address must stay whole, since
+  // verifying addresses is the reason the To line is on screen at all.
+  roleLabel?: string | null;
+};
+
 // One row per recipient. Caller groups them per-builder by passing the
 // builderId/name on each row; the modal does the grouping into emails.
-export type EmailRecipient = {
+export type EmailRecipient = ChipProvenance & {
   contactId: string;
   contactName: string;
   contactEmail: string | null;
@@ -70,11 +87,15 @@ export type EmailSenderChoice = {
 // used by the blast composer to separate the deal's Owner Team from
 // the broader Org Members list. Items without a group render in a
 // default (unbranded) section at the top.
-export type EmailCcUserOption = {
+export type EmailCcUserOption = ChipProvenance & {
   id: string;
   name: string;
   email: string;
-  group?: "owner" | "broker" | "org";
+  group?: CcGroup;
+  // Greyed-out and unselectable in the picker, and never resolvable into
+  // a send. Used for a consultant with no email on file.
+  disabled?: boolean;
+  disabledNote?: string;
 };
 
 // Initial per-builder CC selection passed in by the caller. The modal
@@ -237,6 +258,116 @@ function formatBytes(n: number | null | undefined): string | null {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// A To/CC chip. Without a `capLabel` this renders exactly the chip that
+// shipped before provenance existed (mail icon + name + address). With
+// one, the mail icon is replaced by a fused leading cap — same hue one
+// value step darker, so no new color enters the palette — and the role
+// trails as a dim suffix.
+//
+// Truncation contract, in priority order: the cap never truncates, the
+// name never truncates, the ADDRESS never truncates, and the role is the
+// single element permitted to clip (capped width + ellipsis, full string
+// on the chip's title). Chris is in this modal to verify addresses, so a
+// clipped "Cost to Complete Consu…" is strictly better than a half-
+// hidden domain.
+function RecipientChip({
+  tone,
+  name,
+  email,
+  capLabel,
+  roleLabel,
+}: {
+  tone: "to" | "cc";
+  name: string;
+  email: string | null;
+  capLabel?: string | null;
+  roleLabel?: string | null;
+}) {
+  const isCc = tone === "cc";
+  // Title carries the lossless string even when the role clips.
+  const title = [email, roleLabel].filter(Boolean).join(" · ") || undefined;
+
+  if (!capLabel) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]",
+          isCc ? "bg-purple-50 text-purple-900" : "bg-gray-100 text-gray-700",
+        )}
+        title={title}
+      >
+        <Mail
+          className={cn("h-2.5 w-2.5", isCc ? "text-purple-500" : "text-gray-400")}
+        />
+        <span className="font-medium">{name}</span>
+        <span className={isCc ? "text-purple-700/70" : "text-gray-500"}>
+          &lt;{email}&gt;
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full text-[11px]",
+        isCc ? "bg-purple-50 text-purple-900" : "bg-gray-100 text-gray-700",
+      )}
+      title={title}
+    >
+      {/* self-stretch, not items-center: the cap's 9px text is shorter
+          than the 11px body, so a centered cap would be a short pill
+          floating inside a taller one and its rounded-l-full radius
+          (half of ITS height) would not match the parent's. Stretching
+          makes both radii half the same height, so the corners coincide. */}
+      <span
+        className={cn(
+          "flex flex-shrink-0 items-center self-stretch rounded-l-full border-r border-white px-1.5 text-[9px] font-semibold tracking-wider uppercase",
+          isCc ? "bg-purple-100 text-purple-700" : "bg-gray-200 text-gray-600",
+        )}
+      >
+        {capLabel}
+      </span>
+      <span className="flex min-w-0 items-center gap-1 rounded-r-full px-2 py-0.5">
+        <span className="font-medium whitespace-nowrap">{name}</span>
+        <span
+          className={cn(
+            "whitespace-nowrap",
+            isCc ? "text-purple-700/70" : "text-gray-500",
+          )}
+        >
+          &lt;{email}&gt;
+        </span>
+        {roleLabel && (
+          <span
+            className={cn(
+              "min-w-0 max-w-[130px] truncate text-[10px]",
+              isCc ? "text-purple-700/50" : "text-gray-400",
+            )}
+          >
+            · {roleLabel}
+          </span>
+        )}
+      </span>
+    </span>
+  );
+}
+
+// "2 Owner · 2 Buyer" — a one-line read of what a recipient box adds up
+// to, so the composition is legible without counting chips. Returns null
+// when nothing carries provenance, which is every pre-existing caller.
+function capSummary(items: ReadonlyArray<{ capLabel?: string | null }>): string | null {
+  const counts = new Map<string, number>();
+  for (const i of items) {
+    if (!i.capLabel) continue;
+    counts.set(i.capLabel, (counts.get(i.capLabel) ?? 0) + 1);
+  }
+  if (counts.size === 0) return null;
+  return Array.from(counts.entries())
+    .map(([cap, n]) => `${n} ${cap}`)
+    .join(" · ");
+}
+
 // Group recipients by builder, drop those without an email since they
 // can't be sent to (caller's filter UI should also flag these but we
 // double-check here).
@@ -387,6 +518,20 @@ export function EmailPreviewBody({
   const total = groups.length;
   const active = total > 0 ? groups[Math.min(activeIdx, total - 1)] : null;
 
+  // Resolved CC entries for the active group. Disabled options (a
+  // consultant with no email) are dropped here as well as in the picker,
+  // so a stale id in the initial selection can never render a chip or
+  // reach a send.
+  const activeCcUsers = useMemo(() => {
+    const ids = active ? (ccByBuilder.get(active.builderId) ?? new Set<string>()) : new Set<string>();
+    return Array.from(ids)
+      .map((id) => ccUserById.get(id))
+      .filter((u): u is EmailCcUserOption => Boolean(u) && !u!.disabled && Boolean(u!.email));
+  }, [active, ccByBuilder, ccUserById]);
+
+  const toSummary = capSummary(active?.recipients ?? []);
+  const ccSummary = capSummary(activeCcUsers);
+
   function prev() {
     setActiveIdx((i) => (i > 0 ? i - 1 : i));
   }
@@ -401,7 +546,10 @@ export function EmailPreviewBody({
       const cc: ResolvedEmail["cc"] = [];
       for (const id of ccIds) {
         const u = ccUserById.get(id);
-        if (u) cc.push({ userId: u.id, name: u.name, email: u.email });
+        // Skip disabled / address-less options. The picker won't let one
+        // be selected, but a caller-supplied ccInitial could name one.
+        if (!u || u.disabled || !u.email) continue;
+        cc.push({ userId: u.id, name: u.name, email: u.email });
       }
       return {
         builderId: g.builderId,
@@ -421,7 +569,22 @@ export function EmailPreviewBody({
     setSending(true);
     try {
       if (onSend) {
-        await onSend(resolved);
+        try {
+          await onSend(resolved);
+        } catch (err) {
+          // Without this the promise was dropped on the floor: a thrown
+          // send (expired session, network failure, a programming error
+          // in the transport) left the modal open with no toast and no
+          // sign anything went wrong, so the user would click Send again.
+          // Handled here rather than per-caller so all five composers
+          // that embed this body get the guarantee.
+          console.error("[email-preview] send failed", err);
+          toast.error("Send failed. Nothing was sent.", {
+            description: err instanceof Error ? err.message : "Try again.",
+            duration: 8000,
+          });
+          return;
+        }
       } else {
         // No onSend wired — shouldn't happen in production, but log loudly
         // so a misconfigured caller surfaces in dev rather than silently
@@ -561,17 +724,19 @@ export function EmailPreviewBody({
               </Label>
               <div className="flex flex-wrap gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5">
                 {active?.recipients.map((r) => (
-                  <span
+                  <RecipientChip
                     key={r.contactId}
-                    className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700"
-                    title={r.contactEmail ?? undefined}
-                  >
-                    <Mail className="h-2.5 w-2.5 text-gray-400" />
-                    <span className="font-medium">{r.contactName}</span>
-                    <span className="text-gray-500">&lt;{r.contactEmail}&gt;</span>
-                  </span>
+                    tone="to"
+                    name={r.contactName}
+                    email={r.contactEmail}
+                    capLabel={r.capLabel}
+                    roleLabel={r.roleLabel}
+                  />
                 ))}
               </div>
+              {toSummary && (
+                <span className="text-[11px] text-gray-500">{toSummary}</span>
+              )}
             </div>
 
             {/* CC line — editable per builder. Picker on the right
@@ -596,32 +761,34 @@ export function EmailPreviewBody({
                       id: o.id,
                       name: o.name,
                       group: o.group,
+                      detail: o.roleLabel,
+                      disabled: o.disabled,
+                      disabledNote: o.disabledNote,
                     }))}
                     onChange={(ids) => applyCcChange(active.builderId, ids)}
                     emptyLabel="+ Add CC"
                   />
                 </div>
                 <div className="flex flex-wrap gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5 min-h-[34px]">
-                  {Array.from(ccByBuilder.get(active.builderId) ?? new Set<string>())
-                    .map((id) => ccUserById.get(id))
-                    .filter((u): u is EmailCcUserOption => Boolean(u))
-                    .map((c) => (
-                      <span
-                        key={c.id}
-                        className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[11px] text-purple-900"
-                        title={c.email}
-                      >
-                        <Mail className="h-2.5 w-2.5 text-purple-500" />
-                        <span className="font-medium">{c.name}</span>
-                        <span className="text-purple-700/70">&lt;{c.email}&gt;</span>
-                      </span>
-                    ))}
-                  {(ccByBuilder.get(active.builderId)?.size ?? 0) === 0 && (
+                  {activeCcUsers.map((c) => (
+                    <RecipientChip
+                      key={c.id}
+                      tone="cc"
+                      name={c.name}
+                      email={c.email}
+                      capLabel={c.capLabel}
+                      roleLabel={c.roleLabel}
+                    />
+                  ))}
+                  {activeCcUsers.length === 0 && (
                     <span className="text-[11px] text-gray-400 italic">
                       No CC recipients
                     </span>
                   )}
                 </div>
+                {ccSummary && (
+                  <span className="text-[11px] text-gray-500">{ccSummary}</span>
+                )}
               </div>
             )}
 

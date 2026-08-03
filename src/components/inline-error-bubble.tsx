@@ -53,7 +53,10 @@
 //     its `getBoundingClientRect()` and applies an extra translate-X
 //     shift if either edge would be outside the viewport. Runs in a
 //     useLayoutEffect (pre-paint) so there's no flicker; bubble is
-//     `visibility: hidden` until measured.
+//     `visibility: hidden` until measured. The measuring half lives in
+//     its own component keyed on the message, so a new message remounts
+//     it and the hidden-until-measured state re-arms on mount rather
+//     than being reset by an effect writing state back into itself.
 //   - Default placement is below the button; pass `placement="above"`
 //     for rows near the bottom of the page where below would clip.
 //
@@ -80,6 +83,29 @@ export function InlineErrorBubble({
   onDismiss,
   placement = "below",
 }: InlineErrorBubbleProps) {
+  if (!message) return null;
+  // Keyed on the message so a different message remounts the bubble.
+  // That's what re-arms "hidden until measured" — previously an effect
+  // reset those two pieces of state on the way out, which is a
+  // setState-in-effect cascade (and left the previous message's shift
+  // applied for a frame when one message replaced another).
+  return (
+    <MeasuredBubble
+      key={message}
+      message={message}
+      onDismiss={onDismiss}
+      placement={placement}
+    />
+  );
+}
+
+// The positioned bubble itself. Only ever mounted with a real message,
+// so its state has no "empty" case to clean up.
+function MeasuredBubble({
+  message,
+  onDismiss,
+  placement,
+}: InlineErrorBubbleProps & { message: string }) {
   const bubbleRef = useRef<HTMLButtonElement | null>(null);
   // Horizontal shift applied on top of the centered baseline so the
   // bubble doesn't run off the viewport when the trigger is near a
@@ -87,16 +113,11 @@ export function InlineErrorBubble({
   const [shiftPx, setShiftPx] = useState(0);
   const [measured, setMeasured] = useState(false);
 
-  // Re-measure each time a new message appears. useLayoutEffect runs
-  // before paint so the shift applies in the same frame the bubble
-  // becomes visible — no flicker. Hidden via visibility (not display)
-  // so getBoundingClientRect still returns real numbers.
+  // Measure once on mount. useLayoutEffect runs before paint so the
+  // shift applies in the same frame the bubble becomes visible — no
+  // flicker. Hidden via visibility (not display) so
+  // getBoundingClientRect still returns real numbers.
   useLayoutEffect(() => {
-    if (!message) {
-      setMeasured(false);
-      setShiftPx(0);
-      return;
-    }
     const el = bubbleRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -108,9 +129,8 @@ export function InlineErrorBubble({
     }
     setShiftPx(shift);
     setMeasured(true);
-  }, [message]);
+  }, []);
 
-  if (!message) return null;
   return (
     <button
       ref={bubbleRef}

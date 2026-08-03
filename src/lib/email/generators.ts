@@ -1,6 +1,7 @@
 import "server-only";
 
 import { generateConsultantRosterPdf } from "@/lib/pdf/generate-consultant-roster";
+import { generateDdTrackingPdf } from "@/lib/pdf/generate-dd-tracking";
 import { generateDealStatusPdf } from "@/lib/pdf/generate-deal-status";
 import { generateMarketingReportPdf } from "@/lib/pdf/generate-marketing-report";
 
@@ -49,11 +50,12 @@ export async function renderGeneratedAttachment(input: {
       return { filename: pdf.filename, content: pdf.content };
     }
     case "dd-tracking": {
-      // Not wired yet — DD Tracking still ships as kind: "link". Once
-      // the same data-loader-and-render extraction happens for
-      // dd-tracking.pdf, plug it in here the same way as marketing-
-      // report. See docs/backlog.md.
-      throw new Error("dd-tracking generator not yet implemented");
+      const pdf = await generateDdTrackingPdf({
+        dealId: input.dealId,
+        orgId: input.orgId,
+      });
+      if (!pdf) return null;
+      return { filename: pdf.filename, content: pdf.content };
     }
     case "deal-status": {
       const pdf = await generateDealStatusPdf({
