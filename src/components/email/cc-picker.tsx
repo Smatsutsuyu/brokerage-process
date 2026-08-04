@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 export type CcGroup =
   | "owner"
   | "broker"
+  | "buyer"
   | "org"
   | "consultant_seller"
   | "consultant_buyer";
@@ -27,6 +28,7 @@ export type CcGroup =
 const GROUP_LABEL: Record<CcGroup, string> = {
   owner: "Owner Team",
   broker: "Broker Team",
+  buyer: "Buyer Team",
   org: "Org Members",
   // Wording tracks the Consultants tab's own side badge rather than
   // inventing a synonym.

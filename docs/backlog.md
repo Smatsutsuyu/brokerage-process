@@ -116,7 +116,7 @@ Inventory as of 2026-07-20. 16 total call sites split into two tiers by cost and
 
 **Structural tier — new patterns (~1-3 hrs each, in scope):**
 - Phase 3 "Initial Summary of Offers + LOIS" row → email Owner Team with the current SOO. Needs an LOI-summary data model or a manual-entry surface first.
-- Phase 4 "Kick off PSA" row → email PSA Attorney. Pattern exists (Deal Team send); needs a template + wire.
+- ~~Phase 4 "Kick off PSA" row → email PSA Attorney.~~ **Done 2026-08-03.** Recipients resolve from the consultant roster (`role = psa_attorney`), not from any deal-level field. Single third-person template so one message can address both sides' counsel correctly. No schema change: this was step 1 of the PSA unification, see below.
 - Phase 4 "Schedule Recurring Call" row → `.ics` file generator + email. No existing pattern.
 
 **Deferred to future engagement (per CLAUDE.md scope decisions — do NOT build without an explicit ask):**
@@ -184,6 +184,14 @@ Inventory as of 2026-07-20. 16 total call sites split into two tiers by cost and
 - **What**: Pulled in transitively. `npm audit fix` upgrades cleanly per the agent's check.
 - **Fix**: run `npm audit fix`, smoke-test.
 - **Effort**: S
+
+### [Migration] Retire deals.psa_attorney_name / psa_attorney_firm onto the consultant roster
+- **What**: PSA attorney contact data lives in two unrelated places. `deals.psa_attorney_name` / `psa_attorney_firm` are free text with nowhere to put an email; the `consultants` table's `psa_attorney` role holds firm, contact, email, phone and side. Nothing links them. Decided 2026-08-03: the roster is the single source of truth.
+- **`deals.psa_drafting` stays.** Whose counsel holds the pen is a fact about the transaction, not an attribute of a firm. It is answered on a Phase 1 row months before counsel is retained, `consultants.firm_name` is NOT NULL and `addConsultant` throws on empty, and the `na` value describes a state that predates any attorney record. Verified in prod: every deal carrying PSA data has `psa_drafting` set.
+- **Production census, 2026-08-03** (6 deals): Woods has both records and they agree, and its roster row already carries the email. The Trails at Lyons Canyon has an attorney only in the deal columns. Lakeview Heights (Dev Test) likewise. So the backfill is two inserts, no disagreements to adjudicate, and `side` is derived from `psa_drafting` rather than guessed. Sean approved backfilling the test deal too.
+- **Remaining steps**: (2) point the Phase 1 "Determine PSA Attorney" row at the roster; (3) one hand-written migration carrying the backfill and the `DROP COLUMN` together, per the `0031` precedent, which runs inside drizzle's transaction so backfill and drop commit or roll back as one.
+- **Client-visible**: after step 2 a PSA attorney recorded on the Phase 1 row starts appearing in the Consultant Roster PDF and the DD Tracking PDF, which already go to ownership and the buyer.
+- Step 1 (the Kick off PSA send) shipped independently and needed none of this.
 
 ### [Bug — latent] Two-step composer modals can clip their own footer on short viewports
 - **What**: `DialogContent` (`src/components/ui/dialog.tsx`) sets no `overflow` and no `max-height` of its own. The two-step send modals override it to `flex h-[85vh] max-h-[900px] flex-col` and drop `EmailPreviewBody` straight in, and that body has no scroll container either. On a 768px-tall laptop, 85vh is ~653px while the composer runs ~700px+ (From, To, CC, attachments, subject, a 200px body textarea, footer). The overflow is clipped rather than scrolled, so the Send button can sit off the bottom with no way to reach it.

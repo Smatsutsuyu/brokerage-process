@@ -30,6 +30,10 @@ import {
   buildUnifiedComposerData,
   type UnifiedDealTeamComposerData,
 } from "@/lib/email/unified-deal-team";
+import {
+  buildPsaKickoffComposerData,
+  type PsaKickoffComposerData,
+} from "@/lib/psa-attorney";
 import { env } from "@/lib/env";
 import { formatMilestoneDate } from "@/lib/format-milestone-date";
 import { formatPhone } from "@/lib/phone";
@@ -2688,6 +2692,117 @@ export async function getUnifiedDealTeamComposerData(input: {
   ]);
 
   return buildUnifiedComposerData({ teamRows, consultantRows, orgRows });
+}
+
+// ---------------------------------------------------------------------
+// Kick off PSA composer
+// ---------------------------------------------------------------------
+//
+// Recipients come from the deal's consultant roster (role =
+// "psa_attorney"), not from any deal-level field. deals.psa_attorney_name
+// and psa_attorney_firm are legacy free text with nowhere to put an
+// address, and are being retired; deals.psa_drafting stays, because
+// whose counsel holds the pen is a fact about the transaction rather
+// than an attribute of a firm. See docs/backlog.md.
+//
+// Queries only. Shaping lives in src/lib/psa-attorney.ts so it can be
+// exercised by npm run verify:psa-resolution.
+export type { PsaKickoffComposerData } from "@/lib/psa-attorney";
+
+export async function getPsaKickoffComposerData(input: {
+  dealId: string;
+}): Promise<PsaKickoffComposerData> {
+  const org = await getCurrentOrg();
+  if (!org) throw new Error("No organization context");
+
+  const [dealRow, psaRows, teamRows, orgRows] = await Promise.all([
+    db
+      .select({ drafting: deals.psaDrafting })
+      .from(deals)
+      .where(and(eq(deals.id, input.dealId), eq(deals.orgId, org.id)))
+      .limit(1),
+    db
+      .select({
+        id: consultants.id,
+        firmName: consultants.firmName,
+        contactName: consultants.contactName,
+        contactEmail: consultants.contactEmail,
+        side: consultants.side,
+      })
+      .from(consultants)
+      .where(
+        and(
+          eq(consultants.dealId, input.dealId),
+          eq(consultants.orgId, org.id),
+          eq(consultants.role, "psa_attorney"),
+        ),
+      )
+      .orderBy(consultants.side, consultants.firmName),
+    db
+      .select({
+        id: dealTeamMembers.id,
+        team: dealTeamMembers.team,
+        roleLabel: dealTeamMembers.roleLabel,
+        userId: dealTeamMembers.userId,
+        contactId: dealTeamMembers.contactId,
+        freeName: dealTeamMembers.name,
+        freeEmail: dealTeamMembers.email,
+        userName: authUser.name,
+        userEmail: authUser.email,
+        contactFirst: contacts.firstName,
+        contactLast: contacts.lastName,
+        contactEmail: contacts.email,
+      })
+      .from(dealTeamMembers)
+      .leftJoin(users, eq(users.id, dealTeamMembers.userId))
+      .leftJoin(authUser, eq(authUser.id, users.authUserId))
+      .leftJoin(contacts, eq(contacts.id, dealTeamMembers.contactId))
+      .where(
+        and(
+          eq(dealTeamMembers.dealId, input.dealId),
+          eq(dealTeamMembers.orgId, org.id),
+          eq(dealTeamMembers.includeInEmails, true),
+        ),
+      )
+      .orderBy(
+        dealTeamMembers.team,
+        dealTeamMembers.sortOrder,
+        dealTeamMembers.createdAt,
+      ),
+    db
+      .select({ id: users.id, name: authUser.name, email: authUser.email })
+      .from(users)
+      .innerJoin(authUser, eq(authUser.id, users.authUserId))
+      .where(eq(users.orgId, org.id))
+      .orderBy(asc(authUser.name)),
+  ]);
+
+  return buildPsaKickoffComposerData({
+    psaRows,
+    drafting: dealRow[0]?.drafting ?? null,
+    teamRows,
+    orgRows,
+  });
+}
+
+// The Phase 3 "Sign LOI" checklist item, so the kickoff composer can
+// offer the executed LOI as an attachment. Mirrors getOmItemId.
+export async function getSignLoiItemId(input: {
+  dealId: string;
+}): Promise<string | null> {
+  const org = await getCurrentOrg();
+  if (!org) return null;
+  const itemRows = await db
+    .select({ id: checklistItems.id, name: checklistItems.name })
+    .from(checklistItems)
+    .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
+    .where(
+      and(
+        eq(checklistCategories.dealId, input.dealId),
+        eq(checklistItems.orgId, org.id),
+      ),
+    );
+  return itemRows.find((r) => r.name.toLowerCase().includes("sign loi"))?.id ?? null;
 }
 
 export async function setDealTeamMemberIncluded(input: {

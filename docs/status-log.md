@@ -4,6 +4,63 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-08-03 — Kick off PSA send, and the PSA attorney unification plan
+
+Sean asked whether a Kick off PSA template existed. It did not, and answering properly turned up a bigger problem: PSA attorney data lives in two unrelated places. Sean's call: everything should resolve to the consultant roster.
+
+Spec with the production census: `https://claude.ai/code/artifact/3709afc4-1c3b-4d7e-aaa3-7d8fe651ddb8`
+
+### Correction to my own framing
+
+I told Sean the send was blocked on the unification because there was no address to send to. Wrong, and all three review lenses caught it independently. `consultants.contact_email` exists today and the Consultants tab can already create a `psa_attorney` row with an address. The send ships standalone with no schema change, which matters because it is the piece with client value and no data risk while the migration is pure risk with no visible payoff.
+
+### Production census (read-only, prod)
+
+Six deals. Three carry PSA data. **Woods** has both a deal-level record and a roster row and they agree, and the roster row already carries the email the deal columns structurally cannot hold. **The Trails at Lyons Canyon** has a real attorney (Cox Castle, Matt Levy) recorded only in the deal columns, with no address. **Lakeview Heights (Dev Test)** likewise. So: one real backfill row plus the test deal, no disagreement case, and `side` is derived from `psa_drafting` rather than guessed since all three are `seller`. Ten consultant rows across the portfolio, so the roster is not a dead feature.
+
+Consequence worth knowing: **Woods is currently the only deal where the new button will open.** The Trails will reject and point at the Consultants tab.
+
+### Decision: derive, do not point
+
+Three unification designs were competed and critiqued on data safety, client workflow, and code coherence.
+
+- **Drop everything onto consultants: fatal.** `consultants.firm_name` is NOT NULL and `addConsultant` throws on empty, but "we or they draft" is answered in Phase 1 months before counsel is retained. Recording it would mean typing a firm name for a firm nobody has hired; the design's own plan invented a `"PSA Attorney (firm TBD)"` placeholder that would then print in the client-facing roster PDF.
+- **Deal-level FK pointer: fatal on the stated goal.** It relocates the two-sources-of-truth problem rather than ending it. The pointer can be null while the roster has an attorney, or point at a row whose side contradicts the drafting decision.
+- **Derived lookup: chosen.** Drop the two duplicated columns, keep `psa_drafting` on the deal, resolve at read time. `psa_drafting` stays because whose counsel holds the pen is a fact about the transaction, not an attribute of a firm, and prod data backs it: every deal with PSA data has it set.
+
+### Step 1 shipped: the Kick off PSA send
+
+- **New `src/lib/psa-attorney.ts`** with a pure resolver: five states, allowed to answer "I don't know" in two distinct ways. No `createdAt` tiebreak on co-counsel.
+- **New `PsaKickoffRowActions`** on the Phase 4 row, replacing the "Coming soon" placeholder. Every `psa_attorney` with a parseable address on To, both sides, one synthetic group so it is a single message. Ownership and the brokerage CC by default, Buyer Team offered but never pre-checked.
+- **Gated on the DD folder link only, not the PSA effective date.** Kick off PSA is what produces that date, so requiring it would be circular.
+- **`npm run verify:psa-resolution`**: 43 assertions, pure fixtures, no database.
+
+### The review catch that mattered
+
+Three of four reviewers independently found the same defect in the two-template draft: both bodies said "your office is preparing the first draft", but the To line deliberately carries both sides' counsel in one message. On any deal with counsel on both sides, one recipient reads an instruction meant for the other firm, with ownership and the brokerage copied.
+
+Fixed by collapsing to **one template in the third person**, with a derived `{{draftingNote}}` sentence that names the firm when the roster pins it to one, names the side when two firms sit on the drafting side, and says the question is open when nobody has decided. Fewer moving parts than the split, and correct in every state.
+
+Also from the review, all real:
+- The body asserted "Attached is the executed letter of intent" while the attachment is optional. Reworded to be true either way; the composer now says when nothing is attached.
+- The description promised a CC list that can be empty. Every clause is derived now.
+- The To line was not deduped by address while CC was.
+- `withoutEmail` collapsed "no address" and "broken address", so the rejection told you to add an address when one was already there and merely malformed. Split into three distinct messages.
+- My own comment described a `determine` guard I had not implemented. Implemented something better: the kickoff matcher runs first and is subtracted from the Phase 1 one, and it matches "psa" plus any kickoff word, so a rename to "PSA Kickoff" cannot leak the Phase 1 picker onto that row.
+- The template-var build guard could not see `runPreflight` wiring and was passing on the new var only incidentally. Taught it two more forms.
+
+Three checks failed on the first re-run and all three were my fixtures, not the code: they shared one default address, so the new dedupe correctly collapsed them and the assertions were measuring dedupe rather than what they claimed.
+
+### Also corrected: my own memory note
+
+All three design agents refused to put the backfill inside the migration, citing `reference_drizzle_push_vs_migrate`. They misread it, and the compressed index line invited it. That note is about `db:push`, which skips migration files; production runs `drizzle-kit migrate`, which executes them inside a transaction. Verified two precedents: `0026` ends in a bare `UPDATE`, and `0031` does add-column plus FK plus backfill plus drop-column in one hand-written file that shipped. The backfill goes in the migration. Memory index sharpened.
+
+### Remaining
+
+Steps 2 and 3 (point the Phase 1 row at the roster, then the migration). Sean approved proceeding with both and with backfilling the test deal. **Client-visible consequence he owns telling Chris about:** after step 2, a PSA attorney recorded on the Phase 1 row starts appearing in the Consultant Roster PDF and the DD Tracking PDF, which already go to ownership and the buyer.
+
+---
+
 ## 2026-08-03 — Unified Deal Team send: one email, To/CC split, recipient provenance
 
 Closes the design half of feedback item `54a4fec3`. Chris: *"I'd like this to be 1 email TO: Ownership (Seller) and Buyer with a CC to Loan and co-brokers. Ideally I'd have the CC line allow me to send to consultant teams too."* Follow-up ask in the same thread: show which team or consultant each address belongs to, at a glance.

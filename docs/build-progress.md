@@ -207,6 +207,17 @@ DNS records for `landadvisors.com` are in. Resend consolidated to a single accou
 - **`EMAIL_FROM` cutover** to `no-reply@landadvisors.com`. Feedback notifications now send from the same verified domain as the client-facing pipeline; the `no-reply` prefix signals these are one-way (the mailbox isn't monitored — no LAO IT coordination needed to provision a real inbox).
 - **Docs:** `.env.example`, `operations.md`, and `CLAUDE.md` updated to reflect the single-account / single-domain consolidation.
 
+## Kick off PSA send (2026-08-03)
+
+Step 1 of retiring the deal-level PSA attorney fields onto the consultant roster. No schema change. Full plan and the production census in [backlog.md](backlog.md); user-facing behavior in [features.md](features.md).
+
+- **The Phase 4 "Kick off PSA" row is a real send**, replacing a "Coming soon" placeholder. Recipients resolve from `consultants WHERE role = 'psa_attorney'`; the legacy `deals.psa_attorney_name` / `psa_attorney_firm` columns are not read by any of this.
+- **New `src/lib/psa-attorney.ts`** holds a pure resolver with five states, deliberately allowed to answer "I don't know" in two distinct ways rather than guessing. No `createdAt` tiebreak when two firms sit on the drafting side, because silently picking the older row would be a lie.
+- **One template, third person.** The To line carries both sides' counsel in one message, so a second-person "your office is preparing the first draft" would be addressed to one recipient and wrong for the other. Three independent reviewers caught that in the two-template draft. Who drafts is now a derived `{{draftingNote}}` sentence that degrades from naming the firm, to naming the side, to saying the question is open.
+- **Everything the composer asserts is derived**, after a review pass found the description promising a CC list that can be empty and a body claiming an LOI attachment that is frequently absent.
+- **`npm run verify:psa-resolution`**: 43 assertions on pure fixtures, no database.
+- **Shared-code touches**: `CcGroup` gained `buyer`, `UnifiedCcGroup` gained `owner` and `buyer`, `resolveTeamIdentity` was exported rather than copied a fourth time, and the template-var build guard learned to recognise `runPreflight` and `setVars` wiring (it had been passing on the new var only incidentally).
+
 ## Unified Deal Team send (2026-08-03)
 
 Closes the design half of feedback item `54a4fec3`. Full narrative + review findings in [status-log.md](status-log.md); user-facing behavior in [features.md](features.md).

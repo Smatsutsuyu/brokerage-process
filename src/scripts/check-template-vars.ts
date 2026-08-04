@@ -55,6 +55,7 @@ const ALWAYS_SUPPLIED = new Set(["dealName", "city", "units", "type", "senderNam
 // below against real wiring under VIEWS_DIR.
 const CALLER_SUPPLIED = new Set([
   "ddFolderUrl",
+  "draftingNote",
   "offersDueDate",
   "reviewDate",
   "dueDate",
@@ -132,6 +133,18 @@ async function main() {
   // extraVars={{ a: ..., b: ... }}
   for (const m of viewsSrc.matchAll(/extraVars=\{\{([\s\S]*?)\}\}/g)) {
     for (const s of m[1].matchAll(/([A-Za-z0-9_]+)\s*:/g)) wiredVars.add(s[1]);
+  }
+  // runPreflight({ required: ["a", "b"] }) — the imperative form. Some
+  // composers resolve vars in their own click handler instead of taking
+  // a requireVars prop, and without this the reverse check below would
+  // call a correctly-wired var unwired.
+  for (const m of viewsSrc.matchAll(/required:\s*\[([^\]]*)\]/g)) {
+    for (const s2 of m[1].matchAll(/["']([A-Za-z0-9_]+)["']/g)) wiredVars.add(s2[1]);
+  }
+  // setVars({ ...ctx.vars, a: ..., b: ... }) — a var injected directly
+  // into the composer's var bag rather than through a prop.
+  for (const m of viewsSrc.matchAll(/setVars\(\{([\s\S]*?)\}\)/g)) {
+    for (const s2 of m[1].matchAll(/([A-Za-z0-9_]+)\s*:/g)) wiredVars.add(s2[1]);
   }
   // Boolean-prop gates (requireOfferingDate, requireBnfDate).
   for (const [varName, prop] of Object.entries(GATED_BY_BOOLEAN_PROP)) {

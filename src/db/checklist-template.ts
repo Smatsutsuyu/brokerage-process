@@ -327,18 +327,11 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
           // needed.
           "Share Due Diligence Material / Set Meeting",
           "Create Index of Due Diligence Material",
-          {
-            name: "Kick off PSA",
-            actions: [
-              {
-                kind: "send-email",
-                label: "Notify PSA Attorney",
-                feature: "PSA kickoff email",
-                description: "Drafts a kickoff email to the chosen PSA Attorney for this deal.",
-                phase: "phase_2",
-              },
-            ],
-          },
+          // Notify PSA Attorney is wired in phase-section.tsx via
+          // isKickOffPsaItem -> PsaKickoffRowActions. Recipients come
+          // from the consultant roster (role = psa_attorney). No
+          // PlannedAction placeholder needed.
+          "Kick off PSA",
           {
             name: "Schedule Recurring Call",
             actions: [

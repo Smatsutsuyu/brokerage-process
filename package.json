@@ -23,6 +23,7 @@
     "feedback:update": "tsx --env-file=.env.local src/scripts/feedback-update.ts",
     "checklist:reconcile": "tsx --env-file-if-exists=.env.local src/scripts/reconcile-checklists.ts",
     "check:template-vars": "tsx src/scripts/check-template-vars.ts",
+    "verify:psa-resolution": "tsx src/scripts/verify-psa-resolution.ts",
     "verify:unified-composer": "tsx --env-file=.env.local src/scripts/verify-unified-composer.ts",
     "rename:apply": "tsx --env-file-if-exists=.env.local src/scripts/apply-renames.ts"
   },

@@ -30,6 +30,7 @@ import { ConsultantRosterRowActions } from "./consultant-roster-row-actions";
 import { DealTeamSendButton } from "./deal-team-send-button";
 import { DdTrackingRowActions } from "./dd-tracking-row-actions";
 import { MarketingReportPdfButton } from "./marketing-report-pdf-button";
+import { PsaKickoffRowActions } from "./psa-kickoff-row-actions";
 import { OmBlastButton } from "./om-blast-button";
 import { QaFilePdfButton } from "./qa-file-pdf-button";
 import { SendMarketingReportButton } from "./send-marketing-report-button";
@@ -51,11 +52,27 @@ import {
 import { Send } from "lucide-react";
 import { PsaAttorneyInline, type PsaAttorneyState } from "./psa-attorney";
 
-// Lowercased substring match — flexible to wording tweaks ("Determine PSA
-// Attorney" vs "PSA Attorney" vs slight variations) without requiring an
-// exact name match.
+// Phase 4 "Kick off PSA". Matched on "psa" plus a kickoff word rather
+// than the exact phrase, so a rename to "PSA Kickoff" or "Kick off the
+// PSA" still lands here. That breadth is the point: this matcher is
+// checked FIRST and subtracted from the Phase 1 one below, so anything
+// kickoff-shaped can never fall through to the Phase 1 picker.
+function isKickOffPsaItem(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.includes("psa") && /\bkick\s?off\b|\bkickoff\b/.test(lower);
+}
+
+// Phase 1 "Determine PSA Attorney (we or they draft)". Substring match so
+// wording tweaks ("Determine PSA Attorney" vs "PSA Attorney") still hit,
+// minus anything the kickoff matcher claims.
+//
+// The subtraction is load-bearing, not defensive tidiness. Without it,
+// any Phase 4 row renamed to contain "PSA Attorney" would render the
+// Phase 1 inline picker on the kickoff row alongside the send button.
+// That row has already been renamed once, so it is a live hazard.
 function isPsaAttorneyItem(name: string): boolean {
-  return name.toLowerCase().includes("psa attorney");
+  const lower = name.toLowerCase();
+  return lower.includes("psa attorney") && !isKickOffPsaItem(lower);
 }
 
 // Same loose-match style as isPsaAttorneyItem so a slight rename of the
@@ -442,6 +459,12 @@ export function PhaseSection({
                                 linksTo lookup above). */}
                             {isConsultantRosterItem(item.name) && (
                               <ConsultantRosterRowActions dealId={dealId} />
+                            )}
+                            {/* Phase 4 Kick off PSA: email the deal's PSA
+                                attorney from the consultant roster to
+                                start the purchase and sale agreement. */}
+                            {isKickOffPsaItem(item.name) && (
+                              <PsaKickoffRowActions dealId={dealId} itemId={item.id} />
                             )}
                             {/* Phase 4 Share DD Material row: email
                                 the linked DD folder + index attachment

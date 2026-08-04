@@ -54,7 +54,7 @@ Some items have extra affordances:
 
 - Phase 4 milestone items (LOI Signed, PSA Effective, Cost to Complete drafts, Investment Committee Approval, Waive Feasibility, Closing Date) get a date chip on the row so you can record projected or actual dates.
 - Some items have an "Open [Tab]" jump button when their data lives in a sibling tab. "Create Consultant Roster" jumps to Consultants; "Complete Due Diligence" jumps to Issues.
-- Some items have inline action buttons that share behavior with the relevant tab. Wired and working today: Send OM Blast on the OM Blast row, Send Q&A File on the Q&A File row, Share Market Study on its row, Send CTC on the Phase 1 Cost to Complete (CTC) row, Send to Deal Team on Share Due Diligence Material and on Complete Due Diligence, Marketing Report PDF on its row, Send Marketing Report on the Phase 2 row of the same name (two-step modal: preview the freshly-generated PDF, then compose the email to the Owner Team with a CC picker), and the inline PSA Attorney picker on Determine PSA Attorney. CFD Analysis, Premium Analysis, Valuation, Entitlement Schedule, Entitlement Summary, Custom Underwriting File, and Compiled Package still surface "Coming soon" placeholder toasts and are scoped for a future phase.
+- Some items have inline action buttons that share behavior with the relevant tab. Wired and working today: Send OM Blast on the OM Blast row, Send Q&A File on the Q&A File row, Share Market Study on its row, Send CTC on the Phase 1 Cost to Complete (CTC) row, Send to Deal Team on Share Due Diligence Material and on Complete Due Diligence, Marketing Report PDF on its row, Send Marketing Report on the Phase 2 row of the same name (two-step modal: preview the freshly-generated PDF, then compose the email to the Owner Team with a CC picker), the inline PSA Attorney picker on Determine PSA Attorney, and Notify PSA Attorney on the Phase 4 Kick off PSA row. CFD Analysis, Premium Analysis, Valuation, Entitlement Schedule, Entitlement Summary, Custom Underwriting File, and Compiled Package still surface "Coming soon" placeholder toasts and are scoped for a future phase.
 
 ### Contacts
 
@@ -107,6 +107,20 @@ The Teams tab unifies the Deal Team into three groupings:
 - Buyer Team: the chosen buyer's contacts, picked from contacts already on the deal.
 
 Each member has an Include in emails toggle. Inclusion drives the recipient list when you use the Send to Deal Team buttons (for example, sharing DD material). Members can be real users, existing contacts on the deal, or free-text entries for someone who has no platform record yet.
+
+### Kicking off the PSA
+
+The Phase 4 "Kick off PSA" row emails the deal's PSA attorney to start the purchase and sale agreement.
+
+Recipients come from the **Consultants tab**, not from the Phase 1 PSA Attorney picker. Every consultant on the deal with the PSA Attorney role and a working email address goes on the To line, both sides at once, as a single message: a kickoff that reaches only one side's counsel is a mistake rather than a feature. Ownership and the brokerage are CC'd by default; the Buyer Team is offered in the picker but never pre-checked.
+
+Because it is one message to possibly two firms, the body never says "your office". It states who prepares the first draft as a fact about the deal, naming the firm when the roster identifies one, naming the side when two firms sit on the drafting side, and saying the question is still open when nobody has decided. That sentence is derived, so it is always true.
+
+The email references the executed letter of intent and attaches it when one is on the Phase 3 "Sign LOI" row. If there isn't one, the composer tells you so rather than sending a body that claims an attachment that isn't there. The Consultant Roster PDF is offered as a second attachment but never pre-checked, since it lists both sides' consultants.
+
+Four deal points ship as labelled blanks for you to complete before sending: seller entity, buyer entity, purchase price and deposit structure, feasibility period and closing. The platform does not hold the first two, and the price is usually still unset at kickoff.
+
+The button refuses to open the composer, with a message naming the actual cause, when there is no PSA attorney on the deal, when the one recorded has no email address, when the address on file isn't valid, or when no due diligence folder link can be found.
 
 ### How a Deal Team send is addressed
 

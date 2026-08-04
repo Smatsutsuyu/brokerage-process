@@ -262,3 +262,54 @@ Let us know if anything's missing or if any open items need to move ahead of sch
 Thanks,
 {{senderName}}`,
 };
+
+// Phase 4 - Kick off PSA. Sent to the deal's PSA attorney (the
+// psa_attorney consultants on the roster) to start the purchase and sale
+// agreement.
+//
+// ONE template, written in the THIRD PERSON. The To line carries every
+// psa_attorney on the deal, both sides, in a single message, so a
+// second-person "your office is preparing the first draft" would tell
+// exactly one of two recipients something meant for the other firm. Who
+// drafts is stated as a fact about the deal instead, via {{draftingNote}},
+// which the caller derives from deals.psa_drafting and degrades to
+// side-neutral wording when nobody has decided yet.
+//
+// The letter of intent is referenced but NOT asserted as attached. It is
+// an optional attachment (plenty of LOIs are circulated outside the
+// platform), and "Attached is the executed letter of intent" would be a
+// lie on any deal where the Sign LOI row holds no file.
+//
+// The four labelled blanks are deliberate. The platform genuinely does
+// not hold the seller or buyer legal entity, and purchase_price is
+// usually still null at kickoff, so gating on them would leave the
+// button unclickable in practice. BEST_AND_FINAL_INVITATION_TEMPLATE
+// sets the precedent of shipping labelled blanks for the sender to
+// complete in the composer.
+//
+// city / units / type are deliberately NOT used. interpolate() re-emits
+// a placeholder verbatim when its value is an empty string, and the deal
+// context returns "" for a null column, so a deal with no city recorded
+// would ship a literal "{{city}}" to outside counsel. Every var used
+// below is either a NOT NULL column or hard-gated by the send's
+// pre-flight.
+export const PSA_KICKOFF_TEMPLATE: EmailTemplate = {
+  subject: "PSA kickoff, {{dealName}}",
+  body: `We are ready to kick off the purchase and sale agreement for {{dealName}}. {{draftingNote}}
+
+Please work from the executed letter of intent, which governs the business terms, and let us know if anything in it reads as ambiguous rather than assuming our intent.
+
+A few deal points to confirm before drafting starts:
+
+Seller entity and signature block:
+Buyer entity and signature block:
+Purchase price and deposit structure:
+Feasibility period and closing:
+
+Due diligence material for the property is here: {{ddFolderUrl}}
+
+Please confirm timing for a first draft, and flag anything you need from us to get started.
+
+Thanks,
+{{senderName}}`,
+};

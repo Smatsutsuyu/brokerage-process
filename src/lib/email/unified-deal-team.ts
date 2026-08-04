@@ -29,8 +29,13 @@ export type DealTeamKey = "owner" | "broker" | "buyer";
 export type UnifiedCapLabel = "Owner" | "Broker" | "Buyer" | "Seller" | "Org";
 
 // Picker section keys. Mirrors CcGroup in components/email/cc-picker.tsx.
+// "owner" and "buyer" are unused by the unified Deal Team send (both sit
+// on its To line) but are reachable from the PSA kickoff composer, which
+// shares this option type.
 export type UnifiedCcGroup =
+  | "owner"
   | "broker"
+  | "buyer"
   | "org"
   | "consultant_seller"
   | "consultant_buyer";
@@ -110,9 +115,13 @@ const UNIFIED_TEAM_CAP: Record<DealTeamKey, UnifiedCapLabel> = {
 
 // Resolve a deal_team_members row to its display name + email using the
 // same three-source priority as listDealTeam (user FK, contact FK, then
-// free text). Kept local rather than reusing resolveDealTeamMemberName
-// because we need the email alongside the name.
-function resolveTeamIdentity(r: TeamRow): { name: string; email: string | null } {
+// free text). Kept separate from resolveDealTeamMemberName because we
+// need the email alongside the name; folding the two together is a
+// backlog item.
+//
+// Exported so the PSA kickoff composer can reuse it rather than adding
+// yet another inline copy of this logic.
+export function resolveTeamIdentity(r: TeamRow): { name: string; email: string | null } {
   if (r.userId && (r.userName || r.userEmail)) {
     return { name: r.userName || r.userEmail!, email: r.userEmail };
   }
