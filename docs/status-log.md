@@ -73,6 +73,13 @@ That is a visible regression for the window between step 2 and step 3, and the o
 
 Full `vercel-build` chain run locally end to end (template guard, migrate, renames, reconcile, build) rather than just `next build`, since this is the first change in a while carrying a migration.
 
+### Two bugs Sean caught within the hour
+
+1. **I relabelled the drafting buttons and should not have.** They read `Buyer drafting` / `Seller drafting` in production; I changed them to `We draft` / `They draft` to match the row title "(we or they draft)", which is Chris's Excel wording. That mapping requires asserting Lakebridge is always the seller's side, and it read backwards on a real deal. Reverted. New standing rule in memory: never rename a user-facing label without asking, even to fix an apparent inconsistency.
+2. **The chip claimed there was no attorney when there was one.** `orphanedDrafting` covered both "roster is empty" and "attorneys exist but none on the drafting side", and its copy asserted the former. Flipping Woods from seller-drafting to buyer-drafting hit the second case and told Sean the roster was empty while Joseph S. Stuart sat plainly on it. Split into a distinct `sideMismatch` state that names the attorney and their side (`Joseph S. Stuart (seller-side) · Buyer drafting`), plus an inline note in the modal when the two disagree. Regression cases added to `verify:psa-resolution`.
+
+No data was lost in either case; the resolver only ever read.
+
 ### Remaining
 
 Step 3 only: drop `psa_attorney_name` and `psa_attorney_firm`. Should wait until step 2 has been in production long enough to be confident and the backfilled rows have been eyeballed on the Consultants tab.

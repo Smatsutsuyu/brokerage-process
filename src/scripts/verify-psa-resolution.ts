@@ -62,9 +62,30 @@ const resolved = resolvePsaAttorney({ rows: [atty({ id: "a" })], drafting: "sell
 check("one attorney on the drafting side -> resolved", resolved.state === "resolved", resolved.state);
 check("  drafter is that attorney", resolved.drafter?.id === "a");
 
-const wrongSide = resolvePsaAttorney({ rows: [atty({ id: "a", side: "buyer" })], drafting: "seller" });
-check("attorney on the other side -> orphanedDrafting", wrongSide.state === "orphanedDrafting", wrongSide.state);
+// Regression: this used to collapse into orphanedDrafting, whose copy
+// told a user with an attorney plainly on the roster that there was no
+// attorney on the roster. Reported from production after flipping the
+// drafting side on the Woods deal.
+const wrongSide = resolvePsaAttorney({ rows: [atty({ id: "a", side: "seller" })], drafting: "buyer" });
+check("attorney on the other side -> sideMismatch, NOT orphanedDrafting", wrongSide.state === "sideMismatch", wrongSide.state);
 check("  no drafter named", wrongSide.drafter === null);
+check("  the attorney is still sendable", wrongSide.sendable.length === 1);
+check(
+  "  the chip names the attorney instead of claiming the roster is empty",
+  describePsaResolution(wrongSide).includes("Cox Castle") &&
+    !/no attorney/i.test(describePsaResolution(wrongSide)),
+  describePsaResolution(wrongSide),
+);
+check(
+  "  and says which side they act for",
+  describePsaResolution(wrongSide).includes("seller-side"),
+  describePsaResolution(wrongSide),
+);
+check(
+  "orphanedDrafting is now reserved for a genuinely empty roster",
+  describePsaResolution(orphan).includes("no attorney on the roster"),
+  describePsaResolution(orphan),
+);
 
 const undecided = resolvePsaAttorney({ rows: [atty({ id: "a" })], drafting: null });
 check("attorney but no drafting decision -> undecided", undecided.state === "undecided", undecided.state);

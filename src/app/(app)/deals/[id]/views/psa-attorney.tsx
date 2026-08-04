@@ -32,13 +32,19 @@ export type PsaAttorneyState = {
   drafting: PsaDrafting | null;
 };
 
+// Buyer / Seller, not "we" / "they". The row title says "(we or they
+// draft)" because that is Chris's wording from the Excel, but the stored
+// enum is buyer|seller and translating it to we/they requires asserting
+// which side of the table we are on. That assertion was briefly added and
+// read backwards on a real deal, so the labels state the fact instead and
+// let the reader map it.
 const DRAFTING_LABEL: Record<PsaDrafting, string> = {
-  seller: "We draft",
-  buyer: "They draft",
+  buyer: "Buyer drafting",
+  seller: "Seller drafting",
   na: "N/A",
 };
 
-const DRAFTING_OPTIONS: PsaDrafting[] = ["seller", "buyer", "na"];
+const DRAFTING_OPTIONS: PsaDrafting[] = ["buyer", "seller", "na"];
 
 type PsaAttorneyProps = {
   dealId: string;
@@ -289,6 +295,19 @@ function PsaAttorneyModal({ open, onOpenChange, dealId, state }: PsaAttorneyModa
                 placeholder="e.g. mlevy@coxcastle.com"
               />
             </div>
+
+            {/* Flipping "who drafts" without touching the attorney is the
+                normal way to end up here, and it is not necessarily wrong:
+                the other side's counsel may simply not be recorded yet.
+                Say so plainly rather than letting the chip look broken. */}
+            {drafting && drafting !== "na" && side !== drafting && (
+              <p className="text-[11px] text-amber-700">
+                This attorney is {side === "buyer" ? "buyer-side" : "seller-side"},
+                but {DRAFTING_LABEL[drafting].toLowerCase()} is selected above.
+                That is fine if the drafting side&apos;s counsel is not recorded
+                yet. If this firm is the one drafting, switch the side.
+              </p>
+            )}
 
             {state.rows.length > 1 && (
               <p className="text-[11px] text-gray-500">

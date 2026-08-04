@@ -52,9 +52,16 @@ export type PsaResolutionState =
   // Attorneys exist, but drafting is null or "na", so no single drafter
   // can be named. Not an error: nothing has been decided yet.
   | "undecided"
-  // Drafting says a side, but no attorney is recorded on that side.
-  // Normal for most of a deal's life. Must NOT be rendered as a warning.
+  // Drafting says a side and the roster is EMPTY. Normal for most of a
+  // deal's life. Must NOT be rendered as a warning.
   | "orphanedDrafting"
+  // Drafting says a side, attorneys exist, but none of them are on that
+  // side. Distinct from orphanedDrafting on purpose: the two used to be
+  // one state, and the shared copy told a user with an attorney plainly
+  // on the roster that there was no attorney on the roster. Flipping the
+  // drafting side is the normal way to reach this, and the attorney is
+  // still there and still perfectly sendable.
+  | "sideMismatch"
   // Two or more attorneys on the drafting side. Genuine co-counsel.
   | "ambiguous";
 
@@ -149,9 +156,15 @@ export function resolvePsaAttorney(input: {
     return { ...base, drafter: onDraftingSide[0], state: "resolved" };
   }
   if (onDraftingSide.length === 0) {
-    return { ...base, drafter: null, state: "orphanedDrafting" };
+    // rows is non-empty here (the empty case returned above), so the
+    // attorneys exist and simply act for the other side.
+    return { ...base, drafter: null, state: "sideMismatch" };
   }
   return { ...base, drafter: null, state: "ambiguous" };
+}
+
+function sideWord(side: PsaSide): string {
+  return side === "buyer" ? "buyer-side" : "seller-side";
 }
 
 // The sentence stating who prepares the first draft, in the third
@@ -194,8 +207,16 @@ export function describePsaResolution(res: PsaResolution): string {
       return `${psaAttorneyDisplayName(res.drafter!)} · ${side} drafting`;
     case "ambiguous":
       return `${res.rows.filter((r) => r.side === res.drafting).length} attorneys · ${side} drafting`;
-    // Reached only when drafting is set and is not "na", so there is no
-    // "not applicable" case to handle here.
+    // Attorneys exist, just not on the drafting side. Name them and say
+    // which side they act for. Never claim the roster is empty: it isn't,
+    // and saying so sent a user looking for a record that was in front of
+    // them.
+    case "sideMismatch":
+      return res.rows.length === 1
+        ? `${psaAttorneyDisplayName(res.rows[0])} (${sideWord(res.rows[0].side)}) · ${side} drafting`
+        : `${res.rows.length} attorneys, none ${side.toLowerCase()}-side · ${side} drafting`;
+    // Reached only when drafting is set, is not "na", and the roster is
+    // genuinely empty.
     case "orphanedDrafting":
       return `${side} drafting · no attorney on the roster yet`;
     case "undecided":
