@@ -207,29 +207,77 @@ export async function setChecklistItemNotes(input: {
   revalidatePath(`/deals/${input.dealId}`);
 }
 
-// PSA Attorney decision recorded on the deal itself (not a consultant
-// row). Surfaced inline on the "Determine PSA Attorney" checklist row.
-// All three fields nullable individually so a partial decision (firm
-// known, name TBD, drafting undecided) is representable.
+// The PSA Attorney decision, split across the two things it actually is.
+//
+// WHO DRAFTS lives on the deal (deals.psa_drafting). It is a fact about
+// the transaction, answered on a Phase 1 go-to-market row months before
+// counsel is retained, and when the buyer's counsel drafts it is answered
+// before the buyer even exists.
+//
+// WHO THE ATTORNEY IS lives on the consultant roster as a row with
+// role = "psa_attorney", which is the one place in the platform that can
+// hold a firm, a contact, an email and a side. The legacy
+// deals.psa_attorney_name / psa_attorney_firm columns are free text with
+// nowhere to put an address; nothing reads them any more and they are
+// scheduled for removal. See docs/backlog.md.
 export type PsaDrafting = "buyer" | "seller" | "na";
 
-export async function setPsaAttorney(input: {
+export async function savePsaAttorneyDecision(input: {
   dealId: string;
-  name: string | null;
-  firm: string | null;
   drafting: PsaDrafting | null;
+  // Omit to leave the roster untouched and record only the drafting
+  // decision. This action never deletes: clearing an attorney is done on
+  // the Consultants tab, which is the surface that owns removal.
+  attorney?: {
+    // Present when editing the row this deal already has.
+    consultantId?: string;
+    side: ConsultantSide;
+    firmName: string;
+    contactName?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+  };
 }) {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
 
   await db
     .update(deals)
-    .set({
-      psaAttorneyName: input.name?.trim() || null,
-      psaAttorneyFirm: input.firm?.trim() || null,
-      psaDrafting: input.drafting,
-    })
+    .set({ psaDrafting: input.drafting })
     .where(and(eq(deals.id, input.dealId), eq(deals.orgId, org.id)));
+
+  const a = input.attorney;
+  if (a) {
+    const firmName = a.firmName.trim();
+    if (!firmName) throw new Error("Firm name is required");
+    const values = {
+      role: "psa_attorney" as const,
+      side: a.side,
+      firmName,
+      contactName: a.contactName?.trim() || null,
+      contactEmail: parseEmailAddress(a.contactEmail),
+      contactPhone: formatPhone(a.contactPhone),
+    };
+    if (a.consultantId) {
+      // Scoped by deal as well as org: this is a second caller for the
+      // consultant write path and it must not be able to reach a row on
+      // a sibling deal.
+      await db
+        .update(consultants)
+        .set(values)
+        .where(
+          and(
+            eq(consultants.id, a.consultantId),
+            eq(consultants.dealId, input.dealId),
+            eq(consultants.orgId, org.id),
+          ),
+        );
+    } else {
+      await db
+        .insert(consultants)
+        .values({ ...values, orgId: org.id, dealId: input.dealId });
+    }
+  }
 
   revalidatePath(`/deals/${input.dealId}`);
 }
@@ -897,7 +945,18 @@ export async function updateConsultant(input: {
       contactPhone: formatPhone(input.contactPhone),
       notes: input.notes?.trim() || null,
     })
-    .where(and(eq(consultants.id, input.consultantId), eq(consultants.orgId, org.id)));
+    .where(
+      and(
+        eq(consultants.id, input.consultantId),
+        // Deal-scoped as well as org-scoped. Every sibling query in this
+        // file scopes by deal; these two did not, which was harmless
+        // while the only caller passed an id it had just read off the
+        // same deal, and stops being harmless now the Phase 1 checklist
+        // row is a second caller.
+        eq(consultants.dealId, input.dealId),
+        eq(consultants.orgId, org.id),
+      ),
+    );
 
   revalidatePath(`/deals/${input.dealId}`);
 }
@@ -908,7 +967,18 @@ export async function deleteConsultant(input: { dealId: string; consultantId: st
 
   await db
     .delete(consultants)
-    .where(and(eq(consultants.id, input.consultantId), eq(consultants.orgId, org.id)));
+    .where(
+      and(
+        eq(consultants.id, input.consultantId),
+        // Deal-scoped as well as org-scoped. Every sibling query in this
+        // file scopes by deal; these two did not, which was harmless
+        // while the only caller passed an id it had just read off the
+        // same deal, and stops being harmless now the Phase 1 checklist
+        // row is a second caller.
+        eq(consultants.dealId, input.dealId),
+        eq(consultants.orgId, org.id),
+      ),
+    );
 
   revalidatePath(`/deals/${input.dealId}`);
 }

@@ -207,6 +207,17 @@ DNS records for `landadvisors.com` are in. Resend consolidated to a single accou
 - **`EMAIL_FROM` cutover** to `no-reply@landadvisors.com`. Feedback notifications now send from the same verified domain as the client-facing pipeline; the `no-reply` prefix signals these are one-way (the mailbox isn't monitored — no LAO IT coordination needed to provision a real inbox).
 - **Docs:** `.env.example`, `operations.md`, and `CLAUDE.md` updated to reflect the single-account / single-domain consolidation.
 
+## PSA attorney unified onto the consultant roster (2026-08-03)
+
+Step 2 of the plan in [backlog.md](backlog.md). The Phase 1 "Determine PSA Attorney" row now reads and writes the roster instead of the deal's free-text columns.
+
+- **`savePsaAttorneyDecision`** replaces `setPsaAttorney`. It writes `deals.psa_drafting` and upserts a `psa_attorney` consultant. It never deletes: removal belongs on the Consultants tab, which owns that surface.
+- **The picker gained an email field**, which is the entire point. The legacy columns had nowhere to put one, so a PSA attorney recorded at Phase 1 could never be emailed.
+- **Side is derived from the drafting decision**, not guessed, and stays editable.
+- **Migration `0034` backfills** the legacy columns onto the roster. Additive only; the columns are dropped in a later migration. Idempotent via a `NOT EXISTS` guard, so a deal that already has a roster row keeps it.
+- **The backfill ships WITH the read change, not after it.** A production dry-run through the real transform found two deals whose attorney existed only in the legacy columns; without the backfill in the same deploy they would have silently read "no attorney on the roster yet". That resequenced the plan.
+- **Fixed while here**: `updateConsultant` and `deleteConsultant` scoped by consultant id and org but not deal, unlike every sibling query. Harmless while the only caller passed an id read off the same deal; this change adds a second caller.
+
 ## Kick off PSA send (2026-08-03)
 
 Step 1 of retiring the deal-level PSA attorney fields onto the consultant roster. No schema change. Full plan and the production census in [backlog.md](backlog.md); user-facing behavior in [features.md](features.md).

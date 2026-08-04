@@ -55,9 +55,29 @@ Three checks failed on the first re-run and all three were my fixtures, not the 
 
 All three design agents refused to put the backfill inside the migration, citing `reference_drizzle_push_vs_migrate`. They misread it, and the compressed index line invited it. That note is about `db:push`, which skips migration files; production runs `drizzle-kit migrate`, which executes them inside a transaction. Verified two precedents: `0026` ends in a bare `UPDATE`, and `0031` does add-column plus FK plus backfill plus drop-column in one hand-written file that shipped. The backfill goes in the migration. Memory index sharpened.
 
+### Step 2, same day: the Phase 1 row points at the roster
+
+- `setPsaAttorney` replaced by `savePsaAttorneyDecision`, which writes `deals.psa_drafting` and upserts a `psa_attorney` consultant. It never deletes; removal stays on the Consultants tab.
+- The picker gained an **email field**, which is the whole point. The legacy columns had nowhere to put one, so an attorney recorded at Phase 1 could never be emailed.
+- Side is derived from the drafting decision rather than guessed, and stays editable. Leaving the attorney fields blank writes no roster row at all, so recording only "they draft" is still three clicks and no typing.
+- Empty state renders neutral, not amber, per the earlier amendment.
+- Fixed on the way past: `updateConsultant` and `deleteConsultant` scoped by consultant id and org but **not deal**, unlike every sibling query. Harmless while the only caller passed an id read off the same deal, and this change adds a second caller.
+
+### The dry-run that resequenced the plan
+
+Before wiring anything, real production rows were fed through the shipped transform. Woods resolved cleanly: chip reads "Joseph S. Stuart · Seller drafting" (the sole-practitioner name correctly collapsed rather than doubled), and the send addresses one attorney with five CC. But **The Trails at Lyons Canyon and Lakeview Heights both read "no attorney on the roster yet"**, because their attorney exists only in the legacy columns that step 2 stops reading.
+
+That is a visible regression for the window between step 2 and step 3, and the original plan had the backfill in step 3. So the backfill moved forward: **migration `0034` ships with step 2**, additive only, no drops. Step 3 becomes a pure `DROP COLUMN` with nothing left to preserve.
+
+`0034` is idempotent via a `NOT EXISTS` guard, derives `side` from `psa_drafting`, falls `firm_name` back to the attorney name (the column is NOT NULL), and deliberately leaves `contact_email` null rather than inventing one. Exercised locally against fixtures reproducing all four production classes, including re-running it to confirm the no-op. One assertion failed on the first pass and it was the fixture, not the migration: the seller-drafting case had been assigned to the same deal that already had a roster row, so it was correctly skipped rather than backfilled.
+
+Full `vercel-build` chain run locally end to end (template guard, migrate, renames, reconcile, build) rather than just `next build`, since this is the first change in a while carrying a migration.
+
 ### Remaining
 
-Steps 2 and 3 (point the Phase 1 row at the roster, then the migration). Sean approved proceeding with both and with backfilling the test deal. **Client-visible consequence he owns telling Chris about:** after step 2, a PSA attorney recorded on the Phase 1 row starts appearing in the Consultant Roster PDF and the DD Tracking PDF, which already go to ownership and the buyer.
+Step 3 only: drop `psa_attorney_name` and `psa_attorney_firm`. Should wait until step 2 has been in production long enough to be confident and the backfilled rows have been eyeballed on the Consultants tab.
+
+**Client-visible consequence Sean owns telling Chris about:** a PSA attorney recorded on the Phase 1 row now appears in the Consultant Roster PDF and the DD Tracking PDF, which already go to ownership and the buyer. The backfill also means Cox Castle and Test Firm start appearing on those documents for their deals.
 
 ---
 

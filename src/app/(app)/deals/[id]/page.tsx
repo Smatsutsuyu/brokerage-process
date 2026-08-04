@@ -60,6 +60,7 @@ export default async function DealPage({
     teamCountRow,
     documentRows,
     linkRows,
+    psaAttorneyRows,
   ] = await Promise.all([
       db.query.deals.findFirst({
         where: and(eq(deals.id, id), eq(deals.orgId, org.id)),
@@ -174,7 +175,28 @@ export default async function DealPage({
         )
         .where(eq(checklistCategories.dealId, id))
         .orderBy(asc(checklistItemLinks.sortOrder), asc(checklistItemLinks.createdAt)),
-    ]);
+        // PSA attorney comes from the consultant roster, not from the
+      // deal's legacy free-text columns. Joined into the existing batch
+      // so it stays one round trip.
+      db
+        .select({
+          id: consultants.id,
+          firmName: consultants.firmName,
+          contactName: consultants.contactName,
+          contactEmail: consultants.contactEmail,
+          contactPhone: consultants.contactPhone,
+          side: consultants.side,
+        })
+        .from(consultants)
+        .where(
+          and(
+            eq(consultants.dealId, id),
+            eq(consultants.orgId, org.id),
+            eq(consultants.role, "psa_attorney"),
+          ),
+        )
+        .orderBy(consultants.side, consultants.firmName),
+  ]);
 
   if (!deal) notFound();
 
@@ -296,8 +318,7 @@ export default async function DealPage({
                   documentsByItemId={documentsByItemId}
                   linksByItemId={linksByItemId}
                   psaAttorney={{
-                    name: deal.psaAttorneyName,
-                    firm: deal.psaAttorneyFirm,
+                    rows: psaAttorneyRows,
                     drafting: deal.psaDrafting,
                   }}
                 />

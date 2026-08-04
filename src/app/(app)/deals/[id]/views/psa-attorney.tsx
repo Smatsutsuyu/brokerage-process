@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Gavel, Loader2, Pencil } from "lucide-react";
+import Link from "next/link";
+import { ExternalLink, Gavel, Loader2, Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,41 +15,52 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  describePsaResolution,
+  resolvePsaAttorney,
+  type PsaAttorneyRow,
+  type PsaSide,
+} from "@/lib/psa-attorney";
 import { cn } from "@/lib/utils";
 
-import { setPsaAttorney, type PsaDrafting } from "../actions";
+import { savePsaAttorneyDecision, type PsaDrafting } from "../actions";
 
+// What the checklist row receives. The attorney comes from the deal's
+// consultant roster; only the drafting decision lives on the deal.
 export type PsaAttorneyState = {
-  name: string | null;
-  firm: string | null;
+  rows: PsaAttorneyRow[];
   drafting: PsaDrafting | null;
 };
 
 const DRAFTING_LABEL: Record<PsaDrafting, string> = {
-  buyer: "Buyer drafting",
-  seller: "Seller drafting",
+  seller: "We draft",
+  buyer: "They draft",
   na: "N/A",
 };
 
-const DRAFTING_OPTIONS: PsaDrafting[] = ["buyer", "seller", "na"];
+const DRAFTING_OPTIONS: PsaDrafting[] = ["seller", "buyer", "na"];
 
 type PsaAttorneyProps = {
   dealId: string;
   state: PsaAttorneyState;
 };
 
-// Compact display + edit affordance for the PSA Attorney decision. Lives
-// inline on the "Determine PSA Attorney (drafting preference)" checklist
-// row. Three states:
+// Inline display + edit for the PSA Attorney decision on the Phase 1
+// "Determine PSA Attorney (we or they draft)" row.
 //
-// - Empty → small "Set details" button opens the modal
-// - Partial/full → chip summarizing the current decision (e.g. "Smith & Co —
-//   Buyer drafting") with a pencil icon to re-open the modal
+// Two facts, deliberately kept apart. Who drafts is a property of the
+// transaction and writes to the deal. Who the attorney is writes to the
+// consultant roster, which is the single place PSA attorney contact
+// details live and the only one that can hold an email address, so the
+// Phase 4 kickoff send has something to address.
 //
-// Saving with all fields blank is the same as clearing.
+// Recording only "they draft" months before counsel exists stays a
+// three-click, zero-typing action: the attorney fields are optional and
+// leaving them blank writes no consultant row at all.
 export function PsaAttorneyInline({ dealId, state }: PsaAttorneyProps) {
   const [editing, setEditing] = useState(false);
-  const hasAny = Boolean(state.name || state.firm || state.drafting);
+  const res = resolvePsaAttorney({ rows: state.rows, drafting: state.drafting });
+  const hasAny = state.rows.length > 0 || Boolean(state.drafting);
 
   return (
     <span className="inline-flex items-center gap-0.5">
@@ -56,18 +68,22 @@ export function PsaAttorneyInline({ dealId, state }: PsaAttorneyProps) {
         <button
           type="button"
           onClick={() => setEditing(true)}
-          title="Edit PSA Attorney details"
+          title="Edit the PSA attorney and drafting decision"
           className="hover:bg-brand-blue/10 hover:text-brand-blue inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-700 transition-colors"
         >
           <Gavel className="h-3 w-3" />
-          <span className="max-w-[220px] truncate">{summarize(state)}</span>
+          <span className="max-w-[260px] truncate">{describePsaResolution(res)}</span>
           <Pencil className="h-2.5 w-2.5 opacity-60" />
         </button>
       ) : (
+        // Neutral, not amber. An empty roster during go-to-market is the
+        // normal condition of a deal, not a problem to flag, and painting
+        // the standard state as a warning teaches the user to ignore
+        // warnings.
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-amber-50 hover:text-amber-700"
+          className="hover:bg-brand-blue/10 hover:text-brand-blue inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors"
         >
           <Gavel className="h-3 w-3" />
           Set details
@@ -83,12 +99,6 @@ export function PsaAttorneyInline({ dealId, state }: PsaAttorneyProps) {
   );
 }
 
-function summarize(state: PsaAttorneyState): string {
-  const head = state.firm ?? state.name ?? "—";
-  const tail = state.drafting ? DRAFTING_LABEL[state.drafting] : null;
-  return tail ? `${head} · ${tail}` : head;
-}
-
 type PsaAttorneyModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -97,9 +107,17 @@ type PsaAttorneyModalProps = {
 };
 
 function PsaAttorneyModal({ open, onOpenChange, dealId, state }: PsaAttorneyModalProps) {
-  const [name, setName] = useState(state.name ?? "");
-  const [firm, setFirm] = useState(state.firm ?? "");
+  // The row this panel edits. With more than one attorney on the deal
+  // (co-counsel, or one per side) the panel edits the first and sends the
+  // user to the Consultants tab for the rest, rather than growing a
+  // second roster manager on a checklist row.
+  const existing = state.rows[0] ?? null;
+
   const [drafting, setDrafting] = useState<PsaDrafting | null>(state.drafting);
+  const [side, setSide] = useState<PsaSide>("seller");
+  const [firm, setFirm] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -109,19 +127,45 @@ function PsaAttorneyModal({ open, onOpenChange, dealId, state }: PsaAttorneyModa
       const t = setTimeout(() => setError(null), 150);
       return () => clearTimeout(t);
     }
-    setName(state.name ?? "");
-    setFirm(state.firm ?? "");
     setDrafting(state.drafting);
+    // Side defaults from the drafting decision rather than being guessed:
+    // if our side drafts, the attorney recorded here is ours.
+    setSide(existing?.side ?? (state.drafting === "buyer" ? "buyer" : "seller"));
+    setFirm(existing?.firmName ?? "");
+    setName(existing?.contactName ?? "");
+    setEmail(existing?.contactEmail ?? "");
     setError(null);
-  }, [open, state]);
+  }, [open, state, existing]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const trimmedFirm = firm.trim();
+    // Blank firm means "no attorney recorded yet", which is a legitimate
+    // Phase 1 state. Save the drafting decision and leave the roster
+    // alone. Never a delete: removal belongs on the Consultants tab.
+    if (!trimmedFirm && existing) {
+      setError(
+        "Clearing an attorney is done on the Consultants tab. Leave the firm as it is, or remove the record there.",
+      );
+      return;
+    }
     startTransition(async () => {
       try {
-        await setPsaAttorney({ dealId, name, firm, drafting });
+        await savePsaAttorneyDecision({
+          dealId,
+          drafting,
+          attorney: trimmedFirm
+            ? {
+                consultantId: existing?.id,
+                side,
+                firmName: trimmedFirm,
+                contactName: name,
+                contactEmail: email,
+              }
+            : undefined,
+        });
         onOpenChange(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not save");
@@ -133,39 +177,17 @@ function PsaAttorneyModal({ open, onOpenChange, dealId, state }: PsaAttorneyModa
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>PSA Attorney details</DialogTitle>
+          <DialogTitle>PSA Attorney</DialogTitle>
           <DialogDescription>
-            Captured at the deal level — visible inline on the checklist. All fields are
-            optional; save with everything blank to clear.
+            Who drafts is recorded on the deal. The attorney is saved to this
+            deal&apos;s consultant roster, so the Phase 4 kickoff email has an
+            address to send to.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-2">
-            <Label htmlFor="psa-firm">Firm / Company</Label>
-            <Input
-              id="psa-firm"
-              value={firm}
-              onChange={(e) => setFirm(e.target.value)}
-              placeholder="e.g. Smith & Co"
-              autoFocus
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="psa-name" className="text-gray-600">
-              Attorney name <span className="text-xs font-normal text-gray-400">(optional)</span>
-            </Label>
-            <Input
-              id="psa-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Jane Smith"
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Drafting preference</Label>
+            <Label>Who drafts the PSA?</Label>
             <div className="grid grid-cols-3 gap-2">
               {DRAFTING_OPTIONS.map((value) => {
                 const isActive = value === drafting;
@@ -187,8 +209,94 @@ function PsaAttorneyModal({ open, onOpenChange, dealId, state }: PsaAttorneyModa
               })}
             </div>
             <p className="text-[11px] text-gray-500">
-              Click an active choice again to clear it.
+              Click an active choice again to clear it. This is often the only
+              thing known at this stage, and it saves on its own.
             </p>
+          </div>
+
+          <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 p-3">
+            <div className="flex items-baseline justify-between">
+              <Label className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+                Attorney {existing ? "" : "(optional)"}
+              </Label>
+              <Link
+                href={`/deals/${dealId}?tab=consultants`}
+                className="text-brand-blue inline-flex items-center gap-0.5 text-[11px] hover:underline"
+              >
+                Consultants tab
+                <ExternalLink className="h-2.5 w-2.5" />
+              </Link>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="psa-side" className="text-gray-600">
+                Side
+              </Label>
+              <div id="psa-side" className="grid grid-cols-2 gap-2">
+                {(["seller", "buyer"] as PsaSide[]).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setSide(value)}
+                    className={cn(
+                      "rounded-md border px-2 py-1.5 text-xs font-medium transition-colors",
+                      value === side
+                        ? "border-brand-blue bg-brand-blue text-white"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-400",
+                    )}
+                  >
+                    {value === "seller" ? "Seller-side" : "Buyer-side"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="psa-firm">Firm / Company</Label>
+              <Input
+                id="psa-firm"
+                value={firm}
+                onChange={(e) => setFirm(e.target.value)}
+                placeholder="e.g. Cox Castle"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="psa-name" className="text-gray-600">
+                Attorney name{" "}
+                <span className="text-xs font-normal text-gray-400">(optional)</span>
+              </Label>
+              <Input
+                id="psa-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Matt Levy"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="psa-email" className="text-gray-600">
+                Email{" "}
+                <span className="text-xs font-normal text-gray-400">
+                  (needed for the Phase 4 kickoff email)
+                </span>
+              </Label>
+              <Input
+                id="psa-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. mlevy@coxcastle.com"
+              />
+            </div>
+
+            {state.rows.length > 1 && (
+              <p className="text-[11px] text-gray-500">
+                This deal has {state.rows.length} PSA attorneys on its roster.
+                This panel edits the first; manage the rest on the Consultants
+                tab.
+              </p>
+            )}
           </div>
 
           {error && (

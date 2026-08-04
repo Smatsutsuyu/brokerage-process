@@ -108,6 +108,18 @@ The Teams tab unifies the Deal Team into three groupings:
 
 Each member has an Include in emails toggle. Inclusion drives the recipient list when you use the Send to Deal Team buttons (for example, sharing DD material). Members can be real users, existing contacts on the deal, or free-text entries for someone who has no platform record yet.
 
+### Recording the PSA attorney
+
+The Phase 1 "Determine PSA Attorney" row holds two separate facts, and it is worth knowing they are stored differently.
+
+**Who drafts** (we draft / they draft / N/A) is a property of the deal. It is usually the only thing known at this stage, and it saves on its own with three clicks and no typing.
+
+**Who the attorney is** saves to this deal's **consultant roster** as a PSA Attorney entry, with a side, firm, contact name and email. That is the one place in the platform that can hold an address, which is what lets the Phase 4 kickoff email actually reach them. Leave those fields blank and no roster entry is created, so recording only the drafting decision stays as quick as it ever was.
+
+The row also carries an Open Consultants button, and the panel links across, because the roster is where an attorney is removed or where a second one is added. The Phase 1 panel never deletes.
+
+If the deal already has more than one PSA attorney, the panel edits the first and says so, pointing you at the Consultants tab for the rest.
+
 ### Kicking off the PSA
 
 The Phase 4 "Kick off PSA" row emails the deal's PSA attorney to start the purchase and sale agreement.

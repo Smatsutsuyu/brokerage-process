@@ -213,7 +213,10 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
           // (deferred AI engagement). Upload is the universal action so no
           // item-specific affordance here.
           "Offering Memorandum (OM)",
-          "Determine PSA Attorney (we or they draft)",
+          // The attorney itself is saved to the consultant roster (role =
+          // psa_attorney) by the inline picker, so the row also links to
+          // the tab that owns the record.
+          { name: "Determine PSA Attorney (we or they draft)", linksTo: "consultants" },
         ],
       },
     ],
