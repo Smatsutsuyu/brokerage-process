@@ -313,3 +313,18 @@ Please confirm timing for a first draft, and flag anything you need from us to g
 Thanks,
 {{senderName}}`,
 };
+
+// Phase 4 - Schedule Recurring Call. Asks the Deal Team for availability
+// to set up the recurring due diligence review call. Body is Chris's
+// wording from the 2026-08-17 feedback item, near-verbatim.
+//
+// No .ics generation: the backlog had this row down as a calendar-file
+// feature, and Chris's clarification is that it is simply an email
+// asking people for dates.
+export const DD_CALL_SCHEDULING_TEMPLATE: EmailTemplate = {
+  subject: "Due diligence review call, {{dealName}}",
+  body: `I'd like to set up a due diligence review call for {{dealName}}. Please provide dates in the next week that work for your teams.
+
+Thanks,
+{{senderName}}`,
+};

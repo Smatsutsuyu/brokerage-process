@@ -117,7 +117,7 @@ Inventory as of 2026-07-20. 16 total call sites split into two tiers by cost and
 **Structural tier — new patterns (~1-3 hrs each, in scope):**
 - Phase 3 "Initial Summary of Offers + LOIS" row → email Owner Team with the current SOO. Needs an LOI-summary data model or a manual-entry surface first.
 - ~~Phase 4 "Kick off PSA" row → email PSA Attorney.~~ **Done 2026-08-03.** Recipients resolve from the consultant roster (`role = psa_attorney`), not from any deal-level field. Single third-person template so one message can address both sides' counsel correctly. No schema change: this was step 1 of the PSA unification, see below.
-- Phase 4 "Schedule Recurring Call" row → `.ics` file generator + email. No existing pattern.
+- ~~Phase 4 "Schedule Recurring Call" row → `.ics` file generator + email.~~ **Done 2026-08-18**, and the `.ics` half was never wanted: Chris clarified the row is simply an email asking the Deal Team for availability. Reuses `UnifiedDealTeamSendButton` with a new `DD_CALL_SCHEDULING_TEMPLATE`, no new pattern.
 
 **Deferred to future engagement (per CLAUDE.md scope decisions — do NOT build without an explicit ask):**
 - Phase 1 templated PDFs (7): Premium Analysis, Valuation, CFD Analysis, Entitlement Schedule, Development Schedule, Entitlement Summary, Custom Underwriting File (xlsx). Templated with structured-data substitution.

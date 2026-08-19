@@ -336,17 +336,15 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
           // PlannedAction placeholder needed.
           "Kick off PSA",
           {
+            // "Schedule meetings" is wired in phase-section.tsx via
+            // isScheduleRecurringCallItem -> UnifiedDealTeamSendButton.
+            // Emails the Deal Team asking for availability. No
+            // PlannedAction placeholder needed.
+            //
+            // NOT an .ics generator, which is how the backlog had it
+            // scoped: Chris clarified 2026-08-17 that this is simply an
+            // email asking people for dates.
             name: "Schedule Recurring Call",
-            actions: [
-              {
-                kind: "schedule-reminder",
-                label: "Schedule meetings",
-                feature: "Recurring DD call reminders",
-                description:
-                  "Schedules a recurring DD call reminder for this deal.",
-                phase: "phase_2",
-              },
-            ],
           },
           { name: "Complete Due Diligence", linksTo: "issues" },
           // Milestone date-fields below. Chris populates projected dates

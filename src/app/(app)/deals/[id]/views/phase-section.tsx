@@ -31,6 +31,7 @@ import { DealTeamSendButton } from "./deal-team-send-button";
 import { DdTrackingRowActions } from "./dd-tracking-row-actions";
 import { MarketingReportPdfButton } from "./marketing-report-pdf-button";
 import { PsaKickoffRowActions } from "./psa-kickoff-row-actions";
+import { UnifiedDealTeamSendButton } from "./unified-deal-team-send-button";
 import { OmBlastButton } from "./om-blast-button";
 import { QaFilePdfButton } from "./qa-file-pdf-button";
 import { SendMarketingReportButton } from "./send-marketing-report-button";
@@ -45,6 +46,7 @@ import {
   OFFERS_DUE_NOTICE_TEMPLATE,
   OFFERS_FOLLOWUP_TEMPLATE,
   QA_FILE_TEMPLATE,
+  DD_CALL_SCHEDULING_TEMPLATE,
   SCHEDULE_SOO_REVIEW_TEMPLATE,
   SHARE_MARKETING_DD_TEMPLATE,
   BEST_AND_FINAL_INVITATION_TEMPLATE,
@@ -60,6 +62,13 @@ import { PsaAttorneyInline, type PsaAttorneyState } from "./psa-attorney";
 function isKickOffPsaItem(name: string): boolean {
   const lower = name.toLowerCase();
   return lower.includes("psa") && /\bkick\s?off\b|\bkickoff\b/.test(lower);
+}
+
+// Phase 4 "Schedule Recurring Call". Emails the Deal Team asking for
+// availability to set up the recurring DD review call.
+function isScheduleRecurringCallItem(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.includes("schedule") && lower.includes("recurring call");
 }
 
 // Phase 1 "Determine PSA Attorney (we or they draft)". Substring match so
@@ -465,6 +474,20 @@ export function PhaseSection({
                                 start the purchase and sale agreement. */}
                             {isKickOffPsaItem(item.name) && (
                               <PsaKickoffRowActions dealId={dealId} itemId={item.id} />
+                            )}
+                            {/* Phase 4 Schedule Recurring Call: ask the
+                                Deal Team for availability. Same one-email
+                                To/CC shape as the sibling DD sends. */}
+                            {isScheduleRecurringCallItem(item.name) && (
+                              <UnifiedDealTeamSendButton
+                                dealId={dealId}
+                                label="Schedule meetings"
+                                title="Email the Deal Team asking for availability for the recurring due diligence review call"
+                                icon={CalendarClock}
+                                modalTitle="Schedule Recurring Call"
+                                template={DD_CALL_SCHEDULING_TEMPLATE}
+                                attachments={[]}
+                              />
                             )}
                             {/* Phase 4 Share DD Material row: email
                                 the linked DD folder + index attachment

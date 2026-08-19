@@ -4,6 +4,17 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-08-18 — Schedule Recurring Call sends an availability email
+
+Feedback `f0796293` came in from Loan as "on the Teams tab, can there be a function to email everyone listed?". Sean checked with Chris and the actual ask was different: the Phase 4 **Schedule Recurring Call** row's "Schedule meetings" button should email the Deal Team asking for dates.
+
+- **The backlog had this scoped wrong.** It was down as an `.ics` file generator plus email, "no existing pattern", one of the three remaining structural-tier items. Chris's clarification removes the calendar half entirely, so it is just a send and it reuses `UnifiedDealTeamSendButton` unchanged.
+- **New `DD_CALL_SCHEDULING_TEMPLATE`**, Chris's wording near-verbatim: "I'd like to set up a due diligence review call for {{dealName}}. Please provide dates in the next week that work for your teams."
+- **Recipient shape**: the same one-email To/CC split as the sibling DD sends (ownership and buyer on To, brokerage CC'd), chosen over a flat "everyone on To" because it matches what Chris asked for on the other Phase 4 rows.
+- The PlannedAction placeholder is removed from the row. The button label "Schedule meetings" is unchanged; Chris wrote "Schedule Meeting" in the feedback but that is a paraphrase, not a rename request.
+
+---
+
 ## 2026-08-03 — Kick off PSA send, and the PSA attorney unification plan
 
 Sean asked whether a Kick off PSA template existed. It did not, and answering properly turned up a bigger problem: PSA attorney data lives in two unrelated places. Sean's call: everything should resolve to the consultant roster.
