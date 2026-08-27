@@ -10,6 +10,7 @@ import {
   feedbackComments,
   feedbackItems,
 } from "@/db/schema";
+import { truncateForAudit, writeAudit } from "@/lib/audit";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { notifyFeedbackComment, notifyFeedbackCreated } from "@/lib/email/notify";
@@ -121,7 +122,13 @@ export async function deleteFeedbackAttachment(attachmentId: string): Promise<vo
   const [att] = await db
     .select({
       id: feedbackAttachments.id,
+      feedbackId: feedbackAttachments.feedbackId,
+      name: feedbackAttachments.name,
+      mimeType: feedbackAttachments.mimeType,
+      sizeBytes: feedbackAttachments.sizeBytes,
       blobPath: feedbackAttachments.blobPath,
+      uploadedBy: feedbackAttachments.uploadedBy,
+      uploadedAt: feedbackAttachments.uploadedAt,
       orgId: feedbackAttachments.orgId,
     })
     .from(feedbackAttachments)
@@ -136,6 +143,26 @@ export async function deleteFeedbackAttachment(attachmentId: string): Promise<vo
   } catch (err) {
     console.warn("[feedback-attachment] failed to delete blob", err);
   }
+
+  // The row was the only record of who uploaded this file and what it was.
+  // Keep the blob pathname too: the del() above is best-effort, so a failed
+  // cleanup leaves an orphan that nothing but this entry points at.
+  await writeAudit({
+    orgId: att.orgId,
+    userId: me.id,
+    action: "feedback_attachment.deleted",
+    entityType: "feedback_attachment",
+    entityId: attachmentId,
+    before: {
+      name: att.name,
+      mimeType: att.mimeType,
+      sizeBytes: att.sizeBytes,
+      blobPath: att.blobPath,
+      uploadedBy: att.uploadedBy,
+      uploadedAt: att.uploadedAt,
+    },
+    metadata: { label: att.name, feedbackId: att.feedbackId },
+  });
 
   revalidatePath("/admin/feedback");
 }
@@ -204,11 +231,18 @@ export async function editFeedbackComment(input: { commentId: string; body: stri
 
   // Author OR org owner can edit. Joined to feedback_items to enforce the
   // org boundary even when the comment author's userId is null (deleted user).
+  // The body + author columns are the audit snapshot: the update below
+  // overwrites body in place and feedback_comments keeps no revision history,
+  // so the previous text exists nowhere else once this returns.
   const row = await db
     .select({
       commentId: feedbackComments.id,
       authorId: feedbackComments.userId,
+      authorEmail: feedbackComments.userEmail,
+      body: feedbackComments.body,
+      feedbackId: feedbackComments.feedbackId,
       itemOrgId: feedbackItems.orgId,
+      itemSection: feedbackItems.section,
     })
     .from(feedbackComments)
     .innerJoin(feedbackItems, eq(feedbackItems.id, feedbackComments.feedbackId))
@@ -226,6 +260,30 @@ export async function editFeedbackComment(input: { commentId: string; body: stri
     .set({ body: trimmed })
     .where(eq(feedbackComments.id, input.commentId));
 
+  // Treated as destructive, same as deleteFeedbackComment: an owner can
+  // rewrite anyone's comment, and the row's userId / userEmail name the
+  // AUTHOR, not the editor. Without this nothing records who changed the
+  // text or what it said. Skipped on a no-op save so re-submitting an
+  // unchanged comment doesn't log a phantom edit.
+  if (found.body !== trimmed) {
+    await writeAudit({
+      orgId: found.itemOrgId,
+      userId: me.id,
+      action: "feedback_comment.edited",
+      entityType: "feedback_comment",
+      entityId: input.commentId,
+      before: {
+        body: truncateForAudit(found.body),
+        authorId: found.authorId,
+        authorEmail: found.authorEmail,
+      },
+      after: { body: truncateForAudit(trimmed) },
+      // A comment has no name of its own, so the label names the feedback item
+      // whose thread it hung off.
+      metadata: { label: found.itemSection, feedbackId: found.feedbackId },
+    });
+  }
+
   revalidatePath("/admin/feedback");
   revalidatePath("/feedback");
 }
@@ -236,11 +294,18 @@ export async function deleteFeedbackComment(commentId: string) {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
 
+  // The extra columns are the audit snapshot: once the row is gone, its
+  // captured author and body are gone with it.
   const row = await db
     .select({
       commentId: feedbackComments.id,
       authorId: feedbackComments.userId,
+      authorEmail: feedbackComments.userEmail,
+      body: feedbackComments.body,
+      createdAt: feedbackComments.createdAt,
+      feedbackId: feedbackComments.feedbackId,
       itemOrgId: feedbackItems.orgId,
+      itemSection: feedbackItems.section,
     })
     .from(feedbackComments)
     .innerJoin(feedbackItems, eq(feedbackItems.id, feedbackComments.feedbackId))
@@ -254,6 +319,25 @@ export async function deleteFeedbackComment(commentId: string) {
   if (!isAuthor && !isOwner) throw new Error("Not authorized");
 
   await db.delete(feedbackComments).where(eq(feedbackComments.id, commentId));
+
+  // An owner can delete anyone's comment, so the actor and the destroyed
+  // author are not the same question. Both belong on the entry.
+  await writeAudit({
+    orgId: found.itemOrgId,
+    userId: me.id,
+    action: "feedback_comment.deleted",
+    entityType: "feedback_comment",
+    entityId: commentId,
+    before: {
+      body: truncateForAudit(found.body),
+      authorId: found.authorId,
+      authorEmail: found.authorEmail,
+      createdAt: found.createdAt,
+    },
+    // A comment has no name of its own, so the label names the feedback item
+    // whose thread it hung off.
+    metadata: { label: found.itemSection, feedbackId: found.feedbackId },
+  });
 
   revalidatePath("/admin/feedback");
   revalidatePath("/feedback");

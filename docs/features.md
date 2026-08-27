@@ -256,11 +256,15 @@ Answers "who changed this, and when". Every audited action writes one entry reco
 
 Each row shows when the change happened (hover the timestamp for the exact date and time), who made it, what they did, and where. Click any row to expand a before-and-after table for the fields that changed. Where a change belongs to a deal, the deal name links straight to it.
 
-Filter by action, by person, or by deal, and search across everything including the before and after values. So to answer "did anyone move the Offering Date on Lakeview Heights", filter Deal to Lakeview Heights and Action to Milestone date set, or just type the milestone name into the search box.
+Filter by **Type** (deal, buyer, contact, issue, document, and so on), by **Action**, by **Who**, or by **Deal**, and search across everything including the before and after values. Picking a Type narrows the Action list to that type's verbs, which keeps the dropdown usable now that the log covers the whole platform. So to answer "did anyone move the Offering Date on Lakeview Heights", filter Deal to Lakeview Heights and Action to Milestone date set, or just type the milestone name into the search box.
 
-Coverage is being wired in batches and is not yet complete. Today the log covers member administration (invite, role change, disable, re-enable, remove, password reset) and checklist items (checking an item off, setting or clearing an Est. or Actual milestone date, and editing or clearing an item's note). Actions that are not yet wired write nothing at all, so an absent entry means "not yet covered", not "did not happen". The remaining batches are tracked in `docs/backlog.md`.
+The red **Deletions** button filters to just the entries where something was destroyed. Those matter most: for a deleted row, the audit entry is the only surviving record of what was there, so each one captures the row's contents, not only its id. Deletions are also called out in red in the list.
 
-The page loads the 500 most recent entries by default and says so when there are more, with a link to load the full history. Per-user interface preferences such as deal reordering are deliberately not audited.
+**What is covered.** Every action that changes shared data now writes an entry: deals (including archive, delete and banner changes), the checklist, buyers and their tier / lead / Confi / OM / DD / offer tracking, contacts and builders (including Excel imports), Q&A, issues, consultants, the deal team, documents, member administration, feedback triage, and profile and password changes. Client-facing email sends are recorded too, including partial failures, with the subject and recipients but never the message body.
+
+**What is deliberately not covered**, because it is personal preference rather than a change to shared data: the order deals appear in your own sidebar, your own notification toggles, and submitting or replying to feedback (those already record their author and time on the item itself). Editing or deleting a feedback comment *is* audited, because that destroys someone else's words.
+
+The page loads the 500 most recent entries by default and says so when there are more, with a link to load the full history.
 
 ---
 

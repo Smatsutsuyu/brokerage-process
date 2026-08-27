@@ -260,7 +260,8 @@ Templated outputs only. No LLM calls.
 ### Phase 3: Polish, Operations, Handoff (2 weeks) — in progress
 
 - **Documentation pass (this commit)**: [docs/operations.md](docs/operations.md), [docs/schema.md](docs/schema.md), [docs/features.md](docs/features.md), [docs/build-progress.md](docs/build-progress.md). CLAUDE.md updated to point at them.
-- **Outstanding**: audit log surface. Recorded video walkthroughs. Architecture diagram. Final security + dependency audit.
+- **Audit log surface (done 2026-08-27)**: owner-only viewer at `/admin/audit`, with coverage across the whole mutation surface. Satisfies the "Review audit logs" handoff promise below. Conventions and the deliberate exclusion list live in [docs/schema.md](docs/schema.md); the operator-facing walkthrough is in [docs/operations.md](docs/operations.md).
+- **Outstanding**: recorded video walkthroughs. Architecture diagram. Final security + dependency audit.
 
 ---
 

@@ -1,5 +1,6 @@
 // Shared document/blob helpers. Used by:
-// - /api/upload/blob route (writes a row when a direct browser upload completes)
+// - /api/upload/blob route (authz check before issuing an upload token; the
+//   row itself is written by the recordUpload server action afterwards)
 // - /api/documents/[id] route (authz check + redirect to blob URL)
 // - server actions invoked by the checklist UI (delete a doc)
 //
@@ -13,7 +14,15 @@ import { and, desc, eq } from "drizzle-orm";
 import { del, head } from "@vercel/blob";
 
 import { db } from "@/db";
-import { checklistCategories, checklistItems, dealBuyers, deals, documents } from "@/db/schema";
+import {
+  checklistCategories,
+  checklistItems,
+  dealBuyers,
+  deals,
+  documents,
+  // Aliased: the bare name collides with the DOM's global Document type.
+  type Document as DocumentRow,
+} from "@/db/schema";
 
 export type AuthorizedUploadContext = {
   orgId: string;
@@ -92,6 +101,10 @@ export async function nextVersionFor(args: {
 //
 // Auto-versions per (deal, checklist item) pair. Revalidates the deal page
 // so the UI reflects the new doc on next fetch.
+//
+// Returns the row it just inserted. Callers that audit the upload need the
+// generated id and version, and re-querying for them can't distinguish one
+// upload from a concurrent replace of the same filename on the same item.
 export async function recordUploadedDocument(args: {
   orgId: string;
   userId: string | null;
@@ -101,7 +114,7 @@ export async function recordUploadedDocument(args: {
   // head() to derive the canonical URL + size + content type.
   blobPathname: string;
   name: string;
-}): Promise<void> {
+}): Promise<DocumentRow> {
   // head() resolves the blob in OUR store using BLOB_READ_WRITE_TOKEN. If
   // the pathname is fake (or in someone else's store), this throws and we
   // never write the row.
@@ -111,20 +124,24 @@ export async function recordUploadedDocument(args: {
     dealId: args.dealId,
     checklistItemId: args.checklistItemId,
   });
-  await db.insert(documents).values({
-    orgId: args.orgId,
-    dealId: args.dealId,
-    checklistItemId: args.checklistItemId,
-    name: args.name,
-    version,
-    status: "final",
-    r2Key: meta.url,
-    mimeType: meta.contentType ?? null,
-    sizeBytes: meta.size,
-    uploadedBy: args.userId,
-  });
+  const [inserted] = await db
+    .insert(documents)
+    .values({
+      orgId: args.orgId,
+      dealId: args.dealId,
+      checklistItemId: args.checklistItemId,
+      name: args.name,
+      version,
+      status: "final",
+      r2Key: meta.url,
+      mimeType: meta.contentType ?? null,
+      sizeBytes: meta.size,
+      uploadedBy: args.userId,
+    })
+    .returning();
 
   revalidatePath(`/deals/${args.dealId}`);
+  return inserted;
 }
 
 // Deletes a document (blob + row). Caller must have already verified the

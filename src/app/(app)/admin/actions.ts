@@ -7,7 +7,7 @@ import { hashPassword } from "better-auth/crypto";
 
 import { db } from "@/db";
 import { authAccount, authSession, authUser, dealTeamMembers, users } from "@/db/schema";
-import { writeAudit } from "@/lib/audit";
+import { truncateForAudit, writeAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth/auth";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
@@ -107,11 +107,25 @@ export async function inviteMember(input: {
     action: "member.invited",
     entityType: "user",
     entityId: inserted?.id ?? null,
-    after: { email, name, role: input.role },
+    after: {
+      email: truncateForAudit(email),
+      name: truncateForAudit(name),
+      role: input.role,
+    },
+    // The viewer renders metadata.label as its Target column and searches on
+    // it, so without this the most security-sensitive entries in the log are
+    // unfindable by the member's own name.
+    metadata: { label: truncateForAudit(name) },
   });
 
   revalidatePath("/admin/members");
 }
+
+// A member can sit on every deal in the org, so the Deal Team rows the removal
+// destroys are listed under a cap and paired with the full count. Same value as
+// the deal page's bulk-list cap so the two agree on how much detail an entry
+// keeps.
+const AUDIT_DEAL_TEAM_ROW_CAP = 50;
 
 // Hard-deletes a member: drops the membership row AND the auth identity.
 // Cascades clean up auth_session + auth_account via the FK with onDelete
@@ -127,14 +141,19 @@ export async function removeMember(input: { userId: string }): Promise<void> {
   }
 
   // Lookup the target + sanity-check the owner-count invariant when
-  // removing another owner.
+  // removing another owner. Name + email come along for the audit entry: the
+  // auth_user row is deleted below, so this is the last chance to record who
+  // was removed.
   const [target] = await db
     .select({
       id: users.id,
       authUserId: users.authUserId,
       role: users.role,
+      name: authUser.name,
+      email: authUser.email,
     })
     .from(users)
+    .leftJoin(authUser, eq(authUser.id, users.authUserId))
     .where(and(eq(users.id, input.userId), eq(users.orgId, me.orgId)))
     .limit(1);
   if (!target) throw new Error("Member not found");
@@ -148,6 +167,29 @@ export async function removeMember(input: { userId: string }): Promise<void> {
       throw new Error("Can't remove the only remaining owner");
     }
   }
+
+  // The transaction below hard-deletes this person's Deal Team rows. The
+  // single-row path on the deal page (removeDealTeamMember) writes a
+  // deal_team_member.removed entry for exactly that destruction, so without
+  // this read the same loss leaves no trace at all when it happens through
+  // member removal instead. Read before the delete, since afterwards the rows
+  // are gone; org-scoped like every other read in this file. A throw here
+  // fails closed and the member is not removed, which is the safe direction.
+  const dealTeamRows = await db
+    .select({
+      id: dealTeamMembers.id,
+      dealId: dealTeamMembers.dealId,
+      team: dealTeamMembers.team,
+      roleLabel: dealTeamMembers.roleLabel,
+      includeInEmails: dealTeamMembers.includeInEmails,
+    })
+    .from(dealTeamMembers)
+    .where(
+      and(
+        eq(dealTeamMembers.userId, input.userId),
+        eq(dealTeamMembers.orgId, me.orgId),
+      ),
+    );
 
   // Delete in transaction: membership row first (FK to authUser is
   // onDelete set null, so this would orphan), then the auth identity.
@@ -178,7 +220,28 @@ export async function removeMember(input: { userId: string }): Promise<void> {
     action: "member.removed",
     entityType: "user",
     entityId: input.userId,
-    before: { role: target.role },
+    before: {
+      role: target.role,
+      name: truncateForAudit(target.name),
+      email: truncateForAudit(target.email),
+    },
+    metadata: {
+      label: truncateForAudit(target.name ?? target.email),
+      // What the Deal Team sweep took with it. roleLabel is uncapped text on
+      // the row, so it goes through the truncator like any other free text
+      // reaching jsonb.
+      removedDealTeamRowCount: dealTeamRows.length,
+      removedDealTeamRows: dealTeamRows
+        .slice(0, AUDIT_DEAL_TEAM_ROW_CAP)
+        .map((r) => ({
+          id: r.id,
+          dealId: r.dealId,
+          team: r.team,
+          roleLabel: truncateForAudit(r.roleLabel),
+          includeInEmails: r.includeInEmails,
+        })),
+      removedDealTeamRowsTruncated: dealTeamRows.length > AUDIT_DEAL_TEAM_ROW_CAP,
+    },
   });
 
   revalidatePath("/admin/members");
@@ -191,8 +254,13 @@ export async function changeMemberRole(input: { userId: string; role: Role }): P
   }
 
   const [prev] = await db
-    .select({ role: users.role })
+    .select({
+      role: users.role,
+      name: authUser.name,
+      email: authUser.email,
+    })
     .from(users)
+    .leftJoin(authUser, eq(authUser.id, users.authUserId))
     .where(and(eq(users.id, input.userId), eq(users.orgId, me.orgId)))
     .limit(1);
   if (!prev) throw new Error("Member not found");
@@ -214,6 +282,7 @@ export async function changeMemberRole(input: { userId: string; role: Role }): P
     entityId: input.userId,
     before: { role: prev.role },
     after: { role: input.role },
+    metadata: { label: truncateForAudit(prev.name ?? prev.email) },
   });
 
   revalidatePath("/admin/members");
@@ -229,8 +298,13 @@ export async function setMemberDisabled(input: {
   }
 
   const [prev] = await db
-    .select({ disabledAt: users.disabledAt })
+    .select({
+      disabledAt: users.disabledAt,
+      name: authUser.name,
+      email: authUser.email,
+    })
     .from(users)
+    .leftJoin(authUser, eq(authUser.id, users.authUserId))
     .where(and(eq(users.id, input.userId), eq(users.orgId, me.orgId)))
     .limit(1);
   if (!prev) throw new Error("Member not found");
@@ -254,6 +328,7 @@ export async function setMemberDisabled(input: {
     entityId: input.userId,
     before: { disabledAt: prev.disabledAt },
     after: { disabledAt: nextDisabledAt },
+    metadata: { label: truncateForAudit(prev.name ?? prev.email) },
   });
 
   revalidatePath("/admin/members");
@@ -288,8 +363,11 @@ export async function resetMemberPassword(input: {
     .select({
       id: users.id,
       authUserId: users.authUserId,
+      name: authUser.name,
+      email: authUser.email,
     })
     .from(users)
+    .leftJoin(authUser, eq(authUser.id, users.authUserId))
     .where(and(eq(users.id, input.userId), eq(users.orgId, me.orgId)))
     .limit(1);
   if (!target) throw new Error("Member not found");
@@ -325,6 +403,7 @@ export async function resetMemberPassword(input: {
     action: "member.password_reset",
     entityType: "user",
     entityId: input.userId,
+    metadata: { label: truncateForAudit(target.name ?? target.email) },
   });
 
   revalidatePath("/admin/members");

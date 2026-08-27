@@ -755,7 +755,10 @@ export function BlastModal({
               await setBuilderCcUsers({ dealId, builderId, userIds: orgOnly });
             }}
             onSend={async (emails) => {
-              const result = await sendBlastEmails(emails);
+              // dealId is passed for attribution: this composer attaches no
+              // generated documents, but the send's audit entry is deal-scoped
+              // and cannot derive the deal from the recipients.
+              const result = await sendBlastEmails(emails, { dealId });
               // Mark each successfully-sent builder as Sent (OM or DD)
               // so the flag flips in the contacts tab and the next blast
               // of the same kind defaults them to unchecked. Only when

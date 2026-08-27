@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { feedbackComments, feedbackItems } from "@/db/schema";
+import { feedbackAttachments, feedbackComments, feedbackItems } from "@/db/schema";
+import { truncateForAudit, writeAudit } from "@/lib/audit";
 import { env } from "@/lib/env";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
@@ -100,15 +101,149 @@ export async function setFeedbackStatus(input: {
     });
   }
 
+  // The transition itself is the decision worth keeping. feedback_items only
+  // records who touched it last (lastUpdatedBy) and the current status, so
+  // every earlier triage step is overwritten in place without this entry.
+  if (existing && existing.status !== input.status) {
+    await writeAudit({
+      orgId: org.id,
+      userId: me.id,
+      action: "feedback.status_changed",
+      entityType: "feedback_item",
+      entityId: input.feedbackId,
+      before: { status: existing.status },
+      after: { status: input.status },
+      // Section + page path identify the item. The body itself stays on
+      // feedback_items untouched by a status change, so recopying it here
+      // would duplicate user content into the journal on every triage step.
+      metadata: {
+        label: existing.section,
+        pagePath: existing.pagePath,
+      },
+    });
+  }
+
   revalidatePath("/admin/feedback");
 }
 
+// Caps on the child lists the delete entry carries. Both a thread and an
+// attachment list are unbounded in principle and audit_log only ever grows,
+// so take a bounded slice and record the totals next to it.
+const AUDIT_COMMENT_CAP = 20;
+const AUDIT_ATTACHMENT_CAP = 50;
+
 export async function deleteFeedback(feedbackId: string): Promise<void> {
-  const { org } = await assertOwner();
+  const { me, org } = await assertOwner();
+
+  // Snapshot first. The row carries its own attribution (who submitted it and
+  // who last triaged it, plus when it was reviewed and actioned) and it
+  // cascade-drops its comment thread and attachment rows with it, so
+  // afterwards this audit entry is the only record of the item and of however
+  // much of its thread fits under the caps below. The triage columns are
+  // pulled for the same reason: a status change overwrites them in place, so
+  // once the row is gone nothing else can say who last worked the item.
+  const [existing] = await db
+    .select({
+      section: feedbackItems.section,
+      pagePath: feedbackItems.pagePath,
+      severity: feedbackItems.severity,
+      status: feedbackItems.status,
+      comment: feedbackItems.comment,
+      submitterId: feedbackItems.userId,
+      submitterEmail: feedbackItems.userEmail,
+      lastUpdatedBy: feedbackItems.lastUpdatedBy,
+      reviewedAt: feedbackItems.reviewedAt,
+      actionedAt: feedbackItems.actionedAt,
+      commitSha: feedbackItems.commitSha,
+      createdAt: feedbackItems.createdAt,
+    })
+    .from(feedbackItems)
+    .where(and(eq(feedbackItems.id, feedbackId), eq(feedbackItems.orgId, org.id)))
+    .limit(1);
+
+  // What goes down with it: the conversation (each comment carries the author
+  // email captured at write time, which the cascade destroys) and which files.
+  // The blobs outlive the attachment rows since nothing deletes them here, so
+  // these pathnames are the only pointers left. Counts come back alongside the
+  // capped lists so the entry still says how much was dropped past the cap.
+  const commentCounts = existing
+    ? await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(feedbackComments)
+        .where(eq(feedbackComments.feedbackId, feedbackId))
+    : [];
+  const comments = existing
+    ? await db
+        .select({
+          authorEmail: feedbackComments.userEmail,
+          body: feedbackComments.body,
+          createdAt: feedbackComments.createdAt,
+        })
+        .from(feedbackComments)
+        .where(eq(feedbackComments.feedbackId, feedbackId))
+        .orderBy(asc(feedbackComments.createdAt))
+        .limit(AUDIT_COMMENT_CAP)
+    : [];
+  const attachmentCounts = existing
+    ? await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(feedbackAttachments)
+        .where(eq(feedbackAttachments.feedbackId, feedbackId))
+    : [];
+  const attachments = existing
+    ? await db
+        .select({
+          name: feedbackAttachments.name,
+          blobPath: feedbackAttachments.blobPath,
+        })
+        .from(feedbackAttachments)
+        .where(eq(feedbackAttachments.feedbackId, feedbackId))
+        .orderBy(asc(feedbackAttachments.uploadedAt))
+        .limit(AUDIT_ATTACHMENT_CAP)
+    : [];
 
   await db
     .delete(feedbackItems)
     .where(and(eq(feedbackItems.id, feedbackId), eq(feedbackItems.orgId, org.id)));
+
+  if (existing) {
+    const commentCount = commentCounts[0]?.count ?? 0;
+    const attachmentCount = attachmentCounts[0]?.count ?? 0;
+    await writeAudit({
+      orgId: org.id,
+      userId: me.id,
+      action: "feedback.deleted",
+      entityType: "feedback_item",
+      entityId: feedbackId,
+      before: {
+        section: existing.section,
+        pagePath: existing.pagePath,
+        severity: existing.severity,
+        status: existing.status,
+        comment: truncateForAudit(existing.comment),
+        submitterId: existing.submitterId,
+        submitterEmail: existing.submitterEmail,
+        lastUpdatedBy: existing.lastUpdatedBy,
+        reviewedAt: existing.reviewedAt,
+        actionedAt: existing.actionedAt,
+        commitSha: existing.commitSha,
+        createdAt: existing.createdAt,
+      },
+      metadata: {
+        label: existing.section,
+        commentCount,
+        comments: comments.map((c) => ({
+          authorEmail: c.authorEmail,
+          body: truncateForAudit(c.body),
+          createdAt: c.createdAt,
+        })),
+        commentsTruncated: commentCount > AUDIT_COMMENT_CAP,
+        attachmentCount,
+        attachments,
+        attachmentsTruncated: attachmentCount > AUDIT_ATTACHMENT_CAP,
+      },
+    });
+  }
 
   revalidatePath("/admin/feedback");
 }
@@ -125,7 +260,7 @@ export type SendSummaryResult =
 export async function sendFeedbackSummary(input: {
   recipient: string;
 }): Promise<SendSummaryResult> {
-  const { org } = await assertOwner();
+  const { me, org } = await assertOwner();
   const recipient = input.recipient.trim();
   if (!recipient || !recipient.includes("@")) {
     return { ok: false, reason: "config", error: "Recipient email is required" };
@@ -195,5 +330,23 @@ export async function sendFeedbackSummary(input: {
   if (!result.ok) {
     return { ok: false, reason: result.reason, error: result.error };
   }
+
+  // Outbound mail leaves a trace even though no row changed. Subject,
+  // recipient and how many items rode along, never the rendered body. The
+  // recipient is client-supplied free text with only an "@" check on it, so
+  // it gets capped like any other unbounded string reaching jsonb.
+  await writeAudit({
+    orgId: org.id,
+    userId: me.id,
+    action: "feedback_summary.sent",
+    entityType: "feedback_summary",
+    entityId: null,
+    metadata: {
+      label: subject,
+      recipient: truncateForAudit(recipient),
+      itemCount: items.length,
+    },
+  });
+
   return { ok: true, itemCount: items.length };
 }

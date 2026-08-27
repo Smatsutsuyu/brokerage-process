@@ -4,6 +4,47 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-08-27 (last): audit coverage across the rest of the mutation surface
+
+Sean reviewed the viewer plus the checklist batch in production and greenlit the sweep. This closes the P1 backlog entry.
+
+### Result
+
+0 mutations left unaudited outside a five-item exclusion list. Verified with a checker that maps every function containing a `db` or `tx` write, including writes inside `db.transaction`, against `write*Audit` calls: 69 covered, 5 excluded, 0 missing. That number is mechanical, not an agent's claim, which matters because a sweep this size is exactly where "I audited everything" goes unchallenged.
+
+### Two things the inventory in the backlog got wrong
+
+`banner-actions.ts` was not in it at all. Two mutations, one of which permanently deletes a blob from Vercel Blob. Found by enumerating `"use server"` files directly rather than working from the list. Worth remembering that the backlog entry was itself written from a survey.
+
+And the backlog's count of transaction-using functions was zero, because it never looked. Six functions wrap their writes in `db.transaction(...)`, and `writeAudit` uses the module-level `db`, so a call placed inside the callback escapes the transaction and would record a rolled-back write as though it had committed. Checked mechanically by paren-matching each transaction span against every audit call site: clean, but nothing in the process would have caught it otherwise.
+
+### The defect worth remembering
+
+Roughly a dozen audit-only SELECTs ended up on the critical path *after* their mutation had already committed. `writeAudit` swallows its own errors, so the instinct is that audit code cannot break anything, but that contract only ever covered the INSERT. A snapshot read that throws after the write has landed makes the whole action throw, and the caller reports a failure for something that succeeded.
+
+`recordUpload` was the sharp case: the client turns a throw into "Upload failed" and skips `router.refresh()`, so the user would have been told the upload failed while the document row and the blob both existed. The audit sweep would have made that action less reliable than before it was audited, which is the exact inversion of the point.
+
+Fixed with `auditSafely()` in `src/lib/audit.ts`. Deliberately NOT applied to pre-mutation snapshots: those fail closed, and wrapping them would swallow a genuine authorization or connection error and let the mutation proceed anyway.
+
+### A judgement I got wrong
+
+I told the feedback agent not to audit `editFeedbackComment`, reasoning that the feedback surface already carries its own attribution. Two independent reviewers pushed back with the same argument: the row's `user_id` / `user_email` name the ORIGINAL AUTHOR, not the editor, and the function explicitly lets an owner edit anyone's comment. No history table exists, so the prior text was destroyed with no record of who rewrote it or what it said. Now audited as a destructive action.
+
+I had asked the agent to flag that case loudly if the previous body turned out not to be preserved anywhere, which is the only reason it surfaced rather than quietly shipping as an exclusion.
+
+### Decisions
+
+- **Action prefix names the DOMAIN, `entityType` names the TABLE, and they need not match.** Reviewers flagged `profile.updated` / entityType `user` as an inconsistency four separate times. It isn't: `member.password_reset` / `user` has been live in production since July. Renaming for symmetry would orphan existing rows. Documented in `src/lib/audit.ts` so the next reader stops trying to fix it.
+- **Bulk entries pass `entityId: null`**, never the deal UUID under a row-level entityType. It is a valid UUID so Postgres accepted it, which is what made it dangerous: the viewer printed an id labelled `deal_buyer` that matched no buyer row.
+- **Every array in `metadata` is capped with a truthful total.** A metadata object where half the lists are bounded and half are not is worse than either, because the truncation flag implies the rest are complete.
+- **No comment may overclaim what an entry captures.** Caught three times: `deleteBuilder`, `deleteFeedback` and `recordUpload` all had comments promising fields their snapshots never selected. During an incident that is worse than no comment.
+
+### Viewer changes
+
+A Type filter (~17 entity types) that narrows the Action dropdown, because ~90 action strings in one list is unusable. A Deletions filter with red treatment, since for a destroyed row the entry is the only surviving record. Both derive their options from the data, so nothing needs touching when coverage changes.
+
+---
+
 ## 2026-08-27 (latest): audit log viewer, and the first coverage batch
 
 Started from a real failure rather than the backlog: a checklist milestone date had changed on a production deal and there was no way to tell whether it was Sean testing or Chris working for real. That question is the acceptance test for this work, and it is now answerable in the app.

@@ -6,6 +6,7 @@ import { del, head } from "@vercel/blob";
 
 import { db } from "@/db";
 import { deals } from "@/db/schema";
+import { writeAudit } from "@/lib/audit";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 
@@ -28,7 +29,7 @@ export async function setDealBanner(input: {
 
   // Confirm deal belongs to caller's org.
   const [deal] = await db
-    .select({ id: deals.id, currentBanner: deals.bannerImagePath })
+    .select({ id: deals.id, name: deals.name, currentBanner: deals.bannerImagePath })
     .from(deals)
     .where(and(eq(deals.id, input.dealId), eq(deals.orgId, org.id)))
     .limit(1);
@@ -54,6 +55,22 @@ export async function setDealBanner(input: {
     .set({ bannerImagePath: input.pathname })
     .where(and(eq(deals.id, input.dealId), eq(deals.orgId, org.id)));
 
+  // The previous blob is deleted above and is unrecoverable afterwards, so the
+  // old path only survives here. Re-uploading the identical pathname is a no-op
+  // and writes nothing.
+  if (deal.currentBanner !== input.pathname) {
+    await writeAudit({
+      orgId: org.id,
+      userId: me.id,
+      action: "deal.banner_set",
+      entityType: "deal",
+      entityId: input.dealId,
+      before: { bannerImagePath: deal.currentBanner },
+      after: { bannerImagePath: input.pathname },
+      metadata: { dealId: input.dealId, dealName: deal.name, label: deal.name },
+    });
+  }
+
   revalidatePath(`/deals/${input.dealId}`);
 }
 
@@ -66,7 +83,7 @@ export async function clearDealBanner(dealId: string): Promise<void> {
   if (!me || !org) throw new Error("Not signed in");
 
   const [deal] = await db
-    .select({ id: deals.id, currentBanner: deals.bannerImagePath })
+    .select({ id: deals.id, name: deals.name, currentBanner: deals.bannerImagePath })
     .from(deals)
     .where(and(eq(deals.id, dealId), eq(deals.orgId, org.id)))
     .limit(1);
@@ -84,6 +101,22 @@ export async function clearDealBanner(dealId: string): Promise<void> {
     .update(deals)
     .set({ bannerImagePath: null })
     .where(and(eq(deals.id, dealId), eq(deals.orgId, org.id)));
+
+  // The blob is gone by this point, so the audit row is the only remaining
+  // record of which image the deal used to carry. Clearing an already-empty
+  // banner changes nothing and is not worth an entry.
+  if (deal.currentBanner) {
+    await writeAudit({
+      orgId: org.id,
+      userId: me.id,
+      action: "deal.banner_cleared",
+      entityType: "deal",
+      entityId: dealId,
+      before: { bannerImagePath: deal.currentBanner },
+      after: { bannerImagePath: null },
+      metadata: { dealId, dealName: deal.name, label: deal.name },
+    });
+  }
 
   revalidatePath(`/deals/${dealId}`);
 }

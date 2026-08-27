@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { authUser, users } from "@/db/schema";
+import { truncateForAudit, writeAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 
 export async function updateMyProfile(input: {
@@ -22,9 +23,29 @@ export async function updateMyProfile(input: {
   // table — but only when the corresponding field changed.
   await db.update(authUser).set({ name }).where(eq(authUser.id, me.authUserId));
 
+  // Held outside the branch because the audit entry needs the resulting
+  // phone either way: omitting the field leaves the stored one in place.
+  let nextPhone = me.phone;
   if (input.phone !== undefined) {
-    const phone = input.phone?.trim() || null;
-    await db.update(users).set({ phone }).where(eq(users.id, me.id));
+    nextPhone = input.phone?.trim() || null;
+    await db.update(users).set({ phone: nextPhone }).where(eq(users.id, me.id));
+  }
+
+  // A name change shows up on other people's screens (sidebar, deal team,
+  // issue assignees), so it is worth a row. Skipped when the form saved the
+  // values it already had, which is what a stray Save click does.
+  if (name !== me.name || nextPhone !== me.phone) {
+    await writeAudit({
+      orgId: me.orgId,
+      userId: me.id,
+      action: "profile.updated",
+      entityType: "user",
+      entityId: me.id,
+      // Both fields are client-supplied text with no cap in the schema.
+      before: { name: truncateForAudit(me.name), phone: truncateForAudit(me.phone) },
+      after: { name: truncateForAudit(name), phone: truncateForAudit(nextPhone) },
+      metadata: { label: truncateForAudit(name) },
+    });
   }
 
   revalidatePath("/profile");

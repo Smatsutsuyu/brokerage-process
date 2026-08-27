@@ -44,6 +44,50 @@ export async function writeAudit(entry: {
   }
 }
 
+// Post-mutation audit work
+// ------------------------
+// writeAudit swallows its own errors so a failed audit can never break the
+// mutation it observes. That contract covers the INSERT and nothing else.
+//
+// A snapshot SELECT that runs BEFORE the mutation is already safe: if it
+// throws, the mutation never happens, which fails closed. But a read that runs
+// AFTER the mutation has committed sits outside the contract entirely. If it
+// throws, the action throws too, having already written the row, and the caller
+// reports a failure for something that actually succeeded. That is strictly
+// worse than having no audit trail: an upload that landed gets reported as
+// "Upload failed" and the UI skips its refresh.
+//
+// So: any audit-only work that happens after the write goes through here.
+// Loading a name to label the entry is never worth failing a mutation for.
+export async function auditSafely(work: () => Promise<void>): Promise<void> {
+  try {
+    await work();
+  } catch (err) {
+    console.warn("[audit] post-mutation audit step failed", err);
+  }
+}
+
+// Naming convention
+// -----------------
+// `action` is "<domain>.<past_tense_verb>" and `entityType` is the table the
+// row lives in. These two deliberately do NOT have to match, and several pairs
+// don't:
+//
+//   action "member.password_reset"  entityType "user"
+//   action "profile.updated"        entityType "user"
+//   action "feedback.status_changed" entityType "feedback_item"
+//
+// The action prefix names the domain a person thinks in ("member", "profile"),
+// which is what reads well in the viewer's Action filter. entityType names the
+// table, which is what makes entity_id meaningful. Reviewers reliably read this
+// as an inconsistency and try to "fix" it: don't. Renaming an action string
+// orphans every row already written under the old one, and the pairs above are
+// live in production.
+//
+// Split set from clear, and add from remove, when the distinction earns its own
+// row in the Action filter. Sub-variants that don't (which of two dates moved,
+// say) ride in `metadata` instead.
+//
 // Metadata convention
 // -------------------
 // `writeAudit` accepts arbitrary jsonb in `metadata`, but the audit viewer

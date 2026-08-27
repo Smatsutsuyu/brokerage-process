@@ -207,7 +207,11 @@ export function DealTeamSendButton({
         ccOptions={ccOptions}
         ccInitial={ccInitial}
         onSend={async (emails) => {
-          const result = await sendBlastEmails(emails);
+          // dealId is passed for attribution: this composer attaches no
+          // generated documents, but the send's audit entry is deal-scoped and
+          // cannot derive the deal from the recipients (a Deal Team send
+          // groups by sub-team, not by builder).
+          const result = await sendBlastEmails(emails, { dealId });
           if (result.failed === 0) {
             toast.success(
               `Sent ${result.sent} ${result.sent === 1 ? "email" : "emails"}`,

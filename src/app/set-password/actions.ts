@@ -6,6 +6,7 @@ import { hashPassword } from "better-auth/crypto";
 
 import { db } from "@/db";
 import { authAccount, users } from "@/db/schema";
+import { truncateForAudit, writeAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 
 // Called from /set-password after the user has signed in with the temp
@@ -35,6 +36,25 @@ export async function setOwnPassword(input: { newPassword: string }): Promise<vo
     );
 
   await db.update(users).set({ mustSetPassword: false }).where(eq(users.id, me.id));
+
+  // A password change is a security event, so it gets a row. Nothing about
+  // the password goes in it: not the plaintext, not the hash, not the
+  // length. Same deliberate silence as the admin-side member.password_reset
+  // entry, which records only that the action happened.
+  await writeAudit({
+    orgId: me.orgId,
+    userId: me.id,
+    action: "profile.password_changed",
+    entityType: "user",
+    entityId: me.id,
+    metadata: {
+      label: truncateForAudit(me.name),
+      // True when this closes out an owner-triggered reset (the /set-password
+      // gate forced the visit) rather than a voluntary change, which pairs
+      // the entry with the member.password_reset that preceded it.
+      afterOwnerReset: me.mustSetPassword,
+    },
+  });
 
   // Invalidate cached layouts so the (app) gate re-reads the cleared flag
   // on the very next navigation.

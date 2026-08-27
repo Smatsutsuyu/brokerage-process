@@ -87,15 +87,18 @@ Recipients are managed in-app per user; there is no env-var distribution list.
 
 1. Sign in as an owner.
 2. Open `/admin/audit` (Admin > Audit log in the sidebar).
-3. Narrow with the Action, Who, and Deal filters, or type into the search box. Search matches the actor, the action, the item name, the deal name, and the before and after values, so searching a milestone name or a builder name finds every entry touching it.
+3. Narrow with the Type, Action, Who, and Deal filters, or type into the search box. Search matches the actor, the action, the item name, the deal name, and the before and after values, so searching a milestone name or a builder name finds every entry touching it. Picking a Type narrows the Action list to that type's verbs.
 4. Click a row to expand the before-and-after table for the fields that changed.
 
 To answer the question this page exists for, "who changed this and when", filter Deal to the deal in question and read down the list. Entries by a member who has since been removed show as "Removed user": the `user_id` foreign key is `onDelete: set null`, so the entry survives the person.
 
-Two limits to know about before drawing conclusions:
+**Investigating something that was deleted**: click the red **Deletions** filter. Destructive actions snapshot the row's contents before removing it, so the entry says what was destroyed, not just that something was. This is the only place that information still exists.
 
-- **Coverage is partial.** Audited today: the six member-administration actions, plus checklist item completion, milestone dates (Est. and Actual), and item notes. Everything else writes no entry, so silence on an unaudited action means "not covered yet", not "nobody did it". Remaining batches are listed under the P1 audit entry in `docs/backlog.md`. Update this list as batches land.
+Three things to know before drawing conclusions:
+
+- **Coverage is effectively complete, with a short deliberate exclusion list.** Every action that changes shared data writes an entry. The exclusions are per-user sidebar deal ordering, per-user notification toggles, and submitting or commenting on feedback (those rows already carry their author and timestamp). Editing or deleting a feedback comment IS audited. If you find a mutation with no entry that is not on that list, treat it as a bug and see the P1 audit entry in `docs/backlog.md`.
 - **The default read is capped at the 500 most recent entries**, and filters apply only to what is loaded. The page says so when there is more, with a link that loads the full history.
+- **Absence of an email entry does not prove no email was sent.** The platform records the sends it makes. Anything sent from someone's own Outlook is outside the platform entirely.
 
 There is no retention job. `audit_log` is append-only and grows without bound; CLAUDE.md records the working retention assumption as one year. Trimming it, if it is ever wanted, is a manual `DELETE FROM audit_log WHERE created_at < now() - interval '1 year'` against the production database, using the inline connection-string method under Database operations below.
 

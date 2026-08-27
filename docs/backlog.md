@@ -81,7 +81,21 @@ When you close one, mark `~~done~~` rather than deleting so the running record s
 - **Fix**: scope to what actually changed. Reorder: `revalidatePath("/", "page")` plus the active deal. Profile: same plus `/profile`.
 - **Effort**: S
 
-### [Ops] Wire audit logging across mutations, and build a surface to read it
+### ~~[Ops] Wire audit logging across mutations, and build a surface to read it~~ (done 2026-08-27)
+
+**Closed.** Viewer shipped at `/admin/audit`, coverage now spans the whole mutation surface. Mechanically verified: 69 db-writing functions audited, 5 excluded by policy, 0 missing. See `docs/status-log.md` (2026-08-27, last) for the decisions and the two defects worth remembering, and `docs/schema.md` for the conventions the next person needs.
+
+Three things that came out of it and are worth carrying forward:
+
+- **`auditSafely()`** exists now because roughly a dozen audit-only SELECTs had landed on the critical path after their mutation committed. `writeAudit` swallowing its own errors covers the INSERT only. Any future audit work that runs after a write goes through the helper; pre-mutation snapshots must not, since those correctly fail closed.
+- **`writeAudit` must never sit inside a `db.transaction(...)` callback.** It uses the module-level `db`, so it would escape the transaction and log a rolled-back write as though it succeeded. Six functions use transactions today.
+- **The inventory below was incomplete.** `banner-actions.ts` was missing from it entirely. Enumerate `"use server"` files directly rather than trusting a prior survey.
+
+The original entry is kept below for the record.
+
+---
+
+### [superseded, kept for the record] Wire audit logging across mutations
 
 - **Why this is P1**: `CLAUDE.md:290` lists "Review audit logs" under **What Lakebridge Can Do Without a Developer**, and `CLAUDE.md:263` lists "audit log surface" as an outstanding Phase 3 item. This is a handoff promise, not polish. Prior record of the deferral is `docs/status-log.md:292-294`.
 
@@ -167,7 +181,7 @@ export async function writeAudit(entry: {
 
 **Each later batch must extend the coverage lists** in `docs/schema.md`, `docs/operations.md`, and `docs/features.md`. They currently enumerate exactly what is audited, and an operator drawing conclusions from an absent entry is the failure mode those lists exist to prevent.
 
-- **Effort**: L overall. Viewer + first batch done. The remaining ~68 call sites are a day-plus, best landed in batches rather than one commit.
+- **Effort**: L overall. All of it done 2026-08-27, across three commits: viewer + checklist batch, then the full sweep, then the fixes that adversarial review turned up. The estimate of "a day-plus across ~71 call sites" was about right on scope and well short on verification: the sweep itself was the smaller half, and 52 review findings came out of it.
 
 ### [Ops] Run a Neon PITR restore drill
 - **What**: CLAUDE.md Phase 3 deliverable. Backups are presumed-working but never verified.
