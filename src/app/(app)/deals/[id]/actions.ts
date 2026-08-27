@@ -21,6 +21,7 @@ import {
   qaItems,
   users,
 } from "@/db/schema";
+import { truncateForAudit, writeAudit } from "@/lib/audit";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { findBuilderByName } from "@/lib/builders";
@@ -39,6 +40,38 @@ import { formatMilestoneDate } from "@/lib/format-milestone-date";
 import { formatPhone } from "@/lib/phone";
 import type { ResolvedEmail } from "@/components/email/email-preview-modal";
 
+// Pre-mutation snapshot for the three checklist-item actions below.
+//
+// Every checklist update is otherwise blind (`db.update(...).where(...)` with
+// no prior read), so without this the audit trail could only record that
+// something changed, not what it changed from. The joins to
+// checklist_categories and deals cost one round-trip and buy two things: the
+// item name and deal name get denormalized into the audit row so an entry
+// reads as a sentence without a join, and the deal id comes from the database
+// rather than from client-supplied `input.dealId`.
+//
+// Returns null when the item does not exist or belongs to another org, which
+// is exactly when the caller's own org-scoped update would no-op. Callers skip
+// the audit write in that case rather than logging a change that never landed.
+async function loadChecklistItemAuditContext(itemId: string, orgId: string) {
+  const [row] = await db
+    .select({
+      name: checklistItems.name,
+      completed: checklistItems.completed,
+      trackedDate: checklistItems.trackedDate,
+      estimatedDate: checklistItems.estimatedDate,
+      notes: checklistItems.notes,
+      dealId: checklistCategories.dealId,
+      dealName: deals.name,
+    })
+    .from(checklistItems)
+    .innerJoin(checklistCategories, eq(checklistCategories.id, checklistItems.categoryId))
+    .innerJoin(deals, eq(deals.id, checklistCategories.dealId))
+    .where(and(eq(checklistItems.id, itemId), eq(checklistItems.orgId, orgId)))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function toggleChecklistItem(input: {
   itemId: string;
   dealId: string;
@@ -56,6 +89,8 @@ export async function toggleChecklistItem(input: {
   // completions with completedBy=null.
   if (!user) throw new Error("No user context");
 
+  const before = await loadChecklistItemAuditContext(input.itemId, org.id);
+
   // Scope the update to the current org so a forged itemId can't reach across tenants.
   await db
     .update(checklistItems)
@@ -65,6 +100,27 @@ export async function toggleChecklistItem(input: {
       completedBy: input.completed ? user.id : null,
     })
     .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)));
+
+  // Skip the audit write when the checkbox already held this value. The UI
+  // can re-send the current state (double click, stale optimistic render) and
+  // a row saying "changed from false to false" is noise in a log whose whole
+  // job is to make real changes findable.
+  if (before && before.completed !== input.completed) {
+    await writeAudit({
+      orgId: org.id,
+      userId: user.id,
+      action: input.completed ? "checklist_item.completed" : "checklist_item.uncompleted",
+      entityType: "checklist_item",
+      entityId: input.itemId,
+      before: { completed: before.completed },
+      after: { completed: input.completed },
+      metadata: {
+        dealId: before.dealId,
+        dealName: before.dealName,
+        label: before.name,
+      },
+    });
+  }
 
   revalidatePath(`/deals/${input.dealId}`);
 }
@@ -188,15 +244,50 @@ export async function setChecklistItemDate(input: {
     throw new Error("Invalid date format; expected YYYY-MM-DD");
   }
 
-  const patch =
-    input.kind === "estimate"
-      ? { estimatedDate: input.date }
-      : { trackedDate: input.date };
+  const isEstimate = input.kind === "estimate";
+  const patch = isEstimate ? { estimatedDate: input.date } : { trackedDate: input.date };
+
+  // getCurrentOrg short-circuits on a null user, so `org` being set already
+  // implies a signed-in user. Read it anyway to attribute the change: this is
+  // the action behind the 2026-08-27 question of who moved a milestone date on
+  // a live deal, and per-row attribution never existed for it. Free at runtime
+  // because getCurrentUser is wrapped in React cache() and getCurrentOrg has
+  // already called it this request.
+  const user = await getCurrentUser();
+  const before = await loadChecklistItemAuditContext(input.itemId, org.id);
 
   await db
     .update(checklistItems)
     .set(patch)
     .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)));
+
+  const previousDate = before
+    ? isEstimate
+      ? before.estimatedDate
+      : before.trackedDate
+    : null;
+
+  if (before && previousDate !== input.date) {
+    const field = isEstimate ? "estimatedDate" : "trackedDate";
+    await writeAudit({
+      orgId: org.id,
+      userId: user?.id ?? null,
+      action: input.date === null ? "checklist_item.date_cleared" : "checklist_item.date_set",
+      entityType: "checklist_item",
+      entityId: input.itemId,
+      before: { [field]: previousDate },
+      after: { [field]: input.date },
+      metadata: {
+        dealId: before.dealId,
+        dealName: before.dealName,
+        label: before.name,
+        // Which of the two milestone dates moved. The viewer reads this to
+        // render "Set Est. date" vs "Set Actual date" without guessing from
+        // the before/after keys.
+        dateKind: isEstimate ? "estimate" : "actual",
+      },
+    });
+  }
 
   revalidatePath(`/deals/${input.dealId}`);
 }
@@ -213,10 +304,35 @@ export async function setChecklistItemNotes(input: {
   if (!org) throw new Error("No organization context");
 
   const trimmed = input.notes.trim();
+  const next = trimmed || null;
+
+  const user = await getCurrentUser();
+  const before = await loadChecklistItemAuditContext(input.itemId, org.id);
+
   await db
     .update(checklistItems)
-    .set({ notes: trimmed || null })
+    .set({ notes: next })
     .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)));
+
+  if (before && before.notes !== next) {
+    await writeAudit({
+      orgId: org.id,
+      userId: user?.id ?? null,
+      action: next === null ? "checklist_item.notes_cleared" : "checklist_item.notes_updated",
+      entityType: "checklist_item",
+      entityId: input.itemId,
+      // checklist_items.notes has no length cap, so both sides are truncated
+      // before they reach jsonb. The log answers who changed the note, not
+      // what the note says in full.
+      before: { notes: truncateForAudit(before.notes) },
+      after: { notes: truncateForAudit(next) },
+      metadata: {
+        dealId: before.dealId,
+        dealName: before.dealName,
+        label: before.name,
+      },
+    });
+  }
 
   revalidatePath(`/deals/${input.dealId}`);
 }

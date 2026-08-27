@@ -1,4 +1,4 @@
-import { Building2, Contact, MessageSquare, Users } from "lucide-react";
+import { Building2, Contact, MessageSquare, ScrollText, Users } from "lucide-react";
 import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -135,6 +135,9 @@ export async function Sidebar({ activeDealId }: SidebarProps) {
             icon={<MessageSquare className="h-3.5 w-3.5" />}
           >
             Feedback
+          </SidebarNavLink>
+          <SidebarNavLink href="/admin/audit" icon={<ScrollText className="h-3.5 w-3.5" />}>
+            Audit log
           </SidebarNavLink>
         </div>
       )}

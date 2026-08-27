@@ -238,7 +238,7 @@ The form lets you set severity (Nit / Suggestion / Bug / Blocker), write a comme
 
 ## Admin tools (owner-only)
 
-Owners get two extra sidebar links under Admin.
+Owners get three extra sidebar links under Admin.
 
 ### Members (`/admin/members`)
 
@@ -249,6 +249,18 @@ Each row also has a **Reset PW** button. Click it, pick (or regen) a temporary p
 ### Feedback (`/admin/feedback`)
 
 Triage every piece of feedback submitted across the org. For each item you see who submitted it, when, the page they were on, the deployed commit SHA, severity, status, and any attachments. Move the status through the workflow (New > Reviewed > Actioned > Complete, or Won't Fix), reply on the comment thread, and filter by status, severity, or section. A Send Test Email button lets you fire a test feedback notification to yourself to confirm email delivery is healthy.
+
+### Audit log (`/admin/audit`)
+
+Answers "who changed this, and when". Every audited action writes one entry recording the person who made the change, the value before it, and the value after it. Entries are never edited or deleted by the app.
+
+Each row shows when the change happened (hover the timestamp for the exact date and time), who made it, what they did, and where. Click any row to expand a before-and-after table for the fields that changed. Where a change belongs to a deal, the deal name links straight to it.
+
+Filter by action, by person, or by deal, and search across everything including the before and after values. So to answer "did anyone move the Offering Date on Lakeview Heights", filter Deal to Lakeview Heights and Action to Milestone date set, or just type the milestone name into the search box.
+
+Coverage is being wired in batches and is not yet complete. Today the log covers member administration (invite, role change, disable, re-enable, remove, password reset) and checklist items (checking an item off, setting or clearing an Est. or Actual milestone date, and editing or clearing an item's note). Actions that are not yet wired write nothing at all, so an absent entry means "not yet covered", not "did not happen". The remaining batches are tracked in `docs/backlog.md`.
+
+The page loads the 500 most recent entries by default and says so when there are more, with a link to load the full history. Per-user interface preferences such as deal reordering are deliberately not audited.
 
 ---
 

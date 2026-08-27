@@ -65,7 +65,13 @@ Grouped by domain. One line of purpose, then notable columns and FK relationship
 
 ### Misc
 
-- **`audit_log`** (`src/db/schema/audit-log.ts`) — append-only audit trail. Columns: `org_id`, `user_id`, `action`, `entity_type`, `entity_id`, `before jsonb`, `after jsonb`, `metadata jsonb`. Only `created_at`, no `updated_at`. Written via the `writeAudit()` helper at `src/lib/audit.ts` (fire-and-forget with swallowed errors). Currently wired from the five owner-only mutations in `admin/actions.ts`: `member.invited`, `member.removed`, `member.role_changed`, `member.disabled` / `member.re_enabled`, `member.password_reset`. No UI on top of it yet — read via direct Postgres query.
+- **`audit_log`** (`src/db/schema/audit-log.ts`) — append-only audit trail. Columns: `org_id`, `user_id`, `action`, `entity_type`, `entity_id`, `before jsonb`, `after jsonb`, `metadata jsonb`. Only `created_at`, no `updated_at`. Read at `/admin/audit` (owner-gated; see `docs/features.md`). Written via the `writeAudit()` helper at `src/lib/audit.ts` (fire-and-forget with swallowed errors).
+
+  `user_id` is the ACTOR, not the target, and is `onDelete: set null` so entries outlive the member who wrote them (the viewer renders those as "Removed user"). `entity_id` is **UUID-typed**, so a bulk action cannot put a composite key or a label there; pass the deal id and list affected row ids in `metadata`.
+
+  **`metadata` convention.** Three optional well-known keys, documented at `src/lib/audit.ts`, let an entry render as a sentence without joining back to the row it describes: `dealId` (links the entry to its deal and drives the viewer's per-deal filter), `dealName` (denormalized so the entry stays readable after a rename or delete), and `label` (human name of the target row, without which the viewer can only show a bare UUID). Anything else in `metadata` is action-specific and renders in the expanded detail panel. Free-text `before` / `after` values go through `truncateForAudit()` first, since columns like `checklist_items.notes` have no length cap.
+
+  **Coverage is partial and lands in batches.** Wired today: the six owner-only mutations in `admin/actions.ts` (`member.invited`, `member.removed`, `member.role_changed`, `member.disabled` / `member.re_enabled`, `member.password_reset`) and the three checklist-item actions in `deals/[id]/actions.ts` (`checklist_item.completed` / `.uncompleted`, `.date_set` / `.date_cleared`, `.notes_updated` / `.notes_cleared`). Remaining batches are enumerated in the P1 audit entry in `docs/backlog.md`. Because most updates in the codebase are blind (`db.update(...).where(...)` with no prior read), each batch needs a pre-mutation SELECT to capture `before`; the checklist batch does this in `loadChecklistItemAuditContext()`, which is the shape to copy.
 
 ## Enums
 

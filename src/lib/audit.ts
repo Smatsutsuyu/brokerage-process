@@ -43,3 +43,41 @@ export async function writeAudit(entry: {
     console.warn("[audit] failed to write entry", { action: entry.action, err });
   }
 }
+
+// Metadata convention
+// -------------------
+// `writeAudit` accepts arbitrary jsonb in `metadata`, but the audit viewer
+// (`/admin/audit`) reads three optional well-known keys so an entry renders
+// as a sentence without joining back to the row it describes:
+//
+//   dealId   - the deal the entry belongs to. Renders as a link to the deal
+//              and drives the viewer's per-deal filter. Prefer the value
+//              read back from the database over the client-supplied one.
+//   dealName - denormalized deal name. The audit row must stay readable
+//              after the deal is renamed or deleted, so it is copied in
+//              rather than joined.
+//   label    - human name of the target row ("Offering Date", "Lennar").
+//              Without it the viewer can only show a bare UUID.
+//
+// Anything else in `metadata` is action-specific and renders in the
+// expanded detail panel as-is.
+export type AuditMetadata = {
+  dealId?: string | null;
+  dealName?: string | null;
+  label?: string | null;
+  [key: string]: unknown;
+};
+
+// Free-text columns (checklist_items.notes, issues.description, buyer
+// comments) have no length cap in the schema, so a before/after snapshot
+// can carry an unbounded string into jsonb. Cap it: the audit trail exists
+// to answer "who changed this and roughly to what", not to be a second
+// copy of the content.
+export function truncateForAudit(
+  value: string | null | undefined,
+  max = 500,
+): string | null {
+  if (value === null || value === undefined) return null;
+  if (value.length <= max) return value;
+  return `${value.slice(0, max)}… (${value.length - max} more characters)`;
+}

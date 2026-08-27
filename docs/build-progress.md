@@ -131,7 +131,7 @@ Both from Chris exercising the new Consultant Roster PDF on the Woods deal.
 - **`before` / `after` jsonb snapshots** on the mutations where it's meaningful: role change captures both, disable/re-enable captures the `disabledAt` transition, invite captures the new user's `{ email, name, role }`. Reset deliberately writes nothing beyond the action itself — no plaintext or hashed password ever hits the audit table.
 - **Idempotency guards on `changeMemberRole` and `setMemberDisabled`** short-circuit before the DB write when the new value matches current, so double-click doesn't spam audit rows.
 - **`inviteMember` gained a `.returning()` on the insert** to capture the new user's UUID for `entity_id` (no-arg form, driver-shape workaround).
-- **No UI yet** — reads happen via direct Postgres query for now. `/admin/audit-log` viewer is a separate follow-up.
+- **No UI yet** — reads happen via direct Postgres query for now. `/admin/audit-log` viewer is a separate follow-up. **Superseded 2026-08-27**, see the audit viewer entry below.
 
 ## Owner-triggered password reset + first-login set-password (2026-07-03)
 
@@ -218,6 +218,19 @@ Step 2 of the plan in [backlog.md](backlog.md). The Phase 1 "Determine PSA Attor
 - **The backfill ships WITH the read change, not after it.** A production dry-run through the real transform found two deals whose attorney existed only in the legacy columns; without the backfill in the same deploy they would have silently read "no attorney on the roster yet". That resequenced the plan.
 - **Fixed while here**: `updateConsultant` and `deleteConsultant` scoped by consultant id and org but not deal, unlike every sibling query. Harmless while the only caller passed an id read off the same deal; this change adds a second caller.
 
+## Audit log viewer + checklist coverage (2026-08-27)
+
+Triggered by a concrete failure: a milestone date had moved on a production deal and there was no way to tell whether it was Sean testing or Chris working. Nothing recorded who set a checklist date, and the one audit row production held could not answer it. CLAUDE.md lists "Review audit logs" under what Lakebridge can do without a developer, so this is a handoff promise rather than polish.
+
+- **The viewer shipped first, deliberately.** `audit_log` had zero readers anywhere in `src/`; the helper had existed since 2026-07-15 and the table since migration `0000`. Adding coverage before a reader existed is what produced a table nobody consulted. New owner-gated `/admin/audit` follows the `/admin/members` shape: role check in the page, one org-scoped Drizzle select, rows mapped to a serializable type, handed to a `"use client"` list that filters and sorts in memory. Third sidebar link under Admin.
+- **Reads as a sentence, not a UUID dump.** Columns are When / Who / What / Where; a row expands to a before-and-after table over the union of keys in the two jsonb snapshots, changed values bolded. Filters for action, actor, and deal are derived from the entries present rather than hardcoded, so a future batch's actions appear in the dropdowns with no change to the viewer. Action labels fall back to a prettifier for the same reason.
+- **Default read capped at 500 entries** with a visible notice and an `?all=1` escape hatch. `audit_log` only grows and is never triaged down, unlike members and feedback, so the unpaginated house pattern needed the cap. Silent truncation would read as "covered everything".
+- **First coverage batch: the three checklist-item actions**, chosen because `setChecklistItemDate` is the exact action behind the failure. Actions: `checklist_item.completed` / `.uncompleted`, `.date_set` / `.date_cleared` (with `dateKind` in metadata distinguishing Est. from Actual), `.notes_updated` / `.notes_cleared`.
+- **`loadChecklistItemAuditContext()` is the shape for the remaining batches.** Every checklist update was blind (`db.update(...).where(...)` with no prior read), so a `before` snapshot needs an added SELECT. This one joins through `checklist_categories` to `deals` in the same round-trip, which buys the item name and deal name denormalized into `metadata` (an entry reads without a join, and survives a rename or delete) plus a deal id read from the database rather than from client-supplied input.
+- **No-op writes are skipped.** A re-sent identical value updates the row but writes no audit entry. Same reasoning as the existing idempotency guards in `admin/actions.ts`: a log saying "changed from false to false" is noise in the thing whose job is making real changes findable.
+- **`truncateForAudit()` added** to `src/lib/audit.ts` alongside a documented `metadata` convention (`dealId` / `dealName` / `label`). `checklist_items.notes` has no length cap, so both sides of a note change are capped before reaching jsonb.
+- **Remaining batches** (links, buyers, contacts, Q&A, issues, consultants, deal team, PSA, email sends, plus 26 actions outside `deals/[id]/actions.ts`) are enumerated in the P1 entry in `docs/backlog.md`. Coverage being partial is stated in the viewer's docs, since an absent entry means "not yet wired", not "did not happen".
+
 ## Estimate and actual milestone dates (2026-08-27)
 
 Client ask: "[Estimate / Actual] options on all the date entries on the Checklist." Read as two independent fields rather than a toggle, which is what makes slip visible.
@@ -280,7 +293,7 @@ Closes the design half of feedback item `54a4fec3`. Full narrative + review find
 - **Harden the open `/api/auth/sign-up/email` endpoint** before public production launch. Better Auth's `disableSignUp: true` blocks our own server-side seed/invite calls, so we need a custom server-side guard.
 - **Version-history UI for documents** deferred. Old blobs remain in storage on replace; surfacing them in the UI is a small lift if Chris asks.
 - **Excel/image inline preview** deferred. Browsers render PDFs natively, but `.xlsx`/`.docx` need a third-party viewer (Microsoft Office Online iframe is the likely path).
-- **Audit log entries for member changes** (role / disable). Schema supports it; not yet wired.
+- **Audit log coverage is partial.** Member administration and the three checklist-item actions are wired; the rest of the mutation surface is not. Batches enumerated in the P1 audit entry in `docs/backlog.md`.
 - **The `r2_key` column name** in `documents` stores Vercel Blob URLs despite the historical name. Cosmetic rename deferred.
 - **Per-user `@landadvisors.com` sender addresses** would let the composer's "From:" dropdown offer the signed-in user as a second option. Out of scope for now — single `cshiota@landadvisors.com` covers the immediate need.
 - **Default builder classification on Excel import** still defaults to `private`; Chris to confirm whether `developer` should become the new default or whether more categories (REIT, institutional investor) are needed.

@@ -4,6 +4,42 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-08-27 (latest): audit log viewer, and the first coverage batch
+
+Started from a real failure rather than the backlog: a checklist milestone date had changed on a production deal and there was no way to tell whether it was Sean testing or Chris working for real. That question is the acceptance test for this work, and it is now answerable in the app.
+
+### The viewer came first, on purpose
+
+`audit_log` has existed since migration `0000` and `writeAudit` since 2026-07-15, but grepping `auditLog` outside the schema file returned only the two write sites inside the helper itself. Zero readers. Production held exactly one row, and that row could not answer the question above because nothing had ever been built to consult it.
+
+So the order was viewer, then coverage. Coverage first would have produced more rows in a table nobody could read, which is the state that failed.
+
+`/admin/audit` copies the `/admin/members` shape exactly: owner check in the page, one org-scoped select, rows mapped to a plain serializable type, a `"use client"` list doing filter and sort in memory. Third link in the Admin section of the sidebar.
+
+Two deliberate departures from the house pattern:
+
+- **A 500-entry cap on the default read**, with a notice saying so and an `?all=1` link. Members and feedback are bounded sets that get triaged down. `audit_log` only grows. An unpaginated select is correct today and wrong in a year, and silent truncation on an audit page reads as "this is everything".
+- **Filter options derived from the data, and action labels that fall back to a prettifier.** Coverage lands in batches over the next few sessions. A viewer that needs a hand-edit before each batch's actions render properly would drift out of date immediately.
+
+### First batch: checklist, because that is where the failure was
+
+Three actions, `setChecklistItemDate` among them. Six action strings, since set and clear read differently in a filter list.
+
+The interesting part is `loadChecklistItemAuditContext()`, which is the pattern the remaining batches should copy. Every checklist update was blind: `db.update(...).where(...)` with no prior read, so there is nothing to snapshot as `before` unless a SELECT is added. Adding one anyway buys three things beyond the snapshot. It joins through to `deals`, so the item name and deal name land denormalized in `metadata` and an entry reads as a sentence without a join (and stays readable after a rename or a delete). It yields a deal id read from the database rather than trusting client-supplied `input.dealId`. And it makes no-op detection possible, so re-sending an identical value writes no entry.
+
+### Decisions
+
+- **Six action strings rather than three**, splitting set from clear. `date_set` vs `date_cleared` is worth a filter row; the estimate-vs-actual distinction is not, so that rides in `metadata.dateKind` and the viewer reads it to render "Set Est. date" vs "Set Actual date".
+- **`user?.id ?? null` rather than a thrown assertion** in the two actions that did not previously bind an actor. `getCurrentOrg` short-circuits on a null user, so a non-null org already implies a signed-in user and the null branch is unreachable. Adding a new throw path to a working mutation to satisfy an audit line would be the wrong trade: `writeAudit` exists precisely so auditing can never break the thing it observes.
+- **Skip the audit write on no-ops.** Matches the existing idempotency guards in `admin/actions.ts`. The mutation still runs; only the log entry is suppressed.
+- **`truncateForAudit()` at 500 characters.** `checklist_items.notes` has no length cap and the audit table should not become a second copy of the content.
+
+### Deferred
+
+The remaining batches, roughly 68 more call sites: checklist links, buyers, buyer contacts, Q&A, issues, consultants, deal team, PSA, the two email sends, plus 26 actions outside `deals/[id]/actions.ts`. Held deliberately so Sean can review the shape of one batch against the working viewer before the sweep. `sendBlastEmails` is the highest-value one left, since it sends client-facing mail and writes no DB row at all.
+
+---
+
 ## 2026-08-27 (later) — Dates re-homed onto Est., and the PSA columns dropped
 
 Two clean-up migrations, both driven by Sean.

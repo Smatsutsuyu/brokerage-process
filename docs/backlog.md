@@ -87,17 +87,19 @@ When you close one, mark `~~done~~` rather than deleting so the running record s
 
 - **The concrete failure that triggered this (2026-08-27)**: a checklist milestone date on a production deal had been changed, and there was no way to tell whether Sean had done it while testing or the client had done it for real. Nothing anywhere records who set a checklist date. That question should be answerable in the app.
 
-- **Current state, verified**: the `audit_log` table has existed since migration `0000` and the `writeAudit` helper exists at `src/lib/audit.ts`, but it is called from exactly **five** places, all in `src/app/(app)/admin/actions.ts` (invite, role change, disable, remove, password reset). Production holds **one** row. Partial per-row attribution exists instead and covers only completion and authorship: `checklist_items.completed_by`, `qa_items.approved_by`, `documents.uploaded_by`, `feedback_items.last_updated_by`, `feedback_attachments.uploaded_by`.
+- **Status**: viewer shipped 2026-08-27, along with the first coverage batch (checklist). The rest of the sweep is still open, and the batch table below tracks it.
 
-#### Do the read surface first
+- **Current state, as originally verified**: the `audit_log` table has existed since migration `0000` and the `writeAudit` helper exists at `src/lib/audit.ts`, but it was called from exactly **five** places, all in `src/app/(app)/admin/actions.ts` (invite, role change, disable, remove, password reset). Production held **one** row. Partial per-row attribution exists instead and covers only completion and authorship: `checklist_items.completed_by`, `qa_items.approved_by`, `documents.uploaded_by`, `feedback_items.last_updated_by`, `feedback_attachments.uploaded_by`.
 
-`audit_log` has **zero readers anywhere in `src/`**. Grepping `auditLog` outside the schema file returns only the two write sites in `src/lib/audit.ts`. Adding coverage before there is anything to read it with produces a table nobody can consult, which is precisely why the one existing production row did not answer the question above. Build the viewer first, or at minimum in the same PR as the first batch.
+#### ~~Do the read surface first~~ (done 2026-08-27)
 
-House pattern to copy: a server component that gates on role, runs one unpaginated Drizzle select scoped by org, maps rows to a plain serializable type, and hands them to a `"use client"` list that filters and sorts in memory.
-- Page skeleton: `src/app/(app)/admin/members/page.tsx` (64 lines).
-- Two-aliased-user-join query: `src/app/(app)/admin/feedback/page.tsx`.
-- Owner gating is enforced in the page **and** again in the action; follow both.
-- New route: `src/app/(app)/admin/audit/page.tsx`, plus a third sidebar link under Admin.
+Shipped as `/admin/audit`: owner-gated server page + `audit-list.tsx` client list, third sidebar link under Admin. Follows the `/admin/members` shape. Columns When / Who / What / Where, expandable before-and-after diff, filters for action / actor / deal plus free-text search across the jsonb snapshots.
+
+Two things a later batch needs to know about it:
+- **Filter options and action labels are derived from the entries present**, with a prettifier fallback (`"issue.status_changed"` renders as "Issue status changed"). A new batch's actions therefore appear in the dropdowns with no viewer change. Add a nicer string to `ACTION_LABEL` in `audit-list.tsx` when convenient, but nothing breaks if you forget.
+- **The default read is capped at 500 rows** (`?all=1` lifts it), because `audit_log` only grows. The house pattern's unpaginated select was not safe here.
+
+Original note, kept for the record: `audit_log` had **zero readers anywhere in `src/`**; grepping `auditLog` outside the schema file returned only the two write sites in `src/lib/audit.ts`. Adding coverage before there was anything to read it with produces a table nobody can consult, which is precisely why the one existing production row did not answer the question above.
 
 #### The helper contract
 
@@ -123,11 +125,11 @@ export async function writeAudit(entry: {
 
 #### Scope
 
-**45 mutation points in `src/app/(app)/deals/[id]/actions.ts`**, none audited. Suggested batches, checklist first because it contains the trigger:
+**45 mutation points in `src/app/(app)/deals/[id]/actions.ts`.** Suggested batches, checklist first because it contains the trigger:
 
 | Batch | Count | Notable |
 |---|---|---|
-| checklist | 3 | `setChecklistItemDate:174` is **the trigger action** |
+| ~~checklist~~ | ~~3~~ | **done 2026-08-27.** `setChecklistItemDate` was the trigger action. Copy `loadChecklistItemAuditContext()` for the rest |
 | checklist links | 3 | all three need a `before` snapshot |
 | buyers | 11 | mostly single-flag toggles, cheap |
 | buyers/contacts | 6 | includes `bulkAddContactsToDeal` |
@@ -142,22 +144,30 @@ export async function writeAudit(entry: {
 
 #### Gotchas a fresh session will hit
 
-1. **Only 3 of 43 deal actions currently bind the actor** (`toggleChecklistItem:52`, `setQaApproved:706`, `approveAllQaItems:862`). The other 40 must add `const user = await getCurrentUser();`. This is free at runtime: both `getCurrentUser` and `getCurrentOrg` are wrapped in React `cache()`, so the second call in a request is memoized rather than a second round-trip.
+1. **Most deal actions do not bind the actor.** As of the checklist batch, the ones that do are `toggleChecklistItem`, `setChecklistItemDate`, `setChecklistItemNotes`, `setQaApproved` and `approveAllQaItems`. The rest must add `const user = await getCurrentUser();`. This is free at runtime: both `getCurrentUser` and `getCurrentOrg` are wrapped in React `cache()`, so the second call in a request is memoized rather than a second round-trip.
 2. **`deals/actions.ts`, `contacts/actions.ts` and `builders/actions.ts` never call `getCurrentUser()` at all**, only `getCurrentOrg()`. Each needs the import added, not just a `writeAudit` line. `document-actions.ts` has the same gap in `deleteDocument`.
 3. **`profile/actions.ts` and `set-password/actions.ts` have no org context** but do not need one: `CurrentUser` already carries `orgId`.
-4. **Nearly every update is blind** (`db.update(X).set(...).where(...)` with no prior read), so a `before` snapshot needs an added SELECT. Without it the log records that something changed but not what it changed from, which is half the point. For `setChecklistItemDate` pull `name` in the same SELECT so entries read without a join.
+4. **Nearly every update is blind** (`db.update(X).set(...).where(...)` with no prior read), so a `before` snapshot needs an added SELECT. Without it the log records that something changed but not what it changed from, which is half the point. Settled by the checklist batch: see `loadChecklistItemAuditContext()` in `deals/[id]/actions.ts`, which joins through to `deals` in the same round-trip so `metadata` gets `dealId` / `dealName` / `label` and the entry reads without a join.
 5. **All 7 deletes must snapshot first**, or use `.returning()` on the delete. Afterwards the audit row is the only surviving record.
 6. **No non-request callers.** `src/scripts/` and the seeds import none of these actions, and every action already awaits `getCurrentOrg()` (which reads `headers()`), so they already fail outside a request. Adding `writeAudit` introduces no new failure mode.
 7. **Deliberately skip** per-user UI preferences such as deal reordering (`src/components/layout/reorder-actions.ts`). That is noise, not an audit trail.
-8. **Free-text fields have no length cap** (`checklist_items.notes`). Truncate before/after in the jsonb.
+8. **Free-text fields have no length cap** (`checklist_items.notes`). Truncate before/after in the jsonb. Use `truncateForAudit()` from `src/lib/audit.ts` (added with the checklist batch, caps at 500 characters).
 
-#### Also update in the same commit (documentation-discipline rule)
+#### Conventions set by the first batch, follow them
 
-- `docs/features.md:241` says "Owners get two extra sidebar links under Admin", which becomes three.
-- `docs/operations.md` "Common admin tasks" (line 33) has no **Review the audit log** entry despite `CLAUDE.md:290` promising it.
-- `docs/schema.md:68` and `docs/build-progress.md:134` currently record the viewer as deferred.
+- **Action strings split set from clear** (`checklist_item.date_set` / `.date_cleared`) because that distinction is worth a row in the viewer's Action filter. Sub-variants that are not worth a filter row ride in `metadata` instead: the Est.-vs-Actual distinction is `metadata.dateKind`, which the viewer reads to render "Set Est. date" vs "Set Actual date".
+- **`metadata` carries `dealId` / `dealName` / `label`** wherever they apply. Documented at the bottom of `src/lib/audit.ts`. The viewer renders these three in dedicated columns and dumps everything else in the expanded panel.
+- **Prefer the deal id read back from the database** over client-supplied `input.dealId` when the snapshot SELECT already yields it.
+- **Skip the `writeAudit` call when nothing actually changed.** The mutation still runs; only the entry is suppressed. Matches the existing idempotency guards in `admin/actions.ts`.
+- **Use `user?.id ?? null`, do not add a new throw.** In actions that never bound an actor, `getCurrentOrg` short-circuiting on a null user already guarantees a user, so the null branch is unreachable. Adding an assertion that can fail a working mutation for the sake of an audit line inverts the point of a helper that deliberately never throws. (`toggleChecklistItem` keeps its pre-existing assertion, which is there for `completedBy`, not for audit.)
 
-- **Effort**: L. Viewer is M on its own; the sweep is a day-plus across ~71 call sites, and is best landed in batches rather than one commit.
+#### ~~Also update in the same commit (documentation-discipline rule)~~ (done 2026-08-27)
+
+`docs/features.md` (three sidebar links + an Audit log section), `docs/operations.md` (**Review the audit log** under Common admin tasks, including the partial-coverage and 500-row caveats and the absence of a retention job), `docs/schema.md` (the `audit_log` bullet now documents the `metadata` convention and the coverage list), `docs/build-progress.md` (new entry; the stale "not yet wired" follow-up bullet corrected).
+
+**Each later batch must extend the coverage lists** in `docs/schema.md`, `docs/operations.md`, and `docs/features.md`. They currently enumerate exactly what is audited, and an operator drawing conclusions from an absent entry is the failure mode those lists exist to prevent.
+
+- **Effort**: L overall. Viewer + first batch done. The remaining ~68 call sites are a day-plus, best landed in batches rather than one commit.
 
 ### [Ops] Run a Neon PITR restore drill
 - **What**: CLAUDE.md Phase 3 deliverable. Backups are presumed-working but never verified.
