@@ -51,12 +51,24 @@ export const checklistItems = pgTable("checklist_items", {
   // (which is the canonical item description from the seed) so the user's
   // notes are clearly authored content vs. boilerplate.
   notes: text("notes"),
-  // Optional milestone date attached to the item. Only surfaced in the
-  // UI when the template flags the item with `dateField: true` (Phase 4
-  // CTC / IC / Feasibility / Closing milestones, etc.). Date-only, no
-  // time-of-day: these track when a thing happened or is scheduled, not
-  // a precise moment.
+  // Milestone dates attached to the item. Only surfaced in the UI when
+  // the template flags the item with `dateField: true` (Offering Date,
+  // Schedule SOO Review, Send out B&F, and the seven Phase 4 CTC / IC /
+  // Feasibility / Closing milestones). Date-only, no time-of-day: these
+  // track when a thing happened or is scheduled, not a precise moment.
+  //
+  // Two independent dates, not one date plus a toggle. Chris asked for
+  // "[Estimate / Actual] options" and the useful reading is that a
+  // milestone carries both: the date it was projected for, and the date
+  // it actually landed. Holding both is what makes slip visible, and a
+  // toggle would have forced a choice between them.
+  //
+  // `trackedDate` is the ACTUAL date and keeps its column name because
+  // every existing row already holds a real date Chris entered as things
+  // happened. Renaming it would have meant a rename-vs-drop migration
+  // for no gain.
   trackedDate: date("tracked_date"),
+  estimatedDate: date("estimated_date"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

@@ -68,7 +68,9 @@ export type RecentlyCompletedRow = {
 
 export type UpcomingMilestoneRow = {
   label: string;
+  // Actual date, then the projected one. Both render when both exist.
   date: string | null;
+  estimate: string | null;
   // True when the tracked date is on/before today but the item is not
   // marked complete. Renders in red with an "Overdue" tag so the status
   // report exposes slipping milestones rather than dropping them.
@@ -315,6 +317,17 @@ const styles = StyleSheet.create({
     fontFamily: "Metropolis",
     fontWeight: "bold",
   },
+  // Right-hand column holding up to two lines: the headline date, and
+  // the projected one beneath it in a lighter treatment.
+  milestoneDateCol: {
+    width: 120,
+    alignItems: "flex-end",
+  },
+  milestoneEstimate: {
+    fontSize: 8,
+    color: COLORS.textMuted,
+    marginTop: 1,
+  },
   milestoneOverdueTag: {
     fontSize: 7,
     paddingVertical: 2,
@@ -560,17 +573,24 @@ export function DealStatusDoc({
                   )}
                   <Text style={styles.milestoneLabel}>{m.label}</Text>
                 </View>
-                <Text
-                  style={
-                    m.overdue
-                      ? styles.milestoneDateOverdue
-                      : m.date
-                        ? styles.milestoneDate
-                        : styles.milestoneDateMissing
-                  }
-                >
-                  {m.date ?? "not scheduled"}
-                </Text>
+                <View style={styles.milestoneDateCol}>
+                  {m.date || m.estimate ? (
+                    <>
+                      <Text
+                        style={
+                          m.overdue ? styles.milestoneDateOverdue : styles.milestoneDate
+                        }
+                      >
+                        {m.date ?? `Est. ${m.estimate}`}
+                      </Text>
+                      {m.date && m.estimate && m.estimate !== m.date && (
+                        <Text style={styles.milestoneEstimate}>Est. {m.estimate}</Text>
+                      )}
+                    </>
+                  ) : (
+                    <Text style={styles.milestoneDateMissing}>not scheduled</Text>
+                  )}
+                </View>
               </View>
               )),
             },

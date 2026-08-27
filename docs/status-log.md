@@ -4,6 +4,40 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-08-27 — Estimate and actual dates on every checklist milestone
+
+Feedback `14efaf13` from Chris: "Can you add [Estimate / Actual] options to all the date entries on the Checklist."
+
+### The read that changed the design
+
+Taken literally this is a toggle: one date, flagged as either projected or real. Sean's call was the opposite and better one. Chris has been using the field as things happen, so **every existing date is an actual**; the missing capability is the projection. So it ships as two independent fields rather than one field with a label, and a milestone can hold both. The gap between them is the slip, which a toggle would have thrown away by forcing a choice.
+
+That also made the migration trivial: `tracked_date` keeps its name and its meaning shifts to "actual", `estimated_date` is added empty, nothing to backfill.
+
+### Scope was wider than it read
+
+"All the date entries" is **ten** items, not the seven Phase 4 milestones people think of: Offering Date (Phase 2), Schedule Summary of Offer Review and Send out B&F (Phase 3), plus the seven Phase 4 dates.
+
+### Done
+
+- Migration `0035`, additive only.
+- Two chips per row. Est. is amber and opens the picker (a projection is rarely today); Actual is blue and stamps today in one click, matching how Chris works.
+- Both client-facing PDFs render both dates, actual over projection. Estimate-only becomes the headline, labelled, so no row reads as an unqualified commitment. A matching estimate is suppressed.
+- Deal Status Overdue falls back to the estimate, otherwise a projection-only milestone never flags.
+- Email date resolvers prefer actual and fall back to estimate. Identical behaviour today; every existing row has an actual.
+
+### Bug found while in there
+
+DD Tracking's milestone row relied on the flex default `stretch`. With the date column now able to run two lines, the label centred itself while the dates started at the top and the two stopped sharing a baseline. Deal Status already set `alignItems: center`. DD Tracking did not.
+
+Worth recording how it was found, because the first evidence was wrong: `pdftotext -layout` showed the date column offset by a row, which looked like proof. Rendering a control with no estimates at all reproduced the same offset, so that was an extraction artifact of a right-aligned column, not a layout fault. The real defect was visible in the style rules rather than the dump, and the fix stands on that reasoning.
+
+### Verification gap
+
+No rasterizer on this machine (`pdftoppm` absent, no ImageMagick or Ghostscript), so the PDFs were verified by extracting the text layer and confirming all seven date combinations render with correct values, not by looking at them. Both smoke renders were sent to Sean to eyeball. `tsc`, lint, `check:template-vars`, `verify:psa-resolution` and `next build` all pass.
+
+---
+
 ## 2026-08-18 — Schedule Recurring Call sends an availability email
 
 Feedback `f0796293` came in from Loan as "on the Teams tab, can there be a function to email everyone listed?". Sean checked with Chris and the actual ask was different: the Phase 4 **Schedule Recurring Call** row's "Schedule meetings" button should email the Deal Team asking for dates.

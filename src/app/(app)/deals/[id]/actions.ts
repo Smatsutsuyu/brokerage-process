@@ -164,10 +164,19 @@ export async function deleteChecklistItemLink(input: {
 // Pass null to clear. The UI defaults the picker to today's local-time
 // date on first set, since users typically record these on the day the
 // milestone happens.
+// Which of a milestone's two dates is being written. "actual" maps to
+// the long-standing tracked_date column; "estimate" to the newer
+// estimated_date. Two independent values, not a toggle: a milestone can
+// carry a projection and an outcome at once, and the gap between them is
+// the point.
+export type ChecklistDateKind = "actual" | "estimate";
+
 export async function setChecklistItemDate(input: {
   itemId: string;
   dealId: string;
   date: string | null;
+  // Defaults to "actual" so existing callers keep their behaviour.
+  kind?: ChecklistDateKind;
 }) {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
@@ -179,9 +188,14 @@ export async function setChecklistItemDate(input: {
     throw new Error("Invalid date format; expected YYYY-MM-DD");
   }
 
+  const patch =
+    input.kind === "estimate"
+      ? { estimatedDate: input.date }
+      : { trackedDate: input.date };
+
   await db
     .update(checklistItems)
-    .set({ trackedDate: input.date })
+    .set(patch)
     .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)));
 
   revalidatePath(`/deals/${input.dealId}`);
@@ -1522,7 +1536,11 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
   // when the row isn't set — interpolate leaves {{dueDate}} in place
   // so the user notices.
   const offeringDateItems = await db
-    .select({ name: checklistItems.name, trackedDate: checklistItems.trackedDate })
+    .select({
+      name: checklistItems.name,
+      trackedDate: checklistItems.trackedDate,
+      estimatedDate: checklistItems.estimatedDate,
+    })
     .from(checklistItems)
     .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
     .where(
@@ -1534,14 +1552,18 @@ export async function getOmBlastTemplateContext(input: { dealId: string }): Prom
   const offeringDateRow = offeringDateItems.find((r) =>
     r.name.toLowerCase().includes("offering date"),
   );
-  const dueDate = formatOfferingDate(offeringDateRow?.trackedDate ?? null);
+  const dueDate = formatOfferingDate(
+    offeringDateRow?.trackedDate ?? offeringDateRow?.estimatedDate ?? null,
+  );
   // Same query already loaded every checklist item for this deal, so
   // the B&F due date is found inline without another round-trip.
   const bnfRow = offeringDateItems.find((r) => {
     const n = r.name.toLowerCase();
     return n.includes("send out b&f") || n.includes("send out b & f");
   });
-  const bnfDueDate = formatOfferingDate(bnfRow?.trackedDate ?? null);
+  const bnfDueDate = formatOfferingDate(
+    bnfRow?.trackedDate ?? bnfRow?.estimatedDate ?? null,
+  );
 
   const senderOptions: EmailSenderOption[] = [ACTIVE_BLAST_SENDER];
   const defaultSenderId = ACTIVE_BLAST_SENDER.id;
@@ -1587,7 +1609,11 @@ export async function getOfferingDate(input: {
   // caller's catch, which surfaces a transient-failure toast instead.
   if (!org) throw new Error("No organization context");
   const rows = await db
-    .select({ name: checklistItems.name, trackedDate: checklistItems.trackedDate })
+    .select({
+      name: checklistItems.name,
+      trackedDate: checklistItems.trackedDate,
+      estimatedDate: checklistItems.estimatedDate,
+    })
     .from(checklistItems)
     .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
     .where(
@@ -1597,7 +1623,11 @@ export async function getOfferingDate(input: {
       ),
     );
   const row = rows.find((r) => r.name.toLowerCase().includes("offering date"));
-  return row?.trackedDate ?? null;
+  // Prefer the actual date, fall back to the projection. Before the
+  // estimate field existed every one of these rows held a real date in
+  // tracked_date, so this preserves current behaviour exactly while
+  // letting an email pick up a scheduled date that has not happened yet.
+  return row?.trackedDate ?? row?.estimatedDate ?? null;
 }
 
 // Sister of getOfferingDate for the B&F due date. Reads the trackedDate
@@ -1611,7 +1641,11 @@ export async function getBnfDueDate(input: {
   // check" — the two need different user-facing copy.
   if (!org) throw new Error("No organization context");
   const rows = await db
-    .select({ name: checklistItems.name, trackedDate: checklistItems.trackedDate })
+    .select({
+      name: checklistItems.name,
+      trackedDate: checklistItems.trackedDate,
+      estimatedDate: checklistItems.estimatedDate,
+    })
     .from(checklistItems)
     .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
     .where(
@@ -1624,7 +1658,11 @@ export async function getBnfDueDate(input: {
     const n = r.name.toLowerCase();
     return n.includes("send out b&f") || n.includes("send out b & f");
   });
-  return row?.trackedDate ?? null;
+  // Prefer the actual date, fall back to the projection. Before the
+  // estimate field existed every one of these rows held a real date in
+  // tracked_date, so this preserves current behaviour exactly while
+  // letting an email pick up a scheduled date that has not happened yet.
+  return row?.trackedDate ?? row?.estimatedDate ?? null;
 }
 
 // Meeting date for the Phase 3 "Schedule Summary of Offer Review" row.
@@ -1650,6 +1688,7 @@ export async function getSooReviewDate(input: {
       id: checklistItems.id,
       name: checklistItems.name,
       trackedDate: checklistItems.trackedDate,
+      estimatedDate: checklistItems.estimatedDate,
     })
     .from(checklistItems)
     .innerJoin(checklistCategories, eq(checklistItems.categoryId, checklistCategories.id))
@@ -1664,7 +1703,11 @@ export async function getSooReviewDate(input: {
   const row =
     exact ??
     rows.find((r) => r.name.toLowerCase().includes("schedule summary of offer review"));
-  return row?.trackedDate ?? null;
+  // Prefer the actual date, fall back to the projection. Before the
+  // estimate field existed every one of these rows held a real date in
+  // tracked_date, so this preserves current behaviour exactly while
+  // letting an email pick up a scheduled date that has not happened yet.
+  return row?.trackedDate ?? row?.estimatedDate ?? null;
 }
 
 // DD folder URL for the Phase 4 Share-DD-Material sends. Feeds

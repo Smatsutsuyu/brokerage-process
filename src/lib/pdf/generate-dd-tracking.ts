@@ -115,6 +115,7 @@ export async function generateDdTrackingPdf(input: {
     .select({
       name: checklistItems.name,
       trackedDate: checklistItems.trackedDate,
+      estimatedDate: checklistItems.estimatedDate,
       completed: checklistItems.completed,
     })
     .from(checklistItems)
@@ -130,9 +131,16 @@ export async function generateDdTrackingPdf(input: {
       ),
     );
 
-  const byName = new Map<string, { trackedDate: unknown; completed: boolean }>();
+  const byName = new Map<
+    string,
+    { trackedDate: unknown; estimatedDate: unknown; completed: boolean }
+  >();
   for (const r of milestoneRows) {
-    byName.set(r.name, { trackedDate: r.trackedDate, completed: r.completed });
+    byName.set(r.name, {
+      trackedDate: r.trackedDate,
+      estimatedDate: r.estimatedDate,
+      completed: r.completed,
+    });
   }
   const now = new Date();
   const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -147,6 +155,7 @@ export async function generateDdTrackingPdf(input: {
     return {
       label,
       date: r ? formatTrackedDate(r.trackedDate) : null,
+      estimate: r ? formatTrackedDate(r.estimatedDate) : null,
       completed: Boolean(r?.completed),
       hasHappened,
     };

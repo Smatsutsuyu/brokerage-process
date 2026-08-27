@@ -213,6 +213,7 @@ type Item = {
   completed: boolean;
   notes: string | null;
   trackedDate: string | null;
+  estimatedDate: string | null;
   completedAt: string | null;
   completedByName: string | null;
 };
@@ -432,6 +433,7 @@ export function PhaseSection({
                                 itemId={item.id}
                                 dealId={dealId}
                                 value={item.trackedDate}
+                                estimate={item.estimatedDate}
                               />
                             )}
                             {/* Cross-tab nav for items whose data lives

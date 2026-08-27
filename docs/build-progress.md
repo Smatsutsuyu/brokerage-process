@@ -218,6 +218,17 @@ Step 2 of the plan in [backlog.md](backlog.md). The Phase 1 "Determine PSA Attor
 - **The backfill ships WITH the read change, not after it.** A production dry-run through the real transform found two deals whose attorney existed only in the legacy columns; without the backfill in the same deploy they would have silently read "no attorney on the roster yet". That resequenced the plan.
 - **Fixed while here**: `updateConsultant` and `deleteConsultant` scoped by consultant id and org but not deal, unlike every sibling query. Harmless while the only caller passed an id read off the same deal; this change adds a second caller.
 
+## Estimate and actual milestone dates (2026-08-27)
+
+Client ask: "[Estimate / Actual] options on all the date entries on the Checklist." Read as two independent fields rather than a toggle, which is what makes slip visible.
+
+- **Migration `0035` adds `checklist_items.estimated_date`**, purely additive. `tracked_date` keeps its name and becomes the ACTUAL date; every existing row already held a real date Chris entered as things happened, so there is nothing to backfill and no rename-vs-drop migration.
+- **Two chips per milestone row** across all ten date-bearing items, not just the seven Phase 4 ones. Est. opens the picker; Actual one-click stamps today.
+- **Both PDFs show both dates.** Actual on top, projection beneath in a lighter treatment. Estimate-only renders as `Est. <date>` as the headline so a row never reads as an unqualified commitment; a matching estimate is suppressed rather than printed twice.
+- **Deal Status "Overdue" now falls back to the estimate** when no actual exists. Without it a milestone carrying only a projection could pass its own date without ever flagging.
+- **Email date resolvers prefer actual, fall back to estimate**, so `{{offersDueDate}}`, `{{reviewDate}}` and `{{bnfDueDate}}` behave identically today and gracefully pick up a scheduled date that has not happened yet.
+- **Bug fixed on the way past**: DD Tracking's milestone row used the flex default `stretch`, so with a two-line date column the label centred while the dates started at the top. Deal Status already set `alignItems: center`; DD Tracking did not.
+
 ## Kick off PSA send (2026-08-03)
 
 Step 1 of retiring the deal-level PSA attorney fields onto the consultant roster. No schema change. Full plan and the production census in [backlog.md](backlog.md); user-facing behavior in [features.md](features.md).

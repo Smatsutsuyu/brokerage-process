@@ -19,14 +19,18 @@ async function main() {
       dealName: "Riverside Estates Phase 2",
       dateLabel: "May 13, 2026",
       purchasePrice: 24500000,
+      // Deliberate coverage of every date combination the row can hit:
+      // actual + differing estimate (slip visible), actual + matching
+      // estimate (estimate suppressed), actual only, estimate only
+      // (estimate becomes the headline, labelled), and neither.
       milestones: [
-        { label: "LOI Signed Date", date: "May 1, 2026", completed: true, hasHappened: true },
-        { label: "PSA Effective Date", date: "May 12, 2026", completed: true, hasHappened: true },
-        { label: "Receive 1st Draft Cost to Complete", date: "Jun 1, 2026", completed: false, hasHappened: false },
-        { label: "Finalize Cost to Complete / Final Purchase Price", date: null, completed: false, hasHappened: false },
-        { label: "Investment Committee Approval", date: null, completed: false, hasHappened: false },
-        { label: "Waive Feasibility", date: null, completed: false, hasHappened: false },
-        { label: "Closing Date", date: "Aug 30, 2026", completed: false, hasHappened: false },
+        { label: "LOI Signed Date", date: "May 1, 2026", estimate: "Apr 24, 2026", completed: true, hasHappened: true },
+        { label: "PSA Effective Date", date: "May 12, 2026", estimate: "May 12, 2026", completed: true, hasHappened: true },
+        { label: "Receive 1st Draft Cost to Complete", date: "Jun 1, 2026", estimate: null, completed: false, hasHappened: false },
+        { label: "Finalize Cost to Complete / Final Purchase Price", date: null, estimate: "Jul 15, 2026", completed: false, hasHappened: false },
+        { label: "Investment Committee Approval", date: null, estimate: null, completed: false, hasHappened: false },
+        { label: "Waive Feasibility", date: null, estimate: "Aug 3, 2026", completed: false, hasHappened: false },
+        { label: "Closing Date", date: "Aug 30, 2026", estimate: "Sep 14, 2026", completed: false, hasHappened: false },
       ],
       issues: [
         {
@@ -217,13 +221,13 @@ async function main() {
       dateLabel: "July 31, 2026",
       purchasePrice: 24500000,
       milestones: [
-        { label: "LOI Signed Date", date: "May 1, 2026", completed: true, hasHappened: true },
-        { label: "PSA Effective Date", date: "May 12, 2026", completed: true, hasHappened: true },
-        { label: "Receive 1st Draft Cost to Complete", date: "Jun 1, 2026", completed: false, hasHappened: false },
-        { label: "Finalize Cost to Complete / Final Purchase Price", date: null, completed: false, hasHappened: false },
-        { label: "Investment Committee Approval", date: null, completed: false, hasHappened: false },
-        { label: "Waive Feasibility", date: null, completed: false, hasHappened: false },
-        { label: "Closing Date", date: "Aug 30, 2026", completed: false, hasHappened: false },
+        { label: "LOI Signed Date", date: "May 1, 2026", estimate: "Apr 24, 2026", completed: true, hasHappened: true },
+        { label: "PSA Effective Date", date: "May 12, 2026", estimate: null, completed: true, hasHappened: true },
+        { label: "Receive 1st Draft Cost to Complete", date: "Jun 1, 2026", estimate: "Jun 10, 2026", completed: false, hasHappened: false },
+        { label: "Finalize Cost to Complete / Final Purchase Price", date: null, estimate: "Jul 15, 2026", completed: false, hasHappened: false },
+        { label: "Investment Committee Approval", date: null, estimate: null, completed: false, hasHappened: false },
+        { label: "Waive Feasibility", date: null, estimate: "Aug 3, 2026", completed: false, hasHappened: false },
+        { label: "Closing Date", date: "Aug 30, 2026", estimate: "Sep 14, 2026", completed: false, hasHappened: false },
       ],
       issues: Array.from({ length: 14 }, (_, i) => ({
         title: `Issue ${i + 1} needing resolution before the next call`,
@@ -287,11 +291,11 @@ async function main() {
         completedByName: i % 3 === 0 ? null : "Chris Shiota",
       })),
       upcomingMilestones: [
-        { label: "Receive 1st Draft Cost to Complete", date: "Jun 1, 2026", overdue: true },
-        { label: "Finalize Cost to Complete / Final Purchase Price", date: null, overdue: false },
-        { label: "Investment Committee Approval", date: "Aug 12, 2026", overdue: false },
-        { label: "Waive Feasibility", date: null, overdue: false },
-        { label: "Closing Date", date: "Aug 30, 2026", overdue: false },
+        { label: "Receive 1st Draft Cost to Complete", date: "Jun 1, 2026", estimate: "May 20, 2026", overdue: true },
+        { label: "Finalize Cost to Complete / Final Purchase Price", date: null, estimate: "Jul 15, 2026", overdue: false },
+        { label: "Investment Committee Approval", date: "Aug 12, 2026", estimate: "Aug 12, 2026", overdue: false },
+        { label: "Waive Feasibility", date: null, estimate: null, overdue: false },
+        { label: "Closing Date", date: "Aug 30, 2026", estimate: "Sep 14, 2026", overdue: false },
       ],
       openIssues: Array.from({ length: 12 }, (_, i) => ({
         title: `Open issue ${i + 1} that still needs an owner and a resolution date`,

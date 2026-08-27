@@ -209,6 +209,7 @@ export async function generateDealStatusPdf(input: {
     .select({
       name: checklistItems.name,
       trackedDate: checklistItems.trackedDate,
+      estimatedDate: checklistItems.estimatedDate,
       completed: checklistItems.completed,
     })
     .from(checklistItems)
@@ -227,10 +228,14 @@ export async function generateDealStatusPdf(input: {
   const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const byMilestoneName = new Map<
     string,
-    { trackedDate: unknown; completed: boolean }
+    { trackedDate: unknown; estimatedDate: unknown; completed: boolean }
   >();
   for (const r of milestoneRows) {
-    byMilestoneName.set(r.name, { trackedDate: r.trackedDate, completed: r.completed });
+    byMilestoneName.set(r.name, {
+      trackedDate: r.trackedDate,
+      estimatedDate: r.estimatedDate,
+      completed: r.completed,
+    });
   }
   // Keep every non-completed milestone: no date (unscheduled), future date
   // (upcoming), OR past date with no completion check (overdue — flagged
@@ -245,11 +250,18 @@ export async function generateDealStatusPdf(input: {
     },
   ).map((label) => {
     const row = byMilestoneName.get(label);
-    const iso = row ? trackedDateIso(row.trackedDate) : null;
+    // Overdue is judged against whichever date the row is actually
+    // standing on: the actual once it exists, otherwise the projection.
+    // Without the fallback a milestone with only an estimate could sail
+    // past its own projected date without ever flagging.
+    const actualIso = row ? trackedDateIso(row.trackedDate) : null;
+    const estimateIso = row ? trackedDateIso(row.estimatedDate) : null;
+    const iso = actualIso ?? estimateIso;
     const overdue = iso != null && iso <= todayIso;
     return {
       label,
       date: row ? formatTrackedDate(row.trackedDate) : null,
+      estimate: row ? formatTrackedDate(row.estimatedDate) : null,
       overdue,
     };
   });

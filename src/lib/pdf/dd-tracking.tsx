@@ -61,7 +61,11 @@ export type IssueRow = {
 
 export type MilestoneRow = {
   label: string;
+  // The date it actually landed. Null until the milestone happens.
   date: string | null;
+  // The date it was projected for. Shown alongside the actual so slip is
+  // visible rather than silently overwritten.
+  estimate: string | null;
   completed: boolean;
   // True when this milestone has happened — either the user checked the
   // item complete, or the tracked date is on/before today. Prefixes a
@@ -199,6 +203,12 @@ const styles = StyleSheet.create({
   // Milestone rows: 2-column grid (label / date).
   milestoneRow: {
     flexDirection: "row",
+    // Centered, not the default stretch. The date column can now be two
+    // lines (actual plus estimate) while the label stays one, and under
+    // stretch the label centred itself while the dates started at the
+    // top, so the two stopped sharing a baseline. Deal Status already
+    // did this; DD Tracking did not.
+    alignItems: "center",
     paddingVertical: 5,
     paddingHorizontal: ROW_INSET,
     borderBottomWidth: 0.5,
@@ -239,6 +249,18 @@ const styles = StyleSheet.create({
     textAlign: "right",
     fontSize: 10,
     color: COLORS.textSecondary,
+  },
+  // Right-hand date column holding up to two lines: the actual date, and
+  // the projected one beneath it in a lighter treatment.
+  milestoneDateCol: {
+    width: 120,
+    alignItems: "flex-end",
+  },
+  milestoneEstimate: {
+    fontSize: 8,
+    fontFamily: "Metropolis",
+    color: COLORS.textSecondary,
+    marginTop: 1,
   },
   // Subsection band, shared by the issue status groups, the deal-team
   // subteams, and the consultant roles. Previously these were bold text
@@ -408,9 +430,23 @@ function MilestoneRowView({ m, isLast }: { m: MilestoneRow; isLast: boolean }) {
           {m.label}
         </Text>
       </View>
-      <Text style={m.date ? styles.milestoneDate : styles.milestoneDateMissing}>
-        {m.date ?? "not scheduled"}
-      </Text>
+      {/* Actual on top, projected beneath. When only a projection
+          exists the estimate stands in as the headline date, labelled,
+          so a row never reads as an unqualified commitment. */}
+      <View style={styles.milestoneDateCol}>
+        {m.date ? (
+          <>
+            <Text style={styles.milestoneDate}>{m.date}</Text>
+            {m.estimate && m.estimate !== m.date && (
+              <Text style={styles.milestoneEstimate}>Est. {m.estimate}</Text>
+            )}
+          </>
+        ) : m.estimate ? (
+          <Text style={styles.milestoneDate}>Est. {m.estimate}</Text>
+        ) : (
+          <Text style={styles.milestoneDateMissing}>not scheduled</Text>
+        )}
+      </View>
     </View>
   );
 }

@@ -85,6 +85,7 @@ export default async function DealPage({
           sortOrder: checklistItems.sortOrder,
           notes: checklistItems.notes,
           trackedDate: checklistItems.trackedDate,
+          estimatedDate: checklistItems.estimatedDate,
           completedAt: checklistItems.completedAt,
           // Resolve the completer's display name via the users -> auth_user
           // two-hop join. LEFT so incomplete items still come back.
@@ -221,6 +222,7 @@ export default async function DealPage({
     sortOrder: i.sortOrder,
     notes: i.notes,
     trackedDate: i.trackedDate,
+    estimatedDate: i.estimatedDate,
     completedAt: i.completedAt ? i.completedAt.toISOString() : null,
     completedByName: i.completedByName,
   }));

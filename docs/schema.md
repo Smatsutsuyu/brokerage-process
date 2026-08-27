@@ -45,6 +45,7 @@ Grouped by domain. One line of purpose, then notable columns and FK relationship
 
 - **`checklist_categories`** (`src/db/schema/checklist.ts`) — phase-scoped containers. Columns: `deal_id`, `phase` (`checklist_phase` enum: phase_1 to phase_4), `name`, `sort_order`.
 - **`checklist_items`** — leaf rows. Columns: `category_id`, `name`, `description` (canonical text from the template), `notes` (user-authored working notes, separate field on purpose), `optional`, `sort_order`, `completed`, `completed_at`, `completed_by`, `tracked_date` (date-only milestone field, surfaced only when the template flags the item with `dateField: true`).
+  - **Milestone dates**: `tracked_date` is the date a milestone ACTUALLY landed; `estimated_date` (added in migration `0035`) is the date it was projected for. Two independent nullable `date` columns, not one date plus a toggle: a milestone carries both and the gap between them is the slip. `tracked_date` kept its name because every row predating `0035` already held a real date. Surfaced only on items the template flags `dateField: true` (ten items across Phases 2 to 4).
 - **`checklist_item_links`** — many external links per item (Dropbox, SharePoint, Drive). Columns: `checklist_item_id` (`onDelete: cascade`), `url`, `label`, `sort_order`. Replaced the prior single `external_link_url`/`label` columns on `checklist_items`.
 - **`checklist_item_dependencies`** — many-to-many prerequisite enforcement. Composite PK on `(item_id, depends_on_item_id)`.
 
