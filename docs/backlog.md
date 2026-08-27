@@ -81,6 +81,84 @@ When you close one, mark `~~done~~` rather than deleting so the running record s
 - **Fix**: scope to what actually changed. Reorder: `revalidatePath("/", "page")` plus the active deal. Profile: same plus `/profile`.
 - **Effort**: S
 
+### [Ops] Wire audit logging across mutations, and build a surface to read it
+
+- **Why this is P1**: `CLAUDE.md:290` lists "Review audit logs" under **What Lakebridge Can Do Without a Developer**, and `CLAUDE.md:263` lists "audit log surface" as an outstanding Phase 3 item. This is a handoff promise, not polish. Prior record of the deferral is `docs/status-log.md:292-294`.
+
+- **The concrete failure that triggered this (2026-08-27)**: a checklist milestone date on a production deal had been changed, and there was no way to tell whether Sean had done it while testing or the client had done it for real. Nothing anywhere records who set a checklist date. That question should be answerable in the app.
+
+- **Current state, verified**: the `audit_log` table has existed since migration `0000` and the `writeAudit` helper exists at `src/lib/audit.ts`, but it is called from exactly **five** places, all in `src/app/(app)/admin/actions.ts` (invite, role change, disable, remove, password reset). Production holds **one** row. Partial per-row attribution exists instead and covers only completion and authorship: `checklist_items.completed_by`, `qa_items.approved_by`, `documents.uploaded_by`, `feedback_items.last_updated_by`, `feedback_attachments.uploaded_by`.
+
+#### Do the read surface first
+
+`audit_log` has **zero readers anywhere in `src/`**. Grepping `auditLog` outside the schema file returns only the two write sites in `src/lib/audit.ts`. Adding coverage before there is anything to read it with produces a table nobody can consult, which is precisely why the one existing production row did not answer the question above. Build the viewer first, or at minimum in the same PR as the first batch.
+
+House pattern to copy: a server component that gates on role, runs one unpaginated Drizzle select scoped by org, maps rows to a plain serializable type, and hands them to a `"use client"` list that filters and sorts in memory.
+- Page skeleton: `src/app/(app)/admin/members/page.tsx` (64 lines).
+- Two-aliased-user-join query: `src/app/(app)/admin/feedback/page.tsx`.
+- Owner gating is enforced in the page **and** again in the action; follow both.
+- New route: `src/app/(app)/admin/audit/page.tsx`, plus a third sidebar link under Admin.
+
+#### The helper contract
+
+```ts
+// src/lib/audit.ts:21
+export async function writeAudit(entry: {
+  orgId: string;
+  userId: string | null;
+  action: string;      // "<entity>.<past_tense_verb>"
+  entityType: string;  // the noun
+  entityId?: string | null;
+  before?: unknown;
+  after?: unknown;
+  metadata?: unknown;
+}): Promise<void>
+```
+
+- It does **not** resolve org or user; both are caller-supplied.
+- It **never throws** (internal try/catch, `console.warn` on failure), so a failed audit can never break a mutation. It also means a caller cannot detect failure.
+- Existing call sites `await` it. Copy that.
+- **`audit_log.entity_id` is UUID-typed** (`src/db/schema/audit-log.ts:14`). Bulk actions cannot put a composite key or a label there. Pass `input.dealId` as `entityId` and list affected row ids in `metadata`.
+- `audit_log.user_id` references `users.id`, which is exactly what `getCurrentUser().id` returns and what `admin/actions.ts` already passes as `me.id`.
+
+#### Scope
+
+**45 mutation points in `src/app/(app)/deals/[id]/actions.ts`**, none audited. Suggested batches, checklist first because it contains the trigger:
+
+| Batch | Count | Notable |
+|---|---|---|
+| checklist | 3 | `setChecklistItemDate:174` is **the trigger action** |
+| checklist links | 3 | all three need a `before` snapshot |
+| buyers | 11 | mostly single-flag toggles, cheap |
+| buyers/contacts | 6 | includes `bulkAddContactsToDeal` |
+| Q&A | 5 | `setQaApproved` and `approveAllQaItems` already bind the actor |
+| issues | 4 | |
+| consultants | 3 | |
+| deal team | 5 | |
+| PSA | 1 | `savePsaAttorneyDecision:239`, the only writer to `deals` in this file |
+| email sends | 2 | `sendBlastEmails:2954` writes no DB row but is the **highest-value unaudited event**: it sends client-facing mail |
+
+**26 further unaudited actions outside that file.** All five in `admin/actions.ts` are already covered and nothing there is missed. The rest live in `deals/actions.ts`, `contacts/actions.ts`, `builders/actions.ts`, `deals/[id]/document-actions.ts`, feedback actions, `profile/actions.ts`, `set-password/actions.ts`.
+
+#### Gotchas a fresh session will hit
+
+1. **Only 3 of 43 deal actions currently bind the actor** (`toggleChecklistItem:52`, `setQaApproved:706`, `approveAllQaItems:862`). The other 40 must add `const user = await getCurrentUser();`. This is free at runtime: both `getCurrentUser` and `getCurrentOrg` are wrapped in React `cache()`, so the second call in a request is memoized rather than a second round-trip.
+2. **`deals/actions.ts`, `contacts/actions.ts` and `builders/actions.ts` never call `getCurrentUser()` at all**, only `getCurrentOrg()`. Each needs the import added, not just a `writeAudit` line. `document-actions.ts` has the same gap in `deleteDocument`.
+3. **`profile/actions.ts` and `set-password/actions.ts` have no org context** but do not need one: `CurrentUser` already carries `orgId`.
+4. **Nearly every update is blind** (`db.update(X).set(...).where(...)` with no prior read), so a `before` snapshot needs an added SELECT. Without it the log records that something changed but not what it changed from, which is half the point. For `setChecklistItemDate` pull `name` in the same SELECT so entries read without a join.
+5. **All 7 deletes must snapshot first**, or use `.returning()` on the delete. Afterwards the audit row is the only surviving record.
+6. **No non-request callers.** `src/scripts/` and the seeds import none of these actions, and every action already awaits `getCurrentOrg()` (which reads `headers()`), so they already fail outside a request. Adding `writeAudit` introduces no new failure mode.
+7. **Deliberately skip** per-user UI preferences such as deal reordering (`src/components/layout/reorder-actions.ts`). That is noise, not an audit trail.
+8. **Free-text fields have no length cap** (`checklist_items.notes`). Truncate before/after in the jsonb.
+
+#### Also update in the same commit (documentation-discipline rule)
+
+- `docs/features.md:241` says "Owners get two extra sidebar links under Admin", which becomes three.
+- `docs/operations.md` "Common admin tasks" (line 33) has no **Review the audit log** entry despite `CLAUDE.md:290` promising it.
+- `docs/schema.md:68` and `docs/build-progress.md:134` currently record the viewer as deferred.
+
+- **Effort**: L. Viewer is M on its own; the sweep is a day-plus across ~71 call sites, and is best landed in batches rather than one commit.
+
 ### [Ops] Run a Neon PITR restore drill
 - **What**: CLAUDE.md Phase 3 deliverable. Backups are presumed-working but never verified.
 - **Fix**: spin up a Neon branch from a 24h-old PITR point, point a preview deploy at it, confirm the app boots and a deal page renders. Append result to `docs/build-progress.md`.
