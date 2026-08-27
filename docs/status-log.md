@@ -4,6 +4,24 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-08-27 (later) — Dates re-homed onto Est., and the PSA columns dropped
+
+Two clean-up migrations, both driven by Sean.
+
+### `0037` moves every existing date from Actual to Est.
+
+This reverses the call made a few hours earlier. `0035` shipped `estimated_date` alongside `tracked_date` on the reading that the dates already on file were real dates recorded as milestones landed, so `tracked_date` became the Actual and nothing needed backfilling. Sean's revised read: those dates are projections. So they move to `estimated_date` and Actual starts empty, filling in as things happen.
+
+Guarded on `estimated_date IS NULL`, which makes the statement idempotent and, more importantly, protects the one row that already holds both. Chris used the new estimate field on Lakeview's Offering Date between the two deploys (actual 2026-08-20, est 2026-08-11); a blanket move would have overwritten his estimate with the actual and destroyed exactly the comparison the two fields exist to show. That row is already in the intended shape and is left alone. Nine of the ten rows move.
+
+Verified by a read-only dry run against production listing both sets before the migration was committed. Docker was down so there was no local apply; the statement is a single guarded UPDATE and runs inside drizzle's per-migration transaction.
+
+### `0036` drops the legacy PSA attorney columns
+
+Closes step 3 of the PSA unification. `psa_attorney_name` and `psa_attorney_firm` are gone; nothing had read them since step 2, and `0034` had already backfilled all three deals' values onto the consultant roster. `psa_drafting` stays on the deal, as decided.
+
+---
+
 ## 2026-08-27 — Estimate and actual dates on every checklist milestone
 
 Feedback `14efaf13` from Chris: "Can you add [Estimate / Actual] options to all the date entries on the Checklist."

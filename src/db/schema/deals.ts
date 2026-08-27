@@ -24,12 +24,17 @@ export const deals = pgTable("deals", {
   // at the render boundary where displayed.
   purchasePrice: numeric("purchase_price", { precision: 14, scale: 2 }),
   notes: text("notes"),
-  // PSA Attorney decision — captured inline on the "Determine PSA Attorney"
-  // checklist row. Each deal has at most one such decision; storing on the
-  // deal (rather than as a consultant row) keeps it visible to the workflow
-  // surface where it's actually decided.
-  psaAttorneyName: text("psa_attorney_name"),
-  psaAttorneyFirm: text("psa_attorney_firm"),
+  // Who drafts the PSA. A fact about the transaction rather than an
+  // attribute of any firm, which is why it stays on the deal: it is
+  // answered on a Phase 1 go-to-market row months before counsel is
+  // retained, and when the buyer's counsel drafts it is answered before
+  // the buyer even exists.
+  //
+  // The attorney themselves lives on the consultant roster as a row with
+  // role = "psa_attorney", the only place that can hold a firm, a
+  // contact, a side and an email address. The old psa_attorney_name /
+  // psa_attorney_firm free-text columns were retired in migration 0036
+  // after 0034 backfilled them onto the roster.
   psaDrafting: psaDraftingEnum("psa_drafting"),
   // Banner image used in generated PDFs (Marketing Report header, etc.).
   // Stores the Vercel Blob pathname (NOT the URL) so we can re-stream via
