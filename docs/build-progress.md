@@ -218,6 +218,19 @@ Step 2 of the plan in [backlog.md](backlog.md). The Phase 1 "Determine PSA Attor
 - **The backfill ships WITH the read change, not after it.** A production dry-run through the real transform found two deals whose attorney existed only in the legacy columns; without the backfill in the same deploy they would have silently read "no attorney on the roster yet". That resequenced the plan.
 - **Fixed while here**: `updateConsultant` and `deleteConsultant` scoped by consultant id and org but not deal, unlike every sibling query. Harmless while the only caller passed an id read off the same deal; this change adds a second caller.
 
+## Milestone dates collapse to one field plus an Est. checkbox (2026-09-07)
+
+Client feedback reversed the two-chip design that shipped 2026-08-27. Chris asked for "1 date for each item" with a Completed note when the item's checkbox is ticked, an `[Est.]` box when the date is a projection, and a plain date otherwise.
+
+- **No migration and no data moved.** Both columns stayed. The UI derives from them: displayed date is `tracked_date ?? estimated_date`, and `Est.` shows ticked when `tracked_date IS NULL`. That mapping is total across all four column combinations, and it is the same expression every consumer and the overdue check already used, which is why nothing needed backfilling.
+- **The checkbox decides the column.** Ticked writes `estimated_date` and clears `tracked_date` (the user is saying this is not confirmed after all, so a stale actual must not keep winning). Unticked writes `tracked_date` and leaves `estimated_date` frozen. That freeze is the whole design: promoting a projection is what captures the slip, and it costs the user nothing.
+- **Promotion stamps today rather than inheriting the projection.** The alternative was proposed and rejected on the data: Lakeview's "Send out B&F" holds est 6/24 against actual 8/27, so carrying the estimate across would have recorded a 64-day slip as zero. A rule that silently reports on-time is worse than no column at all.
+- **Auto-promoting on completion was considered and dropped** for the same reason. Four production rows are completed with only an estimate; copying the projection into the actual would have manufactured a zero slip on every one of them and made the report structurally optimistic. Completing an item now touches no dates, and such a row reads "Completed Est. 7/09", which is the honest description.
+- **Polarity follows the client.** Ticked means estimate, unticked means firm, and a bare date is firm, possibly in the future (a closing). The safer default would have been the inverse, since a projection typed without ticking lands in the actuals column, but Chris was explicit and it is his data.
+- **Audit records both columns** on every date write, not just the one the checkbox names, since a demote changes two at once and a promote is only legible next to the estimate it came from. Promotions additionally carry `promotedFromEstimate`.
+- **Reporting is unchanged.** Deal Status and DD Tracking PDFs still print estimate and actual side by side.
+- **Verified end to end** by driving the real server action over HTTP against a production build: all eight transitions (add as estimate, edit, promote, edit firm, clear back to estimate, set future firm, demote, clear) produce the intended column state, and the audit trail reads correctly for each.
+
 ## Audit coverage across the whole mutation surface (2026-08-27, later)
 
 Second half of the audit work. The viewer and the checklist batch shipped earlier the same day; this closes the remaining sweep the backlog estimated at a day-plus across ~68 call sites.

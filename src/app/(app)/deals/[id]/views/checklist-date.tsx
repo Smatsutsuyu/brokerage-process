@@ -1,19 +1,21 @@
 "use client";
 
-import { useRef, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { CalendarDays, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-import { setChecklistItemDate, type ChecklistDateKind } from "../actions";
+import { setChecklistItemDate } from "../actions";
 
 type ChecklistDateProps = {
   itemId: string;
   dealId: string;
-  // Both YYYY-MM-DD or null. `value` is the actual date (tracked_date),
-  // kept as the primary because every existing row already holds one.
+  // Both YYYY-MM-DD or null, straight from the two columns.
   value: string | null;
   estimate: string | null;
+  // The item's own completion checkbox. Drives the "Completed" label only;
+  // this component never writes it.
+  completed: boolean;
 };
 
 // Returns today's date as YYYY-MM-DD in the browser's local timezone.
@@ -46,28 +48,41 @@ function formatDateLabel(iso: string): string {
   });
 }
 
-type ChipProps = {
-  itemId: string;
-  dealId: string;
-  kind: ChecklistDateKind;
-  value: string | null;
-};
-
-// One date chip. Two of these render per milestone row, one per kind.
+// One milestone date per row, plus an "Est." checkbox that says whether the
+// date is a projection or a real one.
 //
-// Empty state is a labelled "+ Est." / "+ Actual" button. Estimate opens
-// the picker straight away, because a projection is rarely today. Actual
-// saves today's date in one click, which is how Chris uses it: he opens
-// the deal on the day a milestone lands and stamps it.
-function DateChip({ itemId, dealId, kind, value }: ChipProps) {
+// Two columns are still kept underneath. The checkbox picks which one the
+// write lands in, so the projection survives being promoted and the gap
+// between the two stays reportable, without asking anyone to maintain two
+// fields. Which column holds the value is also what drives the checkbox:
+//
+//   tracked_date set   -> unticked, a firm date (may be future or past)
+//   only estimated_date -> ticked, a projection
+//   item completed      -> "Completed" prefix, whichever column the date is in
+//
+// The displayed date is `tracked_date ?? estimated_date`, which is the same
+// expression every read site and the overdue check already used, so no data
+// moved when this replaced the two-chip layout.
+export function ChecklistDate({
+  itemId,
+  dealId,
+  value,
+  estimate,
+  completed,
+}: ChecklistDateProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
-  const isEstimate = kind === "estimate";
-  const label = isEstimate ? "Est." : "Actual";
+  // Only meaningful while the row has no date yet: it holds the intended kind
+  // until there is a value to attach it to. Once a date exists the checkbox is
+  // driven by which column holds it, not by local state.
+  const [draftEstimate, setDraftEstimate] = useState(false);
 
-  function commit(next: string | null) {
+  const isEstimate = value === null && estimate !== null;
+  const shown = value ?? estimate;
+
+  function commit(next: string | null, asEstimate: boolean) {
     startTransition(async () => {
-      await setChecklistItemDate({ itemId, dealId, date: next, kind });
+      await setChecklistItemDate({ itemId, dealId, date: next, isEstimate: asEstimate });
     });
   }
 
@@ -81,33 +96,47 @@ function DateChip({ itemId, dealId, kind, value }: ChipProps) {
     else el.focus();
   }
 
+  // The picker writes back under whichever mode the row is currently in.
+  // Editing a date never changes its kind; only the checkbox does that.
   const hidden = (
     <input
       ref={inputRef}
       type="date"
-      value={value ?? ""}
-      onChange={(e) => commit(e.target.value || null)}
+      // Defaulting an empty field to today means the common case (a milestone
+      // that just landed) is click, confirm. A firm future date such as a
+      // closing is still one pick away, which is why this is a default rather
+      // than an auto-stamp.
+      value={shown ?? localTodayIso()}
+      onChange={(e) => commit(e.target.value || null, shown === null ? draftEstimate : isEstimate)}
       className="pointer-events-none absolute inset-0 opacity-0"
       tabIndex={-1}
       aria-hidden
     />
   );
 
-  if (value === null) {
+  // Ticking Est. demotes the shown date to a projection. Unticking promotes it,
+  // and stamps TODAY rather than carrying the projection over: a projection
+  // accepted unchanged as the actual would record every milestone as landing
+  // exactly on schedule, which is the one result this pair of columns exists
+  // to disprove.
+  function toggleEstimate() {
+    if (isEstimate) {
+      commit(shown, true);
+      return;
+    }
+    commit(localTodayIso(), false);
+  }
+
+  if (shown === null) {
     return (
-      <span className="relative inline-flex items-center">
+      <span className="relative inline-flex items-center gap-1.5">
         <button
           type="button"
-          onClick={isEstimate ? openPicker : () => commit(localTodayIso())}
+          onClick={openPicker}
           disabled={isPending}
-          title={
-            isEstimate
-              ? "Set the projected date for this milestone."
-              : "Stamp today as the date this milestone actually happened. Click again to change it."
-          }
+          title="Set the date for this milestone. Defaults to today; pick another day for a scheduled date."
           className={cn(
-            "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors",
-            isEstimate ? "hover:bg-amber-50 hover:text-amber-700" : "hover:bg-blue-50 hover:text-blue-700",
+            "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-700",
             isPending && "opacity-60",
           )}
         >
@@ -116,25 +145,53 @@ function DateChip({ itemId, dealId, kind, value }: ChipProps) {
           ) : (
             <CalendarDays className="h-3 w-3" />
           )}
-          + {label}
+          + Date
         </button>
+        {/* Offered before the first date exists so a projection can be entered
+            as one. Without it, adding a future estimate would have to be saved
+            as a firm date and then demoted, which writes the wrong column and
+            leaves a misleading pair of audit entries behind. */}
+        <label
+          className={cn(
+            "inline-flex cursor-pointer items-center gap-1 text-[10px] font-medium text-gray-400 select-none",
+            isPending && "opacity-60",
+          )}
+          title="Tick before setting the date to record it as an estimate."
+        >
+          <input
+            type="checkbox"
+            checked={draftEstimate}
+            disabled={isPending}
+            onChange={(e) => setDraftEstimate(e.target.checked)}
+            className="h-3 w-3 cursor-pointer accent-amber-600"
+          />
+          Est.
+        </label>
         {hidden}
       </span>
     );
   }
 
   return (
-    <span className="relative inline-flex items-center">
+    <span className="relative inline-flex flex-wrap items-center gap-1.5">
       <button
         type="button"
         onClick={openPicker}
         disabled={isPending}
-        title={`${isEstimate ? "Projected" : "Actual"} date. Click to change it, or clear the field in the picker to remove it.`}
+        title={
+          completed
+            ? "The date recorded for this completed milestone. Click to change it."
+            : isEstimate
+              ? "Projected date. Click to change it, or clear the field in the picker to remove it."
+              : "Date for this milestone. Click to change it, or clear the field in the picker to fall back to the estimate."
+        }
         className={cn(
           "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors",
-          isEstimate
-            ? "bg-amber-50 text-amber-800 hover:bg-amber-100"
-            : "bg-blue-50 text-blue-800 hover:bg-blue-100",
+          completed
+            ? "bg-green-50 text-green-800 hover:bg-green-100"
+            : isEstimate
+              ? "bg-amber-50 text-amber-800 hover:bg-amber-100"
+              : "bg-blue-50 text-blue-800 hover:bg-blue-100",
           isPending && "opacity-60",
         )}
       >
@@ -143,29 +200,36 @@ function DateChip({ itemId, dealId, kind, value }: ChipProps) {
         ) : (
           <CalendarDays className="h-3 w-3" />
         )}
-        <span className={cn("opacity-70", isEstimate ? "font-normal" : "font-normal")}>{label}</span>
-        {formatDateLabel(value)}
+        {/* "Completed" and "Est." are not exclusive. An item ticked off whose
+            only date is still a projection reads "Completed Est. 7/09", which
+            is the honest description of that row rather than a claim the
+            milestone landed on the day it was projected to. */}
+        {completed && <span className="font-normal opacity-70">Completed</span>}
+        {isEstimate && <span className="font-normal opacity-70">Est.</span>}
+        {formatDateLabel(shown)}
       </button>
-      {hidden}
-    </span>
-  );
-}
 
-// Milestone dates on a checklist row: the projected date and the date it
-// actually landed, side by side.
-//
-// Both are always offered. Chris asked for "[Estimate / Actual] options"
-// and the two-field reading is the useful one: a milestone carries a
-// projection and an outcome at once, and the gap between them is what
-// makes slip visible. A single toggled date would have forced a choice
-// and thrown away whichever one was not selected.
-//
-// Estimate renders first because it is set first in the life of a deal.
-export function ChecklistDate({ itemId, dealId, value, estimate }: ChecklistDateProps) {
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      <DateChip itemId={itemId} dealId={dealId} kind="estimate" value={estimate} />
-      <DateChip itemId={itemId} dealId={dealId} kind="actual" value={value} />
+      <label
+        className={cn(
+          "inline-flex cursor-pointer items-center gap-1 text-[10px] font-medium text-gray-500 select-none",
+          isPending && "opacity-60",
+        )}
+        title={
+          isEstimate
+            ? "This date is a projection. Untick once it is firm, which stamps today and keeps the projection for slip reporting."
+            : "Tick to mark this date as an estimate rather than a firm date."
+        }
+      >
+        <input
+          type="checkbox"
+          checked={isEstimate}
+          disabled={isPending}
+          onChange={toggleEstimate}
+          className="h-3 w-3 cursor-pointer accent-amber-600"
+        />
+        Est.
+      </label>
+      {hidden}
     </span>
   );
 }

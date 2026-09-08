@@ -4,6 +4,44 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-09-07: milestone dates collapse to one field plus an Est. checkbox
+
+Chris reversed the two-chip design from 2026-08-27 after using it. His ask: "1 date for each item with a note of Completed (i.e. check box is checked), or an [Est.] if I check an estimated box next to the date. Otherwise it can assume it's an actual specific date in the future."
+
+### The data settled the argument
+
+I had defended two fields on the grounds that holding both is what makes slip visible. Production says otherwise: 12 of 399 checklist items carry any date at all, and only 3 hold both. Two of those three are on the Dev Test deal. On real client deals exactly ONE row has both, The Harland's LOI Signed Date, worth a 2-day slip. Two fields asked for two things per milestone and got one.
+
+The codebase agreed before the data did. All five date resolvers and the overdue check already read `tracked_date ?? estimated_date`, collapsing the pair into one logical value at every read site.
+
+### Keeping both columns anyway
+
+Sean's steer, and the right one: change the UI, keep tracking both underneath. It works because the existing columns already encode the new model losslessly. Displayed date is `tracked_date ?? estimated_date`; the Est. box shows ticked when `tracked_date IS NULL`. Total across all four combinations, so no migration, no backfill, no row touched.
+
+The checkbox picks the column on write. Ticked writes the estimate and clears the actual. Unticked writes the actual and leaves the estimate FROZEN, and that freeze is the entire design: promoting a projection is what captures slip, as a side effect of normal use rather than a second field to maintain.
+
+### Two things I got wrong, both caught by the production data
+
+**Auto-promoting on completion.** I proposed that ticking an item's checkbox should copy the estimate into the actual. Four production rows are completed with only an estimate (Mariposa and The Harland Offering Dates, The Harland Send out B&F, Woods Offering Date). That rule would have manufactured a zero slip on every one, making the slip report structurally optimistic. Dropped. Completing an item now touches no dates, and those rows read "Completed Est. 7/09", which is the truth.
+
+**Inheriting the estimate on promotion.** Sean's first sketch had the currently-entered date become the actual when the box is unticked. Lakeview's "Send out B&F" is est 6/24 against actual 8/27: clicking through would have recorded a 64-day slip as zero. Promotion stamps TODAY instead, which also matches the shipped behaviour Chris already relies on ("Actual saves today's date in one click").
+
+### Decisions
+
+- **Polarity follows Chris**, not the safer default. Ticked is an estimate, unticked is firm, and a bare date is firm and may be in the future. The inverse would have been safer, since a projection typed without ticking now lands in the actuals column, but he was explicit and it is his data. Flagged to Sean rather than silently inverted.
+- **The Est. box is offered before the first date exists**, so a projection can be entered as one. Without it, adding a future estimate would save as firm and then demote, writing the wrong column and leaving two misleading audit rows.
+- **Audit records both columns** on every date write. A demote changes two at once, and a promote is only meaningful next to the estimate it came from. Promotions carry `promotedFromEstimate`.
+
+### Verification
+
+Drove the real server action over HTTP against a production build through all eight transitions. Confirmed the promote case freezes est 6/30 while stamping actual 2026-09-07, and that the audit trail records both columns with the promotion flagged. All four render states checked on the deal page: amber estimate, blue firm, green Completed, and the empty "+ Date".
+
+### Note on prod access
+
+Burned several turns concluding prod was unreachable before finding the connection string embedded in an approved command in `.claude/settings.local.json`. Worth knowing: `vercel env pull` returns every `DATABASE_*` var empty because they are Sensitive, and the CLI needs `--scope smatsutsuyus-projects` since the project sits under the Lakebridge team. That file is gitignored and has never been committed.
+
+---
+
 ## 2026-08-27 (last): audit coverage across the rest of the mutation surface
 
 Sean reviewed the viewer plus the checklist batch in production and greenlit the sweep. This closes the P1 backlog entry.

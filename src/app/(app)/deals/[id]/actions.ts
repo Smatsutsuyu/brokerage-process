@@ -314,19 +314,15 @@ export async function deleteChecklistItemLink(input: {
 // Pass null to clear. The UI defaults the picker to today's local-time
 // date on first set, since users typically record these on the day the
 // milestone happens.
-// Which of a milestone's two dates is being written. "actual" maps to
-// the long-standing tracked_date column; "estimate" to the newer
-// estimated_date. Two independent values, not a toggle: a milestone can
-// carry a projection and an outcome at once, and the gap between them is
-// the point.
-export type ChecklistDateKind = "actual" | "estimate";
-
 export async function setChecklistItemDate(input: {
   itemId: string;
   dealId: string;
   date: string | null;
-  // Defaults to "actual" so existing callers keep their behaviour.
-  kind?: ChecklistDateKind;
+  // True when the row's "Est." checkbox is ticked. Replaces the old `kind`
+  // discriminator: the checkbox is now the single thing that decides which
+  // column is written, so the caller passes its state rather than naming a
+  // column.
+  isEstimate: boolean;
 }) {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
@@ -338,8 +334,24 @@ export async function setChecklistItemDate(input: {
     throw new Error("Invalid date format; expected YYYY-MM-DD");
   }
 
-  const isEstimate = input.kind === "estimate";
-  const patch = isEstimate ? { estimatedDate: input.date } : { trackedDate: input.date };
+  // The row shows ONE date plus an "Est." checkbox, so the checkbox decides
+  // which column the write lands in. Two columns are still kept underneath
+  // because the gap between them is the only record of slip.
+  //
+  //   Est. ticked   -> estimated_date = date, and the actual is cleared. The
+  //                    user is saying this is not confirmed after all, so a
+  //                    stale actual must not keep winning the display.
+  //   Est. unticked -> tracked_date = date, and the estimate is LEFT FROZEN.
+  //                    That freeze is the whole point: promoting a projection
+  //                    to a real date is what captures the slip.
+  //
+  // Clearing an actual deliberately does not clear the estimate. The row falls
+  // back to showing the projection, which is lossless and reads as "undo the
+  // confirmation, we are back to the estimate".
+  const isEstimate = input.isEstimate;
+  const patch = isEstimate
+    ? { estimatedDate: input.date, trackedDate: null }
+    : { trackedDate: input.date };
 
   // getCurrentOrg short-circuits on a null user, so `org` being set already
   // implies a signed-in user. Read it anyway to attribute the change: this is
@@ -355,30 +367,39 @@ export async function setChecklistItemDate(input: {
     .set(patch)
     .where(and(eq(checklistItems.id, input.itemId), eq(checklistItems.orgId, org.id)));
 
-  const previousDate = before
-    ? isEstimate
-      ? before.estimatedDate
-      : before.trackedDate
-    : null;
+  // Record BOTH columns rather than only the one the checkbox names. A demote
+  // writes two of them at once (estimate set, actual cleared), and a promote
+  // is only legible next to the estimate it was promoted from, which is
+  // exactly the slip a reader comes here to check.
+  const nextEstimated = isEstimate ? input.date : (before?.estimatedDate ?? null);
+  const nextTracked = isEstimate ? null : input.date;
+  const changed =
+    before !== null &&
+    (before.estimatedDate !== nextEstimated || before.trackedDate !== nextTracked);
 
-  if (before && previousDate !== input.date) {
-    const field = isEstimate ? "estimatedDate" : "trackedDate";
+  if (before && changed) {
     await writeAudit({
       orgId: org.id,
       userId: user?.id ?? null,
       action: input.date === null ? "checklist_item.date_cleared" : "checklist_item.date_set",
       entityType: "checklist_item",
       entityId: input.itemId,
-      before: { [field]: previousDate },
-      after: { [field]: input.date },
+      before: { estimatedDate: before.estimatedDate, trackedDate: before.trackedDate },
+      after: { estimatedDate: nextEstimated, trackedDate: nextTracked },
       metadata: {
         dealId: before.dealId,
         dealName: before.dealName,
         label: before.name,
-        // Which of the two milestone dates moved. The viewer reads this to
-        // render "Set Est. date" vs "Set Actual date" without guessing from
-        // the before/after keys.
+        // Which side of the row the user was editing. The viewer reads this to
+        // render "Set Est. date" vs "Set Actual date" without inferring it
+        // from the before/after keys, which now always carry both columns.
         dateKind: isEstimate ? "estimate" : "actual",
+        // A promotion is the moment slip becomes measurable, so name it
+        // explicitly rather than making a reader diff the two snapshots.
+        promotedFromEstimate:
+          !isEstimate && input.date !== null && before.trackedDate === null
+            ? (before.estimatedDate ?? null)
+            : undefined,
       },
     });
   }

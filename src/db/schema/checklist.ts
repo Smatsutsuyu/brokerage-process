@@ -57,11 +57,21 @@ export const checklistItems = pgTable("checklist_items", {
   // Feasibility / Closing milestones). Date-only, no time-of-day: these
   // track when a thing happened or is scheduled, not a precise moment.
   //
-  // Two independent dates, not one date plus a toggle. Chris asked for
-  // "[Estimate / Actual] options" and the useful reading is that a
-  // milestone carries both: the date it was projected for, and the date
-  // it actually landed. Holding both is what makes slip visible, and a
-  // toggle would have forced a choice between them.
+  // Two columns, but ONE date in the UI since 2026-09-07. The row shows a
+  // single date plus an "Est." checkbox, and the checkbox decides which
+  // column the write lands in:
+  //
+  //   Est. ticked   -> estimated_date holds it, tracked_date cleared
+  //   Est. unticked -> tracked_date holds it, estimated_date left frozen
+  //
+  // The columns stayed because the gap between them is the only record of
+  // slip, and freezing the projection when it is promoted is what captures
+  // that gap without asking anyone to maintain two fields. Chris asked for
+  // two chips first, then for one, after finding two too fiddly in practice.
+  //
+  // Read side is `tracked_date ?? estimated_date`, which is what every
+  // consumer and the overdue check already did, so the UI change needed no
+  // migration and moved no data.
   //
   // `trackedDate` is the ACTUAL date and keeps its column name because
   // every existing row already holds a real date Chris entered as things

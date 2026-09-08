@@ -434,6 +434,7 @@ export function PhaseSection({
                                 dealId={dealId}
                                 value={item.trackedDate}
                                 estimate={item.estimatedDate}
+                                completed={item.completed}
                               />
                             )}
                             {/* Cross-tab nav for items whose data lives
