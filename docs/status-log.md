@@ -4,6 +4,28 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-09-07 (later): Est. checkbox shipped inverted
+
+Chris reported it immediately: "when i click the 'est' box the date changes and the box stays unticked and i have no way of telling what the date is."
+
+The toggle handler had its two branches the wrong way round. Clicking Est. on a firm date ran the promote path, which stamps today and writes `tracked_date`, so the date jumped to today and the box stayed unticked. Ticking was impossible, and the original date vanished from the row.
+
+### Why the verification missed it
+
+The end-to-end test drove the real server action over HTTP through all eight transitions and passed, because it supplied `isEstimate` explicitly. The defect was in the code that DECIDES that flag, which no test touched. Exercising an action's branches is not the same as exercising the thing that chooses the branch.
+
+### The fix
+
+Moved the decision into `checklist-date-logic.ts`, a module with no imports, and tested it directly. The component could not be imported into a script at all, because it pulls in the server actions, which drag in the email stack and will not load outside the Next bundler. A pure function sitting in that module was untestable by construction, which is the actual root cause.
+
+The round trip is now covered properly: read the row, derive the UI state with the real helper, compute the toggle with the real helper, call the real action, re-read. Clicking Est. on a firm 2026-09-02 leaves it at 2026-09-02 and ticks the box; unticking stamps today and freezes 2026-09-02 as the estimate.
+
+### Also
+
+The promoted date's projection is no longer invisible. The chip's tooltip carries "Originally projected for Jun 30, 2026" once an estimate has been promoted, which is the other half of what Chris could not tell from the row.
+
+---
+
 ## 2026-09-07: milestone dates collapse to one field plus an Est. checkbox
 
 Chris reversed the two-chip design from 2026-08-27 after using it. His ask: "1 date for each item with a note of Completed (i.e. check box is checked), or an [Est.] if I check an estimated box next to the date. Otherwise it can assume it's an actual specific date in the future."

@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 
 import { setChecklistItemDate } from "../actions";
 
+import { deriveDateState, estimateToggleArgs } from "./checklist-date-logic";
+
 type ChecklistDateProps = {
   itemId: string;
   dealId: string;
@@ -77,8 +79,7 @@ export function ChecklistDate({
   // driven by which column holds it, not by local state.
   const [draftEstimate, setDraftEstimate] = useState(false);
 
-  const isEstimate = value === null && estimate !== null;
-  const shown = value ?? estimate;
+  const { shown, isEstimate } = deriveDateState(value, estimate);
 
   function commit(next: string | null, asEstimate: boolean) {
     startTransition(async () => {
@@ -114,17 +115,9 @@ export function ChecklistDate({
     />
   );
 
-  // Ticking Est. demotes the shown date to a projection. Unticking promotes it,
-  // and stamps TODAY rather than carrying the projection over: a projection
-  // accepted unchanged as the actual would record every milestone as landing
-  // exactly on schedule, which is the one result this pair of columns exists
-  // to disprove.
   function toggleEstimate() {
-    if (isEstimate) {
-      commit(shown, true);
-      return;
-    }
-    commit(localTodayIso(), false);
+    const next = estimateToggleArgs({ shown, isEstimate, today: localTodayIso() });
+    commit(next.date, next.isEstimate);
   }
 
   if (shown === null) {
@@ -178,13 +171,22 @@ export function ChecklistDate({
         type="button"
         onClick={openPicker}
         disabled={isPending}
-        title={
+        title={[
           completed
-            ? "The date recorded for this completed milestone. Click to change it."
+            ? "The date recorded for this completed milestone."
             : isEstimate
-              ? "Projected date. Click to change it, or clear the field in the picker to remove it."
-              : "Date for this milestone. Click to change it, or clear the field in the picker to fall back to the estimate."
-        }
+              ? "Projected date."
+              : "Date for this milestone.",
+          "Click to change it.",
+          // The projection stops being visible once it is promoted, so keep it
+          // reachable here. This is the slip, and it is the first thing anyone
+          // asks about a date that moved.
+          !isEstimate && estimate !== null && estimate !== value
+            ? `Originally projected for ${formatDateLabel(estimate)}.`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" ")}
         className={cn(
           "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors",
           completed
@@ -216,8 +218,8 @@ export function ChecklistDate({
         )}
         title={
           isEstimate
-            ? "This date is a projection. Untick once it is firm, which stamps today and keeps the projection for slip reporting."
-            : "Tick to mark this date as an estimate rather than a firm date."
+            ? "This date is a projection. Untick once it is firm: that stamps today and keeps the projection for slip reporting."
+            : "Tick to mark this date as a projection. The date itself is kept."
         }
       >
         <input
