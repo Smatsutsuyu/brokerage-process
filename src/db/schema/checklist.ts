@@ -53,7 +53,7 @@ export const checklistItems = pgTable("checklist_items", {
   notes: text("notes"),
   // Milestone dates attached to the item. Only surfaced in the UI when
   // the template flags the item with `dateField: true` (Offering Date,
-  // Schedule SOO Review, Send out B&F, and the seven Phase 4 CTC / IC /
+  // Schedule SOO Review, Send out B&F, and the eight Phase 4 CTC / IC /
   // Feasibility / Closing milestones). Date-only, no time-of-day: these
   // track when a thing happened or is scheduled, not a precise moment.
   //

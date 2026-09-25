@@ -350,12 +350,13 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
           // Milestone date-fields below. Chris populates projected dates
           // via the +Date affordance up front and checks them off as each
           // milestone hits. Ordering is the deal lifecycle: LOI signed,
-          // PSA effective, CTC drafts, IC approval, feasibility waive,
+          // PSA effective, CTC drafts, IC book, IC approval, feasibility waive,
           // close.
           { name: "LOI Signed Date", dateField: true },
           { name: "PSA Effective Date", dateField: true },
           { name: "Receive 1st Draft Cost to Complete", dateField: true },
           { name: "Finalize Cost to Complete / Final Purchase Price", dateField: true },
+          { name: "Investment Committee Book Complete", dateField: true },
           { name: "Investment Committee Approval", dateField: true },
           { name: "Waive Feasibility", dateField: true },
           { name: "Closing Date", dateField: true },

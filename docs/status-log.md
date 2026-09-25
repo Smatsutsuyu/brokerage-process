@@ -4,6 +4,14 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-09-24: Investment Committee Book Complete milestone
+
+Triaged open feedback: one item, from Chris (`4ed8f3c3`), asking for "Investment Committee Book Complete" above "Investment Committee Approval" in the Phase 4 dates, functioning like the rest. Used his wording verbatim.
+
+Added it to the checklist template and to the two hardcoded milestone lists that drive the DD Tracking and Deal Status PDFs. Rasterized both smoke PDFs: new row renders in order, no orphaned headings. Prod reconcile dry run: 8 items added (one per deal), 24 reorders, nothing else. The deploy's `vercel-build` applies it.
+
+---
+
 ## 2026-09-07 (later): Est. checkbox shipped inverted
 
 Chris reported it immediately: "when i click the 'est' box the date changes and the box stays unticked and i have no way of telling what the date is."

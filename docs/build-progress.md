@@ -218,6 +218,14 @@ Step 2 of the plan in [backlog.md](backlog.md). The Phase 1 "Determine PSA Attor
 - **The backfill ships WITH the read change, not after it.** A production dry-run through the real transform found two deals whose attorney existed only in the legacy columns; without the backfill in the same deploy they would have silently read "no attorney on the roster yet". That resequenced the plan.
 - **Fixed while here**: `updateConsultant` and `deleteConsultant` scoped by consultant id and org but not deal, unlike every sibling query. Harmless while the only caller passed an id read off the same deal; this change adds a second caller.
 
+## Investment Committee Book Complete milestone (2026-09-24)
+
+Closes feedback item `4ed8f3c3`. Chris asked for a new Phase 4 date row directly above Investment Committee Approval, working like the other milestones.
+
+- **Template**: `{ name: "Investment Committee Book Complete", dateField: true }` added to `CHECKLIST_TEMPLATE`. Same single date plus Est. checkbox as every other milestone; no schema change.
+- **PDFs**: added to the fixed `MILESTONE_NAMES` lists in `generate-dd-tracking.ts` and `generate-deal-status.ts`, so it renders in DD Tracking Key Dates and Deal Status Upcoming Milestones in lifecycle order. Smoke fixtures updated and rasterized.
+- **Backfill**: `checklist:reconcile` dry run against prod inserts the item on all 8 deals and shifts the three rows below it; nothing else. Applied by `vercel-build` on deploy.
+
 ## Milestone dates collapse to one field plus an Est. checkbox (2026-09-07)
 
 Client feedback reversed the two-chip design that shipped 2026-08-27. Chris asked for "1 date for each item" with a Completed note when the item's checkbox is ticked, an `[Est.]` box when the date is a projection, and a plain date otherwise.

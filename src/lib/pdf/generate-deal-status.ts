@@ -54,6 +54,7 @@ const MILESTONE_NAMES: readonly string[] = [
   "PSA Effective Date",
   "Receive 1st Draft Cost to Complete",
   "Finalize Cost to Complete / Final Purchase Price",
+  "Investment Committee Book Complete",
   "Investment Committee Approval",
   "Waive Feasibility",
   "Closing Date",

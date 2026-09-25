@@ -45,7 +45,7 @@ export type DdTrackingPdf = {
   content: Buffer;
 };
 
-// Canonical order of the 7 Phase 4 milestone dates. Drives both the
+// Canonical order of the 8 Phase 4 milestone dates. Drives both the
 // query (these are the only items we pull) and the render order. Must
 // stay in sync with the dateField items in src/db/checklist-template.ts.
 const MILESTONE_NAMES: readonly string[] = [
@@ -53,6 +53,7 @@ const MILESTONE_NAMES: readonly string[] = [
   "PSA Effective Date",
   "Receive 1st Draft Cost to Complete",
   "Finalize Cost to Complete / Final Purchase Price",
+  "Investment Committee Book Complete",
   "Investment Committee Approval",
   "Waive Feasibility",
   "Closing Date",
@@ -108,7 +109,7 @@ export async function generateDdTrackingPdf(input: {
   const purchasePrice =
     deal.purchasePrice != null ? Number(deal.purchasePrice) : null;
 
-  // 1) Milestones. Pull the 7 Phase 4 checklist items by name and merge
+  // 1) Milestones. Pull the 8 Phase 4 checklist items by name and merge
   // with the canonical order so a missing row still renders as "not
   // scheduled".
   const milestoneRows = await db

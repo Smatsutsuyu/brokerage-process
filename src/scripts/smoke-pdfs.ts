@@ -28,6 +28,7 @@ async function main() {
         { label: "PSA Effective Date", date: "May 12, 2026", estimate: "May 12, 2026", completed: true, hasHappened: true },
         { label: "Receive 1st Draft Cost to Complete", date: "Jun 1, 2026", estimate: null, completed: false, hasHappened: false },
         { label: "Finalize Cost to Complete / Final Purchase Price", date: null, estimate: "Jul 15, 2026", completed: false, hasHappened: false },
+        { label: "Investment Committee Book Complete", date: null, estimate: "Aug 5, 2026", completed: false, hasHappened: false },
         { label: "Investment Committee Approval", date: null, estimate: null, completed: false, hasHappened: false },
         { label: "Waive Feasibility", date: null, estimate: "Aug 3, 2026", completed: false, hasHappened: false },
         { label: "Closing Date", date: "Aug 30, 2026", estimate: "Sep 14, 2026", completed: false, hasHappened: false },
@@ -225,6 +226,7 @@ async function main() {
         { label: "PSA Effective Date", date: "May 12, 2026", estimate: null, completed: true, hasHappened: true },
         { label: "Receive 1st Draft Cost to Complete", date: "Jun 1, 2026", estimate: "Jun 10, 2026", completed: false, hasHappened: false },
         { label: "Finalize Cost to Complete / Final Purchase Price", date: null, estimate: "Jul 15, 2026", completed: false, hasHappened: false },
+        { label: "Investment Committee Book Complete", date: null, estimate: "Aug 5, 2026", completed: false, hasHappened: false },
         { label: "Investment Committee Approval", date: null, estimate: null, completed: false, hasHappened: false },
         { label: "Waive Feasibility", date: null, estimate: "Aug 3, 2026", completed: false, hasHappened: false },
         { label: "Closing Date", date: "Aug 30, 2026", estimate: "Sep 14, 2026", completed: false, hasHappened: false },
@@ -293,6 +295,7 @@ async function main() {
       upcomingMilestones: [
         { label: "Receive 1st Draft Cost to Complete", date: "Jun 1, 2026", estimate: "May 20, 2026", overdue: true },
         { label: "Finalize Cost to Complete / Final Purchase Price", date: null, estimate: "Jul 15, 2026", overdue: false },
+        { label: "Investment Committee Book Complete", date: "Aug 5, 2026", estimate: null, overdue: false },
         { label: "Investment Committee Approval", date: "Aug 12, 2026", estimate: "Aug 12, 2026", overdue: false },
         { label: "Waive Feasibility", date: null, estimate: null, overdue: false },
         { label: "Closing Date", date: "Aug 30, 2026", estimate: "Sep 14, 2026", overdue: false },
