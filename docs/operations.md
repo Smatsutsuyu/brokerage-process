@@ -146,7 +146,7 @@ Sentry was removed early in the build to reduce vendor count. The primary error 
 | Specific page or API route misbehaves | Same Logs tab, filter by the route path (for example `/api/deals/[id]/marketing-report.pdf`). |
 | Slow page loads | Neon dashboard, project `brokerage-process`, **Monitoring**, Slow queries view. Cross-reference with the Vercel function logs for the same time range. |
 | Email did not send or bounced | Resend dashboard, **Logs** tab. Each send is recorded with status, recipient, and the SDK error if any. |
-| Visual or UX bug a user reported | Ask the user to file in-app feedback via the floating button or the per-section bubble icons. The submission captures the page URL, commit SHA, and an optional screenshot. View on `/admin/feedback`. |
+| Visual or UX bug a user reported | Ask the user to file in-app feedback via the floating Feedback button at the bottom right of every page. The submission captures the page URL, commit SHA, and an optional screenshot. View on `/admin/feedback`. |
 
 Vercel's status page at `https://www.vercel-status.com` is worth checking first when nothing app-specific seems wrong.
 

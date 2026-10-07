@@ -18,7 +18,7 @@ This file is the authoritative project context for Claude Code working on the La
 - [docs/backlog.md](docs/backlog.md): prioritized list of fixes / optimizations / hardening items from the 2026-05-19 multi-agent review. Pick from P0 first.
 - [docs/status-log.md](docs/status-log.md): historical prose log of decisions + blockers (entries through ~2026-05-07; gap covered by build-progress.md).
 
-**Reviewing client feedback during the build**: Chris uses an in-app feedback widget (floating button + per-section 💬 icons) to leave notes while exercising the platform. Notes flow into the `feedback_items` Postgres table. Read them with `npm run feedback:report` (defaults to "new" items grouped by section, with build commit SHA so you can correlate against deployed code). Disabled via `NEXT_PUBLIC_FEEDBACK_ENABLED=false` for production launch. See `docs/local-development.md` for full mechanics including how to mark items reviewed/actioned.
+**Reviewing client feedback during the build**: Chris uses an in-app feedback widget (floating button, bottom right of every page; the per-section 💬 icons were removed 2026-10-06 as the build left the dev stage) to leave notes while exercising the platform. Notes flow into the `feedback_items` Postgres table. Read them with `npm run feedback:report` (defaults to "new" items grouped by section, with build commit SHA so you can correlate against deployed code). Disabled via `NEXT_PUBLIC_FEEDBACK_ENABLED=false` for production launch. See `docs/local-development.md` for full mechanics including how to mark items reviewed/actioned.
 
 **Current phase (as of 2026-05-18):** Phase 1 shipped 2026-05-01. Phase 2 (templated documents + email pipeline) substantially shipped: Marketing Report PDF, Q&A File PDF, Issues Report PDF, Resend pipeline with owner-only feedback notification subscriptions, OM blast preview modal with tier + lead filtering, per-contact communication opt-out, per-builder Confi-signed tracking, Deal Team tab with send-to-team buttons, threaded feedback comments + file attachments, per-user deal reordering in the sidebar, replaced the placeholder LAO mountain wordmark with the real LAO logo image. Phase 1-4 checklist content reconciled against Excel v2 + Chris's 2026-05-18 Phase 4 milestone-date rework. Auto-applied template-evolution framework (apply-renames + reconcile-checklists, both wired into vercel-build) lets the template be the source of truth without manual data migrations. **Still pending in Phase 2:** AI deliverables (deferred, see scope decisions below). **Phase 3 (polish + handoff):** has not formally begun; this file plus the four companion docs above are the start of the handoff documentation pass.
 
@@ -607,7 +607,7 @@ By end of week 1: logged-in user, org context active, empty deal pages, all infr
 - Issues tracker → **Done** (status, priority, assignee, identified/resolved dates)
 - Consultant roster → **Done** (13 roles with buyer/seller side, multiple firms per role)
 - Profile page + Members admin → **Done** (added during 2026-05-01 batch)
-- In-app feedback widget → **Done** (per-section 💬 affordances + floating button; `npm run feedback:report` reads it)
+- In-app feedback widget → **Done** (floating button; per-section 💬 affordances removed 2026-10-06; `npm run feedback:report` reads it)
 - Four Contacts UX prototypes → **Done** (parallel tabs for client review)
 - Phase 2 placeholder buttons throughout → **Done** (Sonner-toast surface area for design sign-off before any Phase 2 code)
 

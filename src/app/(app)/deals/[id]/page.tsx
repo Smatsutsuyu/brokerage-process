@@ -16,7 +16,6 @@ import {
   qaItems,
   users,
 } from "@/db/schema";
-import { FeedbackZone } from "@/components/feedback/feedback-zone";
 import { Sidebar } from "@/components/layout/sidebar";
 import { getCurrentOrg } from "@/lib/auth/get-current-org";
 
@@ -276,80 +275,64 @@ export default async function DealPage({
 
   return (
     <>
-      <FeedbackZone section="sidebar">
-        <Sidebar activeDealId={id} />
-      </FeedbackZone>
+      <Sidebar activeDealId={id} />
       <main className="bg-brand-bg flex-1 overflow-y-auto px-8 py-8 [scrollbar-gutter:stable]">
-        <FeedbackZone section="deal-header" align="far">
-          <DealHeader
-            name={deal.name}
-            subtitle={[
-              [deal.city, deal.state].filter(Boolean).join(", ") || "No location",
-              `${counts.checklist.done}/${counts.checklist.total} checklist`,
-              `${counts.contacts} contacts`,
-              `${counts.qa.approved}/${counts.qa.total} Q&A`,
-              `${counts.issuesOpen} open issues`,
-            ].join(" · ")}
-            priority={deal.priority}
-            progressPct={pct}
-            deal={{
-              dealId: deal.id,
-              name: deal.name,
-              units: deal.units,
-              city: deal.city,
-              state: deal.state,
-              type: deal.type,
-              priority: deal.priority,
-              // Drizzle returns numeric() columns as a string; render layer wants Number.
-              purchasePrice:
-                deal.purchasePrice != null ? Number(deal.purchasePrice) : null,
-              archivedAt: deal.archivedAt ? deal.archivedAt.toISOString() : null,
-              notes: deal.notes,
-            }}
-            hasBanner={Boolean(deal.bannerImagePath)}
-          />
-        </FeedbackZone>
+        <DealHeader
+          name={deal.name}
+          subtitle={[
+            [deal.city, deal.state].filter(Boolean).join(", ") || "No location",
+            `${counts.checklist.done}/${counts.checklist.total} checklist`,
+            `${counts.contacts} contacts`,
+            `${counts.qa.approved}/${counts.qa.total} Q&A`,
+            `${counts.issuesOpen} open issues`,
+          ].join(" · ")}
+          priority={deal.priority}
+          progressPct={pct}
+          deal={{
+            dealId: deal.id,
+            name: deal.name,
+            units: deal.units,
+            city: deal.city,
+            state: deal.state,
+            type: deal.type,
+            priority: deal.priority,
+            // Drizzle returns numeric() columns as a string; render layer wants Number.
+            purchasePrice:
+              deal.purchasePrice != null ? Number(deal.purchasePrice) : null,
+            archivedAt: deal.archivedAt ? deal.archivedAt.toISOString() : null,
+            notes: deal.notes,
+          }}
+          hasBanner={Boolean(deal.bannerImagePath)}
+        />
         <DealTabs counts={counts}>
           {{
             checklist: (
-              <FeedbackZone section="deal-checklist">
-                <ChecklistView
-                  dealId={id}
-                  categories={categories}
-                  items={itemsForClient}
-                  documentsByItemId={documentsByItemId}
-                  linksByItemId={linksByItemId}
-                  psaAttorney={{
-                    rows: psaAttorneyRows,
-                    drafting: deal.psaDrafting,
-                  }}
-                />
-              </FeedbackZone>
+              <ChecklistView
+                dealId={id}
+                categories={categories}
+                items={itemsForClient}
+                documentsByItemId={documentsByItemId}
+                linksByItemId={linksByItemId}
+                psaAttorney={{
+                  rows: psaAttorneyRows,
+                  drafting: deal.psaDrafting,
+                }}
+              />
             ),
             contacts: (
-              <FeedbackZone section="deal-contacts">
-                <ContactsView dealId={id} layout={contactsLayout} />
-              </FeedbackZone>
+              <ContactsView dealId={id} layout={contactsLayout} />
             ),
             qa: (
-              <FeedbackZone section="deal-qa">
-                <QaView dealId={id} />
-              </FeedbackZone>
+              <QaView dealId={id} />
             ),
             issues: (
-              <FeedbackZone section="deal-issues">
-                <IssuesView dealId={id} />
-              </FeedbackZone>
+              <IssuesView dealId={id} />
             ),
             consultants: (
-              <FeedbackZone section="deal-consultants">
-                <ConsultantsView dealId={id} />
-              </FeedbackZone>
+              <ConsultantsView dealId={id} />
             ),
             team: (
-              <FeedbackZone section="deal-team">
-                <TeamView dealId={id} />
-              </FeedbackZone>
+              <TeamView dealId={id} />
             ),
           }}
         </DealTabs>

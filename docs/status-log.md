@@ -4,6 +4,12 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-10-06 (last): per-section feedback icons removed
+
+The build is leaving the dev stage, so Sean asked to drop the hover-to-reveal 💬 icons on each section and keep only the floating Feedback button at the bottom right. Removed every `FeedbackZone` wrapper (sidebar on both pages, home empty state, deal header, all six deal tabs, priority ribbon) and deleted the component. The wrappers were plain `relative` divs; the one that carried layout classes (`flex flex-1` on the home empty state) wrapped a `<main>` that already had `flex-1`, so the layout is unchanged. Checked both pages locally. New submissions all land under section `general`, with the page URL still recorded. The floating button and the whole pipeline behind it are untouched; `NEXT_PUBLIC_FEEDBACK_ENABLED=false` still turns the lot off.
+
+---
+
 ## 2026-10-06 (later): priority ribbon hidden when empty
 
 Sean asked whether anyone uses High Priority. Prod: all 8 deals normal, and the audit log has no priority change since deal edits started being logged in late August (only the two deal creations, both normal). Asked to hide the bar unless something is starred. Done in the ribbon component itself, which returns null when the list is empty. Verified locally in both directions through the Edit Deal dialog: unstarring removes the bar immediately and re-starring brings it back. Note for whoever reads this later: priority is set on the deal, not per user, so "your" high-priority deals are everyone's.

@@ -168,7 +168,7 @@ While Chris is exercising the platform during the build, he can leave in-app fee
 **How it works**
 
 - Floating "Feedback" button bottom-right of every page → captures general/page-level notes.
-- Hover over any major section (sidebar, priority ribbon, deal header, each tab) → a small 💬 icon appears in the corner. Click it to comment specifically on that section.
+- Per-section 💬 icons (hover a section, comment on just that section) existed during the build and were removed 2026-10-06. Submissions now all come from the floating button, filed under section `general`; the page URL still records where the user was.
 - Each submission captures: section name, page URL, build commit SHA, severity (nit/suggestion/bug/blocker), comment, and submitter email.
 - Stored in the `feedback_items` table.
 
@@ -206,6 +206,6 @@ Set `NEXT_PUBLIC_FEEDBACK_ENABLED=false` in the production environment (Vercel d
 2. Delete `src/scripts/feedback-report.ts`
 3. Delete `src/db/schema/feedback.ts` and the two `feedback_*` enums in `enums.ts`
 4. Generate a migration to drop the table
-5. Remove `<FeedbackShell>` and `<FeedbackZone>` references from `src/app/(app)/layout.tsx` and the deal pages
+5. Remove the `<FeedbackShell>` wrapper from `src/app/(app)/layout.tsx`
 6. Remove `NEXT_PUBLIC_FEEDBACK_ENABLED`, `NEXT_PUBLIC_COMMIT_SHA` from `src/lib/env.ts` and `.env.example`
 7. Remove the SHA capture from `next.config.ts`

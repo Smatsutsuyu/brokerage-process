@@ -14,8 +14,8 @@ const FeedbackContext = createContext<FeedbackContextValue | null>(null);
 export function useFeedback(): FeedbackContextValue {
   const ctx = useContext(FeedbackContext);
   if (!ctx) {
-    // Return a no-op context when feedback is disabled — lets FeedbackZone
-    // and FeedbackButton render without throwing.
+    // Return a no-op context when feedback is disabled — lets
+    // FeedbackButton render without throwing.
     return {
       isOpen: false,
       section: "general",
