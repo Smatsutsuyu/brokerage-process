@@ -218,6 +218,10 @@ Step 2 of the plan in [backlog.md](backlog.md). The Phase 1 "Determine PSA Attor
 - **The backfill ships WITH the read change, not after it.** A production dry-run through the real transform found two deals whose attorney existed only in the legacy columns; without the backfill in the same deploy they would have silently read "no attorney on the roster yet". That resequenced the plan.
 - **Fixed while here**: `updateConsultant` and `deleteConsultant` scoped by consultant id and org but not deal, unlike every sibling query. Harmless while the only caller passed an id read off the same deal; this change adds a second caller.
 
+## Priority ribbon hides when nothing is starred (2026-10-06)
+
+The navy "High Priority" bar at the top of every page now renders nothing when no active deal is set to High. A prod check found all 8 deals at normal and no priority change in the audit log, so the bar was an empty strip on every page. Priority stays per-deal and org-wide: the bar returns for everyone as soon as any deal is starred, and leaves as soon as the last one is unstarred, without a reload. Its FeedbackZone moved from the layout into `priority-ribbon.tsx` so a hidden ribbon leaves no empty zone behind.
+
 ## Questions for Owner row + owner-only Deal Team send (2026-10-06)
 
 Closes feedback item `5c901a47` (filed by the marketing coordinator for Chris). New Phase 1 Underwriting & OM row, "Questions for Owner", directly above Offering Memorandum (OM), with an "Email owner" button.

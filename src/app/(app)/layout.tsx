@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { ConfirmProvider } from "@/components/confirm/confirm-provider";
 import { FeedbackShell } from "@/components/feedback/feedback-shell";
-import { FeedbackZone } from "@/components/feedback/feedback-zone";
 import { PriorityRibbon } from "@/components/layout/priority-ribbon";
 import { Toaster } from "@/components/ui/sonner";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
@@ -24,9 +23,8 @@ export default async function AppLayout({ children }: Readonly<{ children: React
             past the visible area on tablets, hiding the sidebar's
             bottom-pinned UserLink under the system nav. */}
         <div className="flex h-dvh flex-col">
-          <FeedbackZone section="priority-ribbon" align="inside">
-            <PriorityRibbon />
-          </FeedbackZone>
+          {/* Renders nothing when no active deal is high priority. */}
+          <PriorityRibbon />
           <div className="flex min-h-0 flex-1">{children}</div>
         </div>
       </FeedbackShell>

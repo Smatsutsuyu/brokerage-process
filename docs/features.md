@@ -34,7 +34,7 @@ The left sidebar is always present once you are signed in. The top shows the Lan
 
 Hover any deal row to reveal small up and down chevrons on the right edge. Click to reorder. The ordering is per-user, so each member arranges their own working list without affecting anyone else.
 
-Above the sidebar, a dark navy ribbon spans the top of the app and pins every deal flagged as high priority in your org. Click any pinned deal to jump to it. If nothing is starred, the ribbon shows "Star a deal to pin it here."
+Above the sidebar, a dark navy ribbon spans the top of the app and pins every deal flagged as high priority in your org. Click any pinned deal to jump to it. If no active deal is starred, the ribbon is hidden entirely and the page starts at the sidebar; it reappears for everyone as soon as any deal is set to High priority.
 
 Below the deal list, the sidebar links to two org-wide directories (Builders, Contacts) and, for owners only, an Admin section with Members and Feedback. Your name and role sit at the bottom; clicking opens your profile.
 

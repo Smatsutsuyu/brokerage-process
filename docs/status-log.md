@@ -4,6 +4,12 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-10-06 (later): priority ribbon hidden when empty
+
+Sean asked whether anyone uses High Priority. Prod: all 8 deals normal, and the audit log has no priority change since deal edits started being logged in late August (only the two deal creations, both normal). Asked to hide the bar unless something is starred. Done in the ribbon component itself, which returns null when the list is empty. Verified locally in both directions through the Edit Deal dialog: unstarring removes the bar immediately and re-starring brings it back. Note for whoever reads this later: priority is set on the deal, not per user, so "your" high-priority deals are everyone's.
+
+---
+
 ## 2026-10-06: Questions for Owner
 
 New feedback (`5c901a47`, from the marketing coordinator on Chris's behalf): a "Questions for Owner" checkbox in Phase 1 Underwriting & OM, above the OM, that tees up an email asking the owner for OM input. Marked the Investment Committee item actioned in the same pass after confirming the backfill landed on all 8 prod deals.
