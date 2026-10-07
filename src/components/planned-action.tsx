@@ -4,12 +4,11 @@ import type { LucideIcon } from "lucide-react";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-// Phase tag drives the toast subtitle so Chris can see roughly when each
-// placeholder will be implemented. Mostly-aspirational right now — we're in
-// Phase 1, Phase 2 is templated PDFs + email, Phase 3 is polish + handoff.
+// Phase tag shown under the description so readers can see roughly when
+// each placeholder is expected to land.
 export type PlannedPhase = "phase_2" | "phase_3" | "future";
 
 const PHASE_LABEL: Record<PlannedPhase, string> = {
@@ -43,10 +42,10 @@ export function toastComingSoon(opts: {
 }
 
 type PlannedActionProps = {
-  // Short verb-phrase shown in the toast title, e.g. "Send OM blast" or
+  // Short verb-phrase shown as the tooltip title, e.g. "Send OM blast" or
   // "Generate Marketing Report PDF".
   feature: string;
-  // Longer description shown in the toast body. Should explain what will
+  // Longer description shown in the tooltip body. Should explain what will
   // happen when the button is real.
   description: string;
   // Roughly when this lands. Affects the subtitle copy.
@@ -55,6 +54,8 @@ type PlannedActionProps = {
   label: string;
   icon?: LucideIcon;
   size?: "sm" | "default";
+  // Kept for call-site compatibility; every placeholder now renders in the
+  // same grayed-out style regardless.
   variant?: "default" | "outline" | "ghost";
   className?: string;
   // When true, the button is rendered minimally (just icon + label, no full
@@ -62,10 +63,14 @@ type PlannedActionProps = {
   compact?: boolean;
 };
 
-// Renders like a real action button but on click shows a "coming soon" toast
-// with a phase tag. Used to flesh out the design for client sign-off before
-// any of the underlying functionality is built. Each placeholder names its
-// future feature so reviewers can see exactly what each affordance will do.
+// A button for a feature that isn't built yet. Grayed out and inert, with
+// the explanation in a hover tooltip, so it reads as "not here yet" at a
+// glance (Sean, 2026-10-06). It used to look like a live button and only
+// revealed itself with a "Coming soon" toast on click.
+//
+// aria-disabled rather than the disabled attribute: a disabled button
+// swallows pointer events in some browsers, which would kill the hover
+// tooltip that is now the whole point.
 export function PlannedAction({
   feature,
   description,
@@ -73,49 +78,41 @@ export function PlannedAction({
   label,
   icon: Icon,
   size = "sm",
-  variant = "outline",
   className,
   compact = false,
 }: PlannedActionProps) {
-  function handleClick(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    toastComingSoon({ feature, description, phase });
-  }
+  const chrome = compact
+    ? "gap-1 rounded px-2 py-1 text-[11px]"
+    : cn(
+        "gap-1.5 rounded-md border border-dashed border-gray-200 bg-gray-50 font-medium",
+        size === "sm" ? "h-8 px-3 text-xs" : "h-9 px-4 text-sm",
+      );
+  const iconSize = compact ? "h-3 w-3" : "h-3.5 w-3.5";
 
-  if (compact) {
-    return (
-      <button
+  return (
+    <Tooltip>
+      <TooltipTrigger
         type="button"
-        onClick={handleClick}
-        title={`${feature} — ${PHASE_LABEL[phase]}`}
+        aria-disabled="true"
+        aria-label={`${label} (not available yet)`}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
         className={cn(
-          "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-amber-50 hover:text-amber-700",
+          "inline-flex cursor-not-allowed items-center font-medium whitespace-nowrap text-gray-300 select-none",
+          chrome,
           className,
         )}
       >
-        {Icon && <Icon className="h-3 w-3" />}
+        {Icon && <Icon className={iconSize} />}
         {label}
-      </button>
-    );
-  }
-
-  return (
-    <Button
-      type="button"
-      size={size}
-      variant={variant}
-      onClick={handleClick}
-      title={`${feature} — ${PHASE_LABEL[phase]}`}
-      className={cn(
-        // Subtle visual hint that this isn't a real action yet — dashed
-        // border + amber accent. Hover brightens to standard.
-        variant === "outline" && "border-dashed text-gray-600 hover:border-amber-400 hover:bg-amber-50 hover:text-amber-800",
-        className,
-      )}
-    >
-      {Icon && <Icon className="h-3.5 w-3.5" />}
-      {label}
-    </Button>
+      </TooltipTrigger>
+      <TooltipContent className="space-y-1">
+        <p className="font-semibold text-slate-800">Not available yet: {feature}</p>
+        <p className="text-slate-600">{description}</p>
+        <p className="text-[11px] font-semibold text-amber-700">{PHASE_LABEL[phase]}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }

@@ -98,7 +98,7 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
                 feature: "Premium Analysis PDF",
                 description:
                   "Renders a Land Advisors-branded Premium Analysis PDF from this deal's pricing inputs.",
-                phase: "phase_2",
+                phase: "future",
               },
             ],
           },
@@ -112,7 +112,7 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
                 feature: "Valuation PDF",
                 description:
                   "Renders a Land Advisors-branded Valuation PDF from this deal's CMA / Premium / RPA inputs.",
-                phase: "phase_2",
+                phase: "future",
               },
             ],
           },
@@ -132,7 +132,7 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
                 feature: "CFD Analysis PDF",
                 description:
                   "Renders a Land Advisors-branded PDF using the CFD template populated from this deal's structured data.",
-                phase: "phase_2",
+                phase: "future",
               },
             ],
           },
@@ -155,7 +155,7 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
                 feature: "Entitlement Schedule PDF",
                 description:
                   "Renders the Entitlement Schedule template as a Land Advisors-branded PDF.",
-                phase: "phase_2",
+                phase: "future",
               },
             ],
           },
@@ -168,7 +168,7 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
                 label: "Generate PDF",
                 feature: "Development Schedule PDF",
                 description: "Renders the Development Schedule template as a branded PDF.",
-                phase: "phase_2",
+                phase: "future",
               },
             ],
           },
@@ -180,7 +180,7 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
                 label: "Generate PDF",
                 feature: "Entitlement Summary PDF",
                 description: "Renders the Entitlement Summary template as a branded PDF.",
-                phase: "phase_2",
+                phase: "future",
               },
             ],
           },
@@ -205,7 +205,7 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
                 feature: "Custom Underwriting File",
                 description:
                   "Generates a populated copy of the standard UW Excel template using this deal's data.",
-                phase: "phase_2",
+                phase: "future",
               },
             ],
           },
@@ -304,7 +304,7 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
                 feature: "Compiled offer package PDF",
                 description:
                   "Merges the SOO matrix, underwriting summaries, revenue charts, and supporting docs into a single PDF for ownership review.",
-                phase: "phase_2",
+                phase: "future",
               },
             ],
           },

@@ -34,7 +34,9 @@ import { PsaKickoffRowActions } from "./psa-kickoff-row-actions";
 import { UnifiedDealTeamSendButton } from "./unified-deal-team-send-button";
 import { OmBlastButton } from "./om-blast-button";
 import { QaFilePdfButton } from "./qa-file-pdf-button";
+import { SendFollowUpButton } from "./send-follow-up-button";
 import { SendMarketingReportButton } from "./send-marketing-report-button";
+import { SendQaFileButton } from "./send-qa-file-button";
 import { ShareDdMaterialRowActions } from "./share-dd-material-row-actions";
 
 import {
@@ -44,8 +46,6 @@ import {
   MARKET_STUDY_TEMPLATE,
   OFFERS_DUE_DAY_OF_TEMPLATE,
   OFFERS_DUE_NOTICE_TEMPLATE,
-  OFFERS_FOLLOWUP_TEMPLATE,
-  QA_FILE_TEMPLATE,
   QUESTIONS_FOR_OWNER_TEMPLATE,
   DD_CALL_SCHEDULING_TEMPLATE,
   SCHEDULE_SOO_REVIEW_TEMPLATE,
@@ -545,15 +545,7 @@ export function PhaseSection({
                             {isQaFileItem(item.name) && (
                               <>
                                 <QaFilePdfButton dealId={dealId} variant="compact" />
-                                <BuyerBlastButton
-                                  dealId={dealId}
-                                  label="Send Q&A"
-                                  modalTitle="Q&A File distribution"
-                                  title="Filter buyers and send the Q&A file (attached from this row)."
-                                  template={QA_FILE_TEMPLATE}
-                                  defaultTiers={["green", "yellow"]}
-                                  attachmentSourceItemId={item.id}
-                                />
+                                <SendQaFileButton dealId={dealId} qaFileItemId={item.id} />
                               </>
                             )}
                             {isShareMarketStudyItem(item.name) && (
@@ -618,15 +610,7 @@ export function PhaseSection({
                               />
                             )}
                             {isFollowUpMissingOffersItem(item.name) && (
-                              <BuyerBlastButton
-                                dealId={dealId}
-                                label="Send follow-up"
-                                modalTitle="Follow-up to non-responders"
-                                title="Filter to green/yellow buyers who haven't submitted an offer yet (Offer flag unchecked on the contacts card)."
-                                template={OFFERS_FOLLOWUP_TEMPLATE}
-                                defaultTiers={["green", "yellow"]}
-                                excludeOfferReceived
-                              />
+                              <SendFollowUpButton dealId={dealId} />
                             )}
                             {/* Phase 2 "Send Marketing Report" row -> two-step
                                 modal (PDF preview -> email composer). To: Owner

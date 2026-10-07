@@ -9,7 +9,7 @@ Companion docs:
 
 ## At a glance
 
-The Lakebridge brokerage platform is a workflow and document automation tool for residential land brokerage. It tracks the four-phase deal lifecycle, manages buyer contacts, generates Land Advisors branded PDFs (Marketing Report, Q&A File, Issues PDF), and sends templated emails through Resend. There are no AI features in this build (that work is a separate future engagement). All vendor accounts are owned by Lakebridge. The application is deployed on Vercel at `https://brokerage.lakebridgecap.com` (production) with preview URLs for every pull request. The source code lives in the Lakebridge GitHub organization at the `brokerage_process` repository. Pushes to the `main` branch deploy automatically.
+The Lakebridge brokerage platform is a workflow and document automation tool for residential land brokerage. It tracks the four-phase deal lifecycle, manages buyer contacts, generates Land Advisors branded PDFs (Marketing Report, Q&A File, Due Diligence Tracking, Deal Status, Consultant Roster), and sends templated emails through Resend. There are no AI features in this build (that work is a separate future engagement). All vendor accounts are owned by Lakebridge. The application is deployed on Vercel at `https://brokerage-process.vercel.app` (production; the planned custom subdomain `brokerage.lakebridgecap.com` has not been set up in DNS, so if it is added later, update `BETTER_AUTH_URL` and `NEXT_PUBLIC_APP_URL` to match) with preview URLs for every pull request. The source code lives in the Lakebridge GitHub organization at the `brokerage_process` repository. Pushes to the `main` branch deploy automatically.
 
 ## Vendor accounts
 
@@ -117,7 +117,7 @@ There is no retention job. `audit_log` is append-only and grows without bound; C
    - `npm run rename:apply` runs `src/scripts/apply-renames.ts`, which applies any pending checklist category or item renames, deletes, moves, or merges from the historical evolution registry. Idempotent.
    - `npm run checklist:reconcile` runs `src/scripts/reconcile-checklists.ts`, which walks every deal and ensures the current `CHECKLIST_TEMPLATE` (in `src/db/checklist-template.ts`) is reflected. Adds missing items at the correct position, updates sort order when it drifts. Never deletes; never modifies names. Idempotent.
    - `next build` produces the optimized production bundle.
-5. Vercel promotes the new build to production at `https://brokerage.lakebridgecap.com`.
+5. Vercel promotes the new build to production at `https://brokerage-process.vercel.app`.
 
 If any of those pre-build steps fail, the deploy is aborted and the previous production build stays live. The full log is in the Vercel dashboard under the failed deployment.
 
@@ -264,7 +264,7 @@ Canonical list of expected env vars (from `src/lib/env.ts`):
 
 - `DATABASE_URL` (Sensitive, required): Neon Postgres connection string.
 - `BETTER_AUTH_SECRET` (Sensitive, required, 32+ chars): signing secret for auth sessions.
-- `BETTER_AUTH_URL` (required): the public URL of the app (production: `https://brokerage.lakebridgecap.com`).
+- `BETTER_AUTH_URL` (required): the public URL of the app (production: `https://brokerage-process.vercel.app` until a custom domain is added).
 - `RESEND_API_KEY` (Sensitive, optional): Resend API key. When unset, email sends are no-ops.
 - `EMAIL_FROM` (optional): from-address for the feedback-notification pipeline (currently `no-reply@landadvisors.com`). Client-facing sends override this per call.
 - `SEND_INTERVAL_MS` (optional): minimum gap in milliseconds between outbound blast sends. Throttles a blast under Resend's per-second rate limit. When unset, the code default (250ms ≈ 4 sends/sec) applies. Raise it if Resend lowers the cap or blasts still hit rate limits; set to `0` to disable throttling.

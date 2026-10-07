@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
-import { PlannedAction } from "@/components/planned-action";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,6 +32,7 @@ import { BuyerCommentsEditor } from "../buyer-comments-editor";
 import { LeadPicker, type LeadOption } from "../lead-picker";
 import { InternalMarketingReportPdfButton } from "../internal-marketing-report-pdf-button";
 import { MarketingReportPdfButton } from "../marketing-report-pdf-button";
+import { SendFollowUpButton } from "../send-follow-up-button";
 import { SendMarketingReportButton } from "../send-marketing-report-button";
 import { OmBlastButton } from "../om-blast-button";
 import { ReceivesCommunicationToggle } from "../receives-communication-toggle";
@@ -297,13 +297,7 @@ export function OptionACards({ dealId, groups, leadOptions, orgContacts }: Optio
           <InternalMarketingReportPdfButton dealId={dealId} />
           <SendMarketingReportButton dealId={dealId} compact={false} />
           <OmBlastButton dealId={dealId} compact={false} />
-          <PlannedAction
-            label="Send follow-up"
-            icon={Mail}
-            feature="Follow-up to non-responders"
-            description="Drafts a templated follow-up email to Green/Yellow buyers who have OM Sent but no offer received yet."
-            phase="phase_2"
-          />
+          <SendFollowUpButton dealId={dealId} compact={false} />
           {orgContacts.length > 0 && (
             <Button
               size="sm"

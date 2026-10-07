@@ -4,6 +4,31 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-10-06 (placeholders): tab shortcuts wired, the rest grayed out
+
+Sean asked to wire the two cheap placeholder buttons (Q&A tab Send Q&A, Contacts tab Send follow-up) and make every other placeholder obviously unavailable: grayed out, with the old "Coming soon" text as a hover tooltip.
+
+Built as shared components rather than copies, so a tab button and its checklist-row twin cannot drift. While in the Contacts layouts I found my earlier claim was wrong: I had said layouts B/C/D were only reachable through a URL parameter, but the tab shows a Layout switcher, so their placeholder Send OM blast / Send follow-up buttons were user-visible. Wired those too.
+
+The deferred items' tooltips previously would have said "Phase 2 — document & email automation", which is stale; they now say "Future engagement". Initial Summary of Offers + LOIS stays tagged as planned in-scope work.
+
+Verified in the local app: nine grayed checklist buttons with working tooltips, Send Q&A on the Q&A tab opens the Q&A File blast, Send follow-up on the Contacts tab opens the non-responder blast (excluding builders whose Offer flag is set), and the Grouped layout shows the real buttons.
+
+---
+
+## 2026-10-06 (docs audit): present-state pass
+
+Sean asked for the docs to match the present state. Corrections made:
+
+- **Production URL was wrong everywhere.** Docs said `https://brokerage.lakebridgecap.com`; that host does not resolve. Production is `https://brokerage-process.vercel.app` (serves the Land Advisors Portal sign-in). `portal.lakebridgecap.com` is a different Lakebridge app ("Sponsor Portal"), not this one. Fixed in `operations.md`, `.env.example` and the CLAUDE.md current-phase summary; the custom subdomain is recorded as never set up, with a note to update `BETTER_AUTH_URL` and `NEXT_PUBLIC_APP_URL` if it is added.
+- **CLAUDE.md "Current phase"** was dated 2026-05-18 and said Phase 3 had not begun. Rewritten for today.
+- **`operations.md`** listed the old PDF set (Issues PDF); now the five current PDFs.
+- **`features.md`** placeholder list was missing Development Schedule, Initial Summary of Offers + LOIS and the two tab-level placeholders. Now lists all eleven.
+- **`schema.md`** said ten date-bearing items; eleven since Investment Committee Book Complete.
+- **`backlog.md`**: the "uncommitted" Team-add Select fix was committed long ago (`75b0a8d`); struck through. Placeholder inventory re-dated. (A note added here that layouts B/C/D were only reachable via `?layout=` was wrong and was corrected the same day: the Contacts tab has a visible Layout switcher.)
+
+---
+
 ## 2026-10-06 (last): per-section feedback icons removed
 
 The build is leaving the dev stage, so Sean asked to drop the hover-to-reveal 💬 icons on each section and keep only the floating Feedback button at the bottom right. Removed every `FeedbackZone` wrapper (sidebar on both pages, home empty state, deal header, all six deal tabs, priority ribbon) and deleted the component. The wrappers were plain `relative` divs; the one that carried layout classes (`flex flex-1` on the home empty state) wrapped a `<main>` that already had `flex-1`, so the layout is unchanged. Checked both pages locally. New submissions all land under section `general`, with the page URL still recorded. The floating button and the whole pipeline behind it are untouched; `NEXT_PUBLIC_FEEDBACK_ENABLED=false` still turns the lot off.

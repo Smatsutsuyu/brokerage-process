@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 
 import { useConfirm } from "@/components/confirm/confirm-provider";
-import { PlannedAction } from "@/components/planned-action";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -30,6 +29,8 @@ import { BuyerCheckbox } from "../buyer-checkbox";
 import { LeadPicker, type LeadOption } from "../lead-picker";
 import { InternalMarketingReportPdfButton } from "../internal-marketing-report-pdf-button";
 import { MarketingReportPdfButton } from "../marketing-report-pdf-button";
+import { OmBlastButton } from "../om-blast-button";
+import { SendFollowUpButton } from "../send-follow-up-button";
 import { SendMarketingReportButton } from "../send-marketing-report-button";
 import {
   PickExistingContactModal,
@@ -184,20 +185,8 @@ export function OptionDCompact({ dealId, groups, leadOptions, orgContacts }: Opt
           <MarketingReportPdfButton dealId={dealId} />
           <InternalMarketingReportPdfButton dealId={dealId} />
           <SendMarketingReportButton dealId={dealId} compact={false} />
-          <PlannedAction
-            label="Send OM blast"
-            icon={Mail}
-            feature="OM blast email"
-            description="Composes templated OM-distribution emails per buyer tier (Green / Yellow), opens a review screen, then sends via Resend."
-            phase="phase_2"
-          />
-          <PlannedAction
-            label="Send follow-up"
-            icon={Mail}
-            feature="Follow-up to non-responders"
-            description="Drafts a templated follow-up email to Green/Yellow buyers who have OM Sent but no offer received yet."
-            phase="phase_2"
-          />
+          <OmBlastButton dealId={dealId} compact={false} />
+          <SendFollowUpButton dealId={dealId} compact={false} />
           {orgContacts.length > 0 && (
             <Button
               size="sm"

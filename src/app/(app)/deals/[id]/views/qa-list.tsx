@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckCircle2, Loader2, Mail, Plus } from "lucide-react";
+import { CheckCircle2, Loader2, Plus } from "lucide-react";
 
-import { PlannedAction } from "@/components/planned-action";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +10,7 @@ import { addQaItem, approveAllQaItems } from "../actions";
 
 import { QaEntry } from "./qa-entry";
 import { QaFilePdfButton } from "./qa-file-pdf-button";
+import { SendQaFileButton } from "./send-qa-file-button";
 
 export type QaRow = {
   id: string;
@@ -22,10 +22,12 @@ export type QaRow = {
 
 type QaListProps = {
   dealId: string;
+  // Q&A File checklist row, for the Send Q&A attachments. See QaView.
+  qaFileItemId: string | null;
   items: QaRow[];
 };
 
-export function QaList({ dealId, items }: QaListProps) {
+export function QaList({ dealId, items, qaFileItemId }: QaListProps) {
   const [addingPending, startAdd] = useTransition();
   const [approveAllPending, startApproveAll] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -83,13 +85,7 @@ export function QaList({ dealId, items }: QaListProps) {
             Approve all
           </Button>
           <QaFilePdfButton dealId={dealId} />
-          <PlannedAction
-            label="Send Q&A"
-            icon={Mail}
-            feature="Q&A distribution shortcut"
-            description="Tab-level shortcut to the Phase 2 'Send Q&A' tier-filtered blast. Currently lives on the Q&A File checklist row; will be mirrored here next."
-            phase="phase_2"
-          />
+          <SendQaFileButton dealId={dealId} qaFileItemId={qaFileItemId} compact={false} />
         </div>
       </div>
 

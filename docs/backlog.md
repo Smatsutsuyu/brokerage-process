@@ -208,13 +208,11 @@ export async function writeAudit(entry: {
 ## P2 — Worth doing during Phase 3
 
 ### [UX] Wire up remaining "Coming soon" `PlannedAction` placeholders
-Inventory as of 2026-07-20. 16 total call sites split into two tiers by cost and by whether they're in scope for this build.
+Inventory as of 2026-07-20, updated 2026-10-06. **Since 2026-10-06 every remaining placeholder renders grayed out and inert, with its explanation in a hover tooltip** (was: a live-looking button that toasted "Coming soon" on click). Deferred items are tagged `phase: "future"` in the template so the tooltip says so.
 
 **Cheap tier — shortcuts / roster sends (in scope, ~15-30 min each):**
 - ~~`src/app/(app)/deals/[id]/views/consultants-list.tsx:80` "Email roster"~~ — **done 2026-07-30.** Replaced with the Consultant Roster PDF button + the two-step Deal Team send (preview PDF → compose with it attached). Note this shipped as "send the roster *to the Deal Team*", not the originally-sketched "blast to every consultant on the deal, filterable by side" — emailing the consultants themselves is still unbuilt and needs a separate ask from Chris.
-- `src/app/(app)/deals/[id]/views/qa-list.tsx:86` "Send Q&A" → tab-level shortcut to the working Q&A blast that already lives on the Q&A File checklist row. Second entry point to the same modal.
-- `src/app/(app)/deals/[id]/views/contacts-layouts/option-a-cards.tsx:300` "Send follow-up" → shortcut to the working `isFollowUpMissingOffersItem` BuyerBlastButton in phase-section.tsx.
-- Layouts B/C/D each carry a "Send OM blast" and "Send follow-up" placeholder (`option-b-pane.tsx`, `option-c-grouped.tsx`, `option-d-compact.tsx`). Fixing A alone leaves the alternates showing coming-soon toasts. Consistent with the "shared components across the four layouts" direction from the layouts-promotion refactor — bundle these when doing the feature-parity pass.
+- ~~Q&A tab "Send Q&A", Contacts tab "Send follow-up", and the "Send OM blast" / "Send follow-up" placeholders in layouts B/C/D~~ — **done 2026-10-06.** Extracted `SendQaFileButton` and `SendFollowUpButton` (`views/send-qa-file-button.tsx`, `views/send-follow-up-button.tsx`) and used them on both the checklist rows and the tabs; layouts B/C/D got the existing `OmBlastButton`. The Q&A tab resolves the Q&A File row server-side in `QaView` so its attachments match the row's. All four layouts are user-reachable through the Layout switcher on the Contacts tab.
 
 **Structural tier — new patterns (~1-3 hrs each, in scope):**
 - Phase 3 "Initial Summary of Offers + LOIS" row → email Owner Team with the current SOO. Needs an LOI-summary data model or a manual-entry surface first.
@@ -366,8 +364,8 @@ Inventory as of 2026-07-20. 16 total call sites split into two tiers by cost and
 
 ## Pending / uncommitted (carried over)
 
-### Team-add Select uncontrolled→controlled warning
-- **Status**: fixed, uncommitted in working tree.
+### ~~Team-add Select uncontrolled→controlled warning~~ (done, commit `75b0a8d`; confirmed in code 2026-10-06)
+- **Status**: committed. `team-add-modal.tsx` uses `value={row.roleLabel ?? null}`.
 - **What**: `src/app/(app)/deals/[id]/views/team-add-modal.tsx:413` Select started uncontrolled (`value={row.roleLabel ?? undefined}`), flipped to controlled once a role was picked. Changed to `value={row.roleLabel ?? null}` (Base UI's "no selection" sentinel).
 - **Fix**: already in working tree. Commit on the next batch.
 

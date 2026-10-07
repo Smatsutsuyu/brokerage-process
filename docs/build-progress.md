@@ -218,6 +218,11 @@ Step 2 of the plan in [backlog.md](backlog.md). The Phase 1 "Determine PSA Attor
 - **The backfill ships WITH the read change, not after it.** A production dry-run through the real transform found two deals whose attorney existed only in the legacy columns; without the backfill in the same deploy they would have silently read "no attorney on the roster yet". That resequenced the plan.
 - **Fixed while here**: `updateConsultant` and `deleteConsultant` scoped by consultant id and org but not deal, unlike every sibling query. Harmless while the only caller passed an id read off the same deal; this change adds a second caller.
 
+## Placeholder buttons grayed out, tab shortcuts wired (2026-10-06)
+
+- **Shortcuts wired.** The Q&A tab's Send Q&A and the Contacts tab's Send follow-up were "Coming soon" placeholders duplicating working checklist-row buttons. Both are now shared components (`SendQaFileButton`, `SendFollowUpButton`) rendered in both places, per the shared-shortcut rule. The three alternate Contacts layouts (Pane / Grouped / Compact, all reachable via the Layout switcher) also had placeholder Send OM blast and Send follow-up buttons; they now render the real ones.
+- **Remaining placeholders are visibly inert.** `PlannedAction` now renders grayed out with `cursor-not-allowed` and `aria-disabled`, and the old click toast became a hover tooltip (new `src/components/ui/tooltip.tsx`, a Base UI wrapper in the same shape as `popover.tsx`, portalled so rows can't clip it). `aria-disabled` rather than `disabled` because a disabled button drops the pointer events the tooltip needs. The eight deferred checklist actions are tagged `phase: "future"` so the tooltip reads "Future engagement" instead of the stale "Phase 2".
+
 ## Per-section feedback icons removed (2026-10-06)
 
 Leaving the dev stage. The hover-to-reveal 💬 icons on each section are gone (`FeedbackZone` deleted, all 11 call sites unwrapped). The floating Feedback button at the bottom right of every page stays, along with the report/update scripts and the admin Feedback page. Submissions now file under section `general` with the page URL.
