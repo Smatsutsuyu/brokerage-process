@@ -217,6 +217,25 @@ Thanks,
 {{senderName}}`,
 };
 
+// Phase 1 - Questions for Owner. Asks the owner for input before the OM
+// is drafted. Body is Chris's wording from feedback 5c901a47
+// (2026-10-05), with [Property] mapped to {{dealName}}. The "[Owner],"
+// salutation became a plain "Hello," (Sean, 2026-10-06): a one-email
+// send to the whole Owner Team has no single name to put there. No
+// sign-off, also by decision; Chris can ask for one.
+export const QUESTIONS_FOR_OWNER_TEMPLATE: EmailTemplate = {
+  subject: "OM Preparation",
+  body: `Hello,
+
+We're kicking off the OM for {{dealName}}, I want the materials to tell your story the right way. When you have a moment, could you send me your thoughts on these? If you don't have any specific input, just let us know and we will get it done.
+
+1. Investment Highlights: What are the three to five things you most want buyers to know?
+2. Visuals and Maps: Are there features, nearby demand drivers or developments you want shown?
+3. Things to Downplay: Is there anything sensitive we should handle carefully, such as reason for sale, specific tenants, or past offers?
+
+We'll send a draft for your approval before launch. Happy to cover this on a quick call if that's easier.`,
+};
+
 // Phase 4 - Share Due Diligence Material / Set Meeting.
 export const SHARE_DD_MATERIAL_TEMPLATE: EmailTemplate = {
   subject: "Due Diligence package, {{dealName}}",

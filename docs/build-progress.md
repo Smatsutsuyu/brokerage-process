@@ -218,6 +218,15 @@ Step 2 of the plan in [backlog.md](backlog.md). The Phase 1 "Determine PSA Attor
 - **The backfill ships WITH the read change, not after it.** A production dry-run through the real transform found two deals whose attorney existed only in the legacy columns; without the backfill in the same deploy they would have silently read "no attorney on the roster yet". That resequenced the plan.
 - **Fixed while here**: `updateConsultant` and `deleteConsultant` scoped by consultant id and org but not deal, unlike every sibling query. Harmless while the only caller passed an id read off the same deal; this change adds a second caller.
 
+## Questions for Owner row + owner-only Deal Team send (2026-10-06)
+
+Closes feedback item `5c901a47` (filed by the marketing coordinator for Chris). New Phase 1 Underwriting & OM row, "Questions for Owner", directly above Offering Memorandum (OM), with an "Email owner" button.
+
+- **Template**: `QUESTIONS_FOR_OWNER_TEMPLATE`, subject "OM Preparation", body Chris's wording with [Property] mapped to `{{dealName}}`. Greeting is a plain "Hello," and there is no sign-off, by Sean's decision: the "[Owner]," salutation had no per-recipient source in a one-email send, and Chris can ask for a sign-off later.
+- **Recipients**: To the Owner Team, CC the Broker Team (pre-checked) and the marketing coordinator. Rendered with `UnifiedDealTeamSendButton`, not `DealTeamSendButton`: the per-sub-team button would have sent the brokers their own copy of an email written to ownership, rather than CC'ing them.
+- **New `toTeams` option on the unified send** (button prop, server action, and `buildUnifiedComposerData`), defaulting to Owner + Buyer so the existing three rows are unchanged. Narrowing it also turns off the broker fallback, so a deal with no addressable owner rejects at click time with the inline bubble instead of emailing the brokerage. Consultants are left out of the CC pool on this row.
+- **Verification**: `npm run verify:unified-composer` gains scenario 5 (owner-only To, buyer excluded, brokerage + coordinator default-CC'd, empty-owner rejection). Composer checked in the local app.
+
 ## Investment Committee Book Complete milestone (2026-09-24)
 
 Closes feedback item `4ed8f3c3`. Chris asked for a new Phase 4 date row directly above Investment Committee Approval, working like the other milestones.

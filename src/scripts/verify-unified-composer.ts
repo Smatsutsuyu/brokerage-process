@@ -5,7 +5,7 @@
 // It inserts a realistic fixture set on a local deal, runs the SAME
 // three queries the server action runs, feeds them the SAME pure
 // transform the action uses (buildUnifiedComposerData), asserts across
-// four scenarios, then removes the fixtures.
+// five scenarios, then removes the fixtures.
 //
 // Run: npm run verify:unified-composer
 //
@@ -241,6 +241,43 @@ async function main() {
     ["no disabled consultant reaches defaultCcIds", bad.defaultCcIds.every((id) => !junk.some((j) => j.id === id))],
   ];
   for (const [name, ok] of badChecks) {
+    if (!ok) failed++;
+    console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}`);
+  }
+
+  // ---- scenario 5: owner-only To (Questions for Owner) ---------------
+  // toTeams narrows the To line; brokerFallback off means a roster with
+  // no addressable owner rejects rather than emailing the brokerage a
+  // body written to ownership.
+  const mixed: TeamRow[] = [
+    freeRow("o1", "owner", "Principal", "Olive Owner", "olive@owner.example"),
+    freeRow("y1", "buyer", "Buyer Principal", "Byron Buyer", "byron@buyer.example"),
+    ...brokerOnly,
+  ];
+  const ownerOnly = buildUnifiedComposerData({
+    teamRows: mixed,
+    consultantRows: [],
+    orgRows: [],
+    toTeams: ["owner"],
+    brokerFallback: false,
+  });
+  const noOwner = buildUnifiedComposerData({
+    teamRows: [freeRow("o2", "owner", "Principal", "No Addr Owner", null), ...brokerOnly],
+    consultantRows: [],
+    orgRows: [],
+    toTeams: ["owner"],
+    brokerFallback: false,
+  });
+  console.log("\n=== SCENARIO 5: owner-only To, no broker fallback ===");
+  const ownerChecks: Array<[string, boolean]> = [
+    ["To is the owner alone", ownerOnly.to.length === 1 && ownerOnly.to[0].capLabel === "Owner"],
+    ["buyer is neither To nor CC", ![...ownerOnly.to.map((r) => r.contactEmail), ...ownerOnly.ccOptions.map((o) => o.email)].includes("byron@buyer.example")],
+    ["brokerage is default-CC'd", ownerOnly.defaultCcIds.filter((id) => id.startsWith("broker:")).length === 2],
+    ["marketing coordinator is default-CC'd", ownerOnly.ccOptions.some((o) => ownerOnly.defaultCcIds.includes(o.id) && o.email === "lnguyen@landadvisors.com")],
+    ["no addressable owner leaves To empty (button rejects)", noOwner.to.length === 0 && noOwner.brokerIsRecipient === false],
+    ["addressless owner is counted", noOwner.toWithoutEmail === 1],
+  ];
+  for (const [name, ok] of ownerChecks) {
     if (!ok) failed++;
     console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}`);
   }

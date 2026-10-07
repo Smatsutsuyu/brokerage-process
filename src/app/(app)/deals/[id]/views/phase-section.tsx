@@ -46,6 +46,7 @@ import {
   OFFERS_DUE_NOTICE_TEMPLATE,
   OFFERS_FOLLOWUP_TEMPLATE,
   QA_FILE_TEMPLATE,
+  QUESTIONS_FOR_OWNER_TEMPLATE,
   DD_CALL_SCHEDULING_TEMPLATE,
   SCHEDULE_SOO_REVIEW_TEMPLATE,
   SHARE_MARKETING_DD_TEMPLATE,
@@ -179,6 +180,11 @@ function isFollowUpMissingOffersItem(name: string): boolean {
 function isSendMarketingReportItem(name: string): boolean {
   const n = name.trim().toLowerCase();
   return n === "send marketing report";
+}
+// Phase 1 "Questions for Owner" row -> UnifiedDealTeamSendButton asking
+// the Owner Team for OM input.
+function isQuestionsForOwnerItem(name: string): boolean {
+  return name.toLowerCase().includes("questions for owner");
 }
 // Phase 3 Schedule Summary of Offer Review row -> DealTeamSendButton
 // to Owner + Broker teams.
@@ -628,6 +634,24 @@ export function PhaseSection({
                                 co-brokers + Loan + anyone else needed. */}
                             {isSendMarketingReportItem(item.name) && (
                               <SendMarketingReportButton dealId={dealId} />
+                            )}
+                            {/* Phase 1 Questions for Owner -> one email
+                                to the Owner Team for OM input before the
+                                OM is drafted. CC: Broker Team + marketing
+                                coordinator (the unified send's defaults).
+                                No consultants: nothing for them here. */}
+                            {isQuestionsForOwnerItem(item.name) && (
+                              <UnifiedDealTeamSendButton
+                                dealId={dealId}
+                                label="Email owner"
+                                title="Email the Owner Team (CC Broker Team and marketing coordinator) asking for their input on the OM."
+                                icon={Send}
+                                modalTitle="Questions for Owner"
+                                template={QUESTIONS_FOR_OWNER_TEMPLATE}
+                                toTeams={["owner"]}
+                                includeConsultants={false}
+                                attachments={[]}
+                              />
                             )}
                             {/* Phase 3 Schedule SOO Review -> Deal Team
                                 send (Owner + Broker per Excel). */}

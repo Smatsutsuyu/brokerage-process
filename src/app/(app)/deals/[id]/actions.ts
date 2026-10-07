@@ -31,6 +31,7 @@ import { parseEmailAddress } from "@/lib/email-address";
 import { sendResolvedEmails, type BlastSendResult } from "@/lib/email/blast";
 import {
   buildUnifiedComposerData,
+  type DealTeamKey,
   type UnifiedDealTeamComposerData,
 } from "@/lib/email/unified-deal-team";
 import {
@@ -4807,6 +4808,7 @@ export async function getDealTeamRecipients(input: {
 // only export async functions and so cannot expose a pure helper for a
 // verification script to exercise.
 export type {
+  DealTeamKey,
   UnifiedCapLabel,
   UnifiedCcGroup,
   UnifiedCcOption,
@@ -4821,6 +4823,10 @@ export async function getUnifiedDealTeamComposerData(input: {
   // consultants (e.g. a send where copying the other side would be
   // wrong).
   includeConsultants?: boolean;
+  // Narrow the To line (default Owner + Buyer) and opt out of the broker
+  // fallback. See buildUnifiedComposerData.
+  toTeams?: DealTeamKey[];
+  brokerFallback?: boolean;
 }): Promise<UnifiedDealTeamComposerData> {
   const org = await getCurrentOrg();
   if (!org) throw new Error("No organization context");
@@ -4886,7 +4892,13 @@ export async function getUnifiedDealTeamComposerData(input: {
       .orderBy(asc(authUser.name)),
   ]);
 
-  return buildUnifiedComposerData({ teamRows, consultantRows, orgRows });
+  return buildUnifiedComposerData({
+    teamRows,
+    consultantRows,
+    orgRows,
+    toTeams: input.toTeams,
+    brokerFallback: input.brokerFallback,
+  });
 }
 
 // ---------------------------------------------------------------------

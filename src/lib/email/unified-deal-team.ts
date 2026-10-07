@@ -105,7 +105,10 @@ export type ConsultantRow = {
 
 export type OrgRow = { id: string; name: string | null; email: string };
 
-const UNIFIED_TO_TEAMS: DealTeamKey[] = ["owner", "buyer"];
+// Default To line. A call site can narrow it (Questions for Owner sends
+// to ownership alone), but the brokerage is never a To team: it is the
+// CC, or the fallback below.
+export const UNIFIED_TO_TEAMS: DealTeamKey[] = ["owner", "buyer"];
 
 const UNIFIED_TEAM_CAP: Record<DealTeamKey, UnifiedCapLabel> = {
   owner: "Owner",
@@ -143,8 +146,18 @@ export function buildUnifiedComposerData(input: {
   teamRows: TeamRow[];
   consultantRows: ConsultantRow[];
   orgRows: OrgRow[];
+  toTeams?: DealTeamKey[];
+  // When the To teams have nobody addressable, hand the To line to the
+  // brokerage (default) rather than leave the row unsendable. Turn off
+  // for a send whose body only makes sense to the To teams; the button
+  // then rejects at click time instead.
+  brokerFallback?: boolean;
 }): UnifiedDealTeamComposerData {
   const { teamRows, consultantRows, orgRows } = input;
+  const toTeams: DealTeamKey[] = (input.toTeams ?? UNIFIED_TO_TEAMS).filter(
+    (t) => t !== "broker",
+  );
+  const brokerFallback = input.brokerFallback ?? true;
 
   // Resolve identity once, then bucket. Ownership + buyer normally carry
   // the send with the brokerage on CC.
@@ -154,7 +167,7 @@ export function buildUnifiedComposerData(input: {
   for (const row of teamRows) {
     const { name, email } = resolveTeamIdentity(row);
     const entry: Resolved = { row, name, email: email?.trim() ? email.trim() : null };
-    if (UNIFIED_TO_TEAMS.includes(row.team)) ownerBuyer.push(entry);
+    if (toTeams.includes(row.team)) ownerBuyer.push(entry);
     else if (row.team === "broker") brokers.push(entry);
   }
 
@@ -165,7 +178,7 @@ export function buildUnifiedComposerData(input: {
   // deal whose roster is still broker-only is a real state — the dev
   // seed is exactly that. Without this, swapping a row to the unified
   // button would silently remove its ability to send.
-  const brokerIsRecipient = !ownerBuyer.some((e) => e.email);
+  const brokerIsRecipient = brokerFallback && !ownerBuyer.some((e) => e.email);
   const primary = brokerIsRecipient ? brokers : ownerBuyer;
 
   // --- To line ---------------------------------------------------------

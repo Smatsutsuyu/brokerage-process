@@ -30,6 +30,7 @@ import {
   getOmBlastTemplateContext,
   getUnifiedDealTeamComposerData,
   sendBlastEmails,
+  type DealTeamKey,
 } from "../actions";
 import { runPreflight, type RequirableVar } from "./deal-team-preflight";
 
@@ -55,6 +56,11 @@ type UnifiedDealTeamSendButtonProps = {
   // off for a send where copying the other side of the table would be
   // wrong.
   includeConsultants?: boolean;
+  // Sub-teams on the To line. Defaults to Owner + Buyer. Narrowing it
+  // also turns off the broker fallback: a send addressed to one team
+  // (Questions for Owner) means nothing to the brokerage, so with nobody
+  // addressable on that team the button rejects instead.
+  toTeams?: DealTeamKey[];
   // When set, the flow becomes two-step: review the freshly-rendered PDF
   // first, then continue to the composer with it already attached. Same
   // shape as the Marketing Report / Consultant Roster / Deal Status
@@ -71,7 +77,7 @@ type UnifiedDealTeamSendButtonProps = {
 // "Send to Deal Team", unified variant: ONE email with a proper To/CC
 // split instead of one email per sub-team.
 //
-//   To:  Owner Team + Buyer Team
+//   To:  Owner Team + Buyer Team (narrowable via toTeams)
 //   CC:  Broker Team (pre-checked) + marketing coordinator, and
 //        optionally the deal's consultants, grouped by side
 //
@@ -100,6 +106,7 @@ export function UnifiedDealTeamSendButton({
   requireVars,
   sourceItemId,
   includeConsultants = true,
+  toTeams,
   previewPdf,
   compact = true,
 }: UnifiedDealTeamSendButtonProps) {
@@ -148,7 +155,12 @@ export function UnifiedDealTeamSendButton({
       try {
         const [ctx, data] = await Promise.all([
           getOmBlastTemplateContext({ dealId }),
-          getUnifiedDealTeamComposerData({ dealId, includeConsultants }),
+          getUnifiedDealTeamComposerData({
+            dealId,
+            includeConsultants,
+            toTeams,
+            brokerFallback: toTeams === undefined,
+          }),
         ]);
 
         // Nobody addressable: reject at click time with the inline
@@ -156,8 +168,13 @@ export function UnifiedDealTeamSendButton({
         // whose empty-state copy talks about filters this modal doesn't
         // have. Same affordance the requireVars gate uses.
         if (data.to.length === 0) {
+          const ownerOnly = toTeams?.length === 1 && toTeams[0] === "owner";
           showInlineError(
-            data.toWithoutEmail > 0
+            ownerOnly
+              ? data.toWithoutEmail > 0
+                ? "Nobody on the Owner Team has an email address. Add one on the Deal Team tab, then send."
+                : "No Owner Team members to send to. Add them on the Deal Team tab, then send."
+              : data.toWithoutEmail > 0
               ? "Nobody on this deal team has an email address. Add one on the Deal Team tab, then send."
               : "No deal team members to send to. Add them on the Deal Team tab, then send.",
           );
@@ -224,10 +241,14 @@ export function UnifiedDealTeamSendButton({
                 n === 1 ? "them" : "them"
               }.`
             : "";
+        const toPhrase =
+          toTeams?.length === 1 && toTeams[0] === "owner"
+            ? "Ownership is on the To line"
+            : "Ownership and the buyer are on the To line";
         setDescription(
           (data.brokerIsRecipient
             ? "One email to the Deal Team. Nobody on ownership or the buyer side has an email address yet, so this goes to the brokerage."
-            : "One email to the Deal Team. Ownership and the buyer are on the To line; the brokerage is CC'd.") +
+            : `One email to the Deal Team. ${toPhrase}; the brokerage is CC'd.`) +
             " Each name is tagged with the team or consultant side it comes from." +
             skipped,
         );

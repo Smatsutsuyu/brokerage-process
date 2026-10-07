@@ -4,6 +4,24 @@ Running record of work, decisions, deferrals, and blockers. Newest day at top. S
 
 ---
 
+## 2026-10-06: Questions for Owner
+
+New feedback (`5c901a47`, from the marketing coordinator on Chris's behalf): a "Questions for Owner" checkbox in Phase 1 Underwriting & OM, above the OM, that tees up an email asking the owner for OM input. Marked the Investment Committee item actioned in the same pass after confirming the backfill landed on all 8 prod deals.
+
+### Decisions (Sean, after checking with the client side)
+
+- **Label in title case**, "Questions for Owner", despite the request being written in caps.
+- **To the Owner Team, CC the Broker Team and the marketing coordinator.**
+- **Greeting is "Hello,".** The request opened with "[Owner],", but the send is one email to the whole Owner Team, so there is no single name to put there.
+- **Subject "OM Preparation".**
+- **No sign-off.** Every other template ends "Thanks, {{senderName}}"; Chris's text did not, and he can ask for one.
+
+### Worth knowing
+
+The first cut used `DealTeamSendButton` with Owner + Broker, copying Schedule SOO Review. Opening the composer showed "Email 1 of 2": that button sends one email per sub-team, so the brokers would have received their own copy of a message asking them for "your story". Switched to the unified send, which already does a real To/CC split, and added a `toTeams` option so it can address ownership alone. Default unchanged for the three existing rows. With the narrowed To line the broker fallback is off, so a deal with no owner email rejects rather than emailing the brokerage.
+
+---
+
 ## 2026-09-24: Investment Committee Book Complete milestone
 
 Triaged open feedback: one item, from Chris (`4ed8f3c3`), asking for "Investment Committee Book Complete" above "Investment Committee Approval" in the Phase 4 dates, functioning like the rest. Used his wording verbatim.

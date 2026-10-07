@@ -209,6 +209,11 @@ export const CHECKLIST_TEMPLATE: TemplateSpec[] = [
               },
             ],
           },
+          // "Questions for Owner" is wired in phase-section.tsx via
+          // isQuestionsForOwnerItem -> UnifiedDealTeamSendButton. Emails the
+          // owner for OM input before the OM is drafted. Requested by
+          // Chris via feedback 5c901a47 (2026-10-05).
+          "Questions for Owner",
           // Offering Memorandum: prose generation is explicitly out of scope
           // (deferred AI engagement). Upload is the universal action so no
           // item-specific affordance here.
